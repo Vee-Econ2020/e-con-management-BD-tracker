@@ -1,0 +1,76 @@
+Fetching data for 23 records via API...
+  → Authenticating with Zoho API...
+  → Requesting fresh access token from Zoho OAuth...
+  ✓ Access token obtained successfully
+  ✓ Authentication successful
+
+
+  [1/23] Processing Record ID: 38660000575754619
+    ✓ Found newest forecast change on 2026-03-05
+
+  [2/23] Processing Record ID: 38660000575895529
+    ✓ Found newest forecast change on 2026-03-09
+
+  [3/23] Processing Record ID: 38660000582896102
+    ℹ No forecast changes found - caching as null
+
+  [4/23] Processing Record ID: 38660000583234043
+    ℹ No forecast changes found - caching as null
+
+  [5/23] Processing Record ID: 38660000583234123
+    ℹ No forecast changes found - caching as null
+
+  [6/23] Processing Record ID: 38660000583234209
+    ℹ No forecast changes found - caching as null
+
+  [7/23] Processing Record ID: 38660000583492630
+    ℹ No forecast changes found - caching as null
+
+  [8/23] Processing Record ID: 38660000583492724
+    ℹ No forecast changes found - caching as null
+
+  [9/23] Processing Record ID: 38660000583492810
+    ℹ No forecast changes found - caching as null
+
+  [10/23] Processing Record ID: 38660000583800016
+    ✓ Found newest forecast change on 2026-03-09
+
+  [11/23] Processing Record ID: 38660000583864717
+    ℹ No forecast changes found - caching as null
+
+  [12/23] Processing Record ID: 38660000583864819
+    ℹ No forecast changes found - caching as null
+
+  [13/23] Processing Record ID: 38660000583864942
+    ℹ No forecast changes found - caching as null
+
+  [14/23] Processing Record ID: 38660000583925043
+    ℹ No forecast changes found - caching as null
+
+  [15/23] Processing Record ID: 38660000583925142
+    ℹ No forecast changes found - caching as null
+
+  [16/23] Processing Record ID: 38660000583925253
+    ℹ No forecast changes found - caching as null
+
+  [17/23] Processing Record ID: 38660000583925349
+    ℹ No forecast changes found - caching as null
+
+  [18/23] Processing Record ID: 38660000583925447
+    ℹ No forecast changes found - caching as null
+
+  [19/23] Processing Record ID: 38660000583925530
+    ℹ No forecast changes found - caching as null
+
+  [20/23] Processing Record ID: 38660000583925651
+    ℹ No forecast changes found - caching as null
+
+  [21/23] Processing Record ID: 38660000583925743
+    ℹ No forecast changes found - caching as null
+
+  [22/23] Processing Record ID: 38660000583999245
+    ℹ No forecast changes found - caching as null
+
+  [23/23] Processing Record ID: 38660000584333085
+    ℹ No forecast changes found - caching as null
+  → Updating MongoDB cache with 23 new records...

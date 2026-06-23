@@ -1,0 +1,258 @@
+:root {
+  /* Colors */
+  --color-text-main: #333333;
+  --color-text-secondary: #888888;
+  --color-button-bg: #333333;
+  --color-white: #ffffff;
+
+  /* Font */
+  --font-family: 'Helvetica', 'Arial', sans-serif;
+
+  /* Spacing */
+  --spacing-container: 4rem;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--color-white);
+  color: var(--color-text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  width: 100%;
+  max-width: 1600px;
+  /* Increased width to accommodate larger elements */
+  margin: 0 auto;
+  padding: 5rem 4rem;
+  /* Increased padding */
+}
+
+/* Header Section */
+.header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6rem;
+}
+
+.title-section h1 {
+  font-size: 5.5rem;
+  /* Massive size increase */
+  line-height: 1.05;
+  font-weight: 800;
+  /* Ultra Bold */
+  color: #4a4a55;
+  letter-spacing: -0.02em;
+}
+
+.date-section {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.date-label {
+  font-size: 2rem;
+  /* Increased from 1.5rem */
+  font-weight: 700;
+  color: #9ca3af;
+  margin-bottom: 0.5rem;
+}
+
+.week-display {
+  font-size: 3.5rem;
+  /* Increased from 2.5rem */
+  font-weight: 700;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.week-label {
+  color: #9ca3af;
+}
+
+.week-value {
+  color: #9ca3af;
+}
+
+/* Buttons Section */
+.buttons-container {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.nav-button {
+  background-color: #EEEEEE;
+  /* Light Grey Default */
+  color: #333333;
+  border: none;
+  padding: 2.5rem 3rem;
+  /* Even larger padding */
+  min-width: 380px;
+  /* Wider */
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  /* For pseudo-element */
+  isolation: isolate;
+  /* Create new stacking context */
+
+  /* The "cut" corner shape using clip-path */
+  clip-path: polygon(0 0,
+      calc(100% - 40px) 0,
+      100% 40px,
+      100% 100%,
+      0 100%);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  /* Ensure fill stays within bounds (though clip-path handles most) */
+}
+
+/* Fill Animation */
+.nav-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 100%;
+  background-color: var(--hover-bg-color, rgba(0, 0, 0, 0.08));
+  transition: width 0.3s ease-out;
+  z-index: 0; /* Changed from -1 so it sits over the background but under text */
+}
+
+.nav-button:hover::before {
+  width: 100%;
+}
+
+.nav-button:hover {
+  opacity: 1;
+}
+
+.nav-button:hover .btn-title,
+.nav-button:hover .btn-subtitle {
+  color: #ffffff; /* Make text white on hover for contrast against the vibrant fill */
+  transition: color 0.1s ease-in;
+}
+
+.btn-title {
+  font-size: 2.5rem;
+  /* Much Bigger */
+  font-weight: 800;
+  display: block;
+  margin-bottom: 0.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.btn-subtitle {
+  font-size: 1.5rem;
+  /* Bigger */
+  font-weight: 500;
+  opacity: 0.8;
+  position: relative;
+  z-index: 1;
+}
+
+/* Helper for the Date line which might be small "Date" label above the date value?
+   User said: "Date" label (small, grey) above the current date, and "Week : [n]"
+   Actually user said: "in the date section you will show the todays date and which week it belongs to"
+   Image shows: "Date" (grey text) then below it "Week : 1" (grey text).
+   Wait, the image has "Date" on top, then "Week : 1".
+   It seems the user might want the ACTUAL date shown too.
+   "show the todays date and which week it belongs to".
+   So:
+   Date: Jan 05, 2026
+   Week: 1
+   
+   Let's check the image again.
+   Top right text:
+   "Date" (Bold but grey)
+   "Week : 1" (Bold grey)
+   
+   It doesn't ACTUALLY show the date value in the image sample text "Date", it just says the word "Date".
+   But the user REQUESTED: "show the todays date".
+   So I will format it as:
+   Jan 05, 2026
+   Week : 1
+   
+   Or maybe:
+   Date
+   Jan 05, 2026
+   Week : 1
+   
+   I'll go with:
+   Date (Label)
+   [Actual Date]
+   Week : 1
+   
+   Actually, looking at the crop 3 (top right):
+   It says "Date" in a smaller grey font.
+   Then "Week : 1" in a larger grey font.
+   
+   I will put the Actual Date next to "Date" or below it.
+   Let's try:
+   Date : Jan 05, 2026
+   Week : 1
+*/
+
+.current-date {
+  font-size: 2rem;
+  /* Increased size */
+  font-weight: 700;
+  color: #9ca3af;
+  margin-bottom: 0.5rem;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .header-container {
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .date-section {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .buttons-container {
+    flex-direction: column;
+  }
+
+  .nav-button {
+    width: 100%;
+  }
+}
+
+@keyframes green-glow-fade {
+  0% {
+    background-color: rgba(74, 222, 128, 0.4);
+    /* Green 400 with opacity */
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
+.new-row-highlight {
+  animation: green-glow-fade 10s ease-out forwards;
+}

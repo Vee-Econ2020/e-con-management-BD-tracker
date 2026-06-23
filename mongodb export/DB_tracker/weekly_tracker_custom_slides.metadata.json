@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"98c66c69067c42c8b781c308b424fde3","collectionName":"weekly_tracker_custom_slides","type":"collection"}
