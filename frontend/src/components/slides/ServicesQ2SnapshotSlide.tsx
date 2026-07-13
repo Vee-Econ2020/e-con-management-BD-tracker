@@ -3,7 +3,6 @@ import Plot from 'react-plotly.js';
 
 interface ServicesQ1SnapshotSlideProps {
     region: string;
-    quarter?: string;
 }
 
 const formatCurrency = (value: number) => {
@@ -13,7 +12,7 @@ const formatCurrency = (value: number) => {
     return `$${(value / 1e6).toFixed(1)}M`;
 };
 
-export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: ServicesQ1SnapshotSlideProps) {
+export default function ServicesQ1SnapshotSlide({ region }: ServicesQ1SnapshotSlideProps) {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -25,7 +24,7 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
                 setLoading(true);
                 // Add cache-busting to prevent stale data
                 const cacheBuster = new Date().getTime();
-                const response = await fetch(`/api/admin/slides/services-q1-snapshot?region=${encodeURIComponent(region)}&quarter=${encodeURIComponent(quarter)}&_cb=${cacheBuster}`, {
+                const response = await fetch(`/api/admin/slides/services-q1-snapshot?region=${encodeURIComponent(region)}&_cb=${cacheBuster}`, {
                     cache: 'no-store',
                     headers: {
                         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -41,7 +40,7 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
                 }
             } catch (err) {
                 if (!cancelled) {
-                    console.error(`Failed to fetch Services ${quarter} snapshot for ${region}:`, err);
+                    console.error(`Failed to fetch Services Q1 snapshot for ${region}:`, err);
                     setError(err instanceof Error ? err.message : 'Failed to load data');
                 }
             } finally {
@@ -53,9 +52,7 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
         return () => {
             cancelled = true;
         };
-    }, [region, quarter]);
-
-    const wrapCalWeek = (w: number) => ((w - 1) % 52) + 1;
+    }, [region]);
 
     const auditedPlotData = useMemo(() => {
         if (!data?.series) return [];
@@ -78,8 +75,8 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
                 name: series.fiscal_year,
                 line: { color: series.color, width: 4 },
                 marker: { size: 10, color: series.color },
-                customdata: auditedPoints.map((point: any) => [wrapCalWeek(point.week), point.snapshotDate]),
-                hovertemplate: `<b>${series.fiscal_year} Audited</b><br>Week %{customdata[0]}<br>Date: %{customdata[1]}<br>Total: $%{y:,.0f}<extra></extra>`,
+                customdata: auditedPoints.map((point: any) => point.snapshotDate),
+                hovertemplate: `<b>${series.fiscal_year} Audited</b><br>Week %{x}<br>Date: %{customdata}<br>Total: $%{y:,.0f}<extra></extra>`,
             }];
         });
     }, [data]);
@@ -105,8 +102,8 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
                 name: series.fiscal_year,
                 line: { color: series.color, width: 3, dash: 'dot' },
                 marker: { size: 9, color: series.color, symbol: 'circle-open' },
-                customdata: pipelinePoints.map((point: any) => [wrapCalWeek(point.week), point.snapshotDate]),
-                hovertemplate: `<b>${series.fiscal_year} Pipeline</b><br>Week %{customdata[0]}<br>Date: %{customdata[1]}<br>Pipeline: $%{y:,.0f}<extra></extra>`,
+                customdata: pipelinePoints.map((point: any) => point.snapshotDate),
+                hovertemplate: `<b>${series.fiscal_year} Pipeline</b><br>Week %{x}<br>Date: %{customdata}<br>Pipeline: $%{y:,.0f}<extra></extra>`,
             }];
         });
     }, [data]);
@@ -114,22 +111,16 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
     const auditedAnnotations = useMemo(() => {
         if (!data?.series) return [];
         const allAnnotations: any[] = [];
-
+        
         data.series.forEach((series: any, seriesIdx: number) => {
             // First series (earlier FY) gets leader lines pointing down, later ones point up
             const arrowDirection = seriesIdx === 0 ? 35 : -35;
-
-            // Only annotate points where the value changes (skip forward-filled duplicates)
-            // and always annotate the last point in the series.
-            const weeks: number[] = series.weeks || [];
-            const amounts: number[] = series.amounts || [];
-            let prev = -1;
-            weeks.forEach((week: number, idx: number) => {
-                const amount = Number(amounts[idx] || 0);
+            
+            series.weeks.forEach((week: number, idx: number) => {
+                const amount = Number(series.amounts?.[idx] || 0);
                 const label = series.labels?.[idx] || formatCurrency(amount);
-                const isLast = idx === weeks.length - 1;
-                const changed = amount !== prev;
-                if (amount > 0 && (changed || isLast)) {
+
+                if (amount > 0) {
                     allAnnotations.push({
                         x: week,
                         y: amount,
@@ -153,30 +144,23 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
                         borderpad: 2,
                     });
                 }
-                prev = amount;
             });
         });
-
+        
         return allAnnotations;
     }, [data]);
 
     const pipelineAnnotations = useMemo(() => {
         if (!data?.series) return [];
         const allAnnotations: any[] = [];
-
+        
         data.series.forEach((series: any, seriesIdx: number) => {
             const arrowDirection = seriesIdx === 0 ? 30 : -30;
-
-            const weeks: number[] = series.weeks || [];
-            const pipelines: number[] = series.pipeline_amounts || [];
-            let prev = -1;
-            weeks.forEach((week: number, idx: number) => {
-                const pipelineAmount = Number(pipelines[idx] || 0);
+            
+            series.weeks.forEach((week: number, idx: number) => {
+                const pipelineAmount = Number(series.pipeline_amounts?.[idx] || 0);
                 const pipelineLabel = series.pipeline_labels?.[idx] || formatCurrency(pipelineAmount);
-                if (pipelineAmount <= 0) { prev = pipelineAmount; return; }
-                const isLast = idx === weeks.length - 1;
-                const changed = pipelineAmount !== prev;
-                if (!(changed || isLast)) { prev = pipelineAmount; return; }
+                if (pipelineAmount <= 0) return;
 
                 allAnnotations.push({
                     x: week,
@@ -200,10 +184,9 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
                     bgcolor: 'rgba(255, 255, 255, 0.8)',
                     borderpad: 2,
                 });
-                prev = pipelineAmount;
             });
         });
-
+        
         return allAnnotations;
     }, [data]);
 
@@ -211,7 +194,7 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
         return (
             <div style={{ backgroundColor: '#ffffff', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
                 <div className="animate-pulse" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#6b7280' }}>
-                    Computing Services {quarter} snapshot...
+                    Computing Services Q1 snapshot...
                 </div>
             </div>
         );
@@ -221,7 +204,7 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
         return (
             <div style={{ backgroundColor: '#fee2e2', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
                 <div style={{ textAlign: 'center', color: '#991b1b' }}>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Failed to load Services {quarter} snapshot</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Failed to load Services Q1 snapshot</div>
                     <div style={{ fontSize: '1rem' }}>{error}</div>
                 </div>
             </div>
@@ -229,29 +212,22 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
     }
 
     const title = region === 'Overall'
-        ? `${quarter} Snapshot of Services PO closed won Last Year to this Year - All Region`
-        : `${quarter} Snapshot of Services PO closed won Last Year to this Year - ${region}`;
+        ? 'Q1 Snapshot of Services PO closed won Last Year to this Year - All Region'
+        : `Q1 Snapshot of Services PO closed won Last Year to this Year - ${region}`;
 
     const auditedYMax = Math.max(1, ...data.series.flatMap((series: any) => series.amounts || [])) * 1.28;
     const pipelineYMax = Math.max(1, ...data.series.flatMap((series: any) => series.pipeline_amounts || [])) * 1.35;
     const allWeeks = data.series.flatMap((series: any) => series.weeks || []);
     const minWeek = Math.min(...allWeeks);
     const maxWeek = Math.max(...allWeeks);
-    const tickVals: number[] = Array.isArray(data.week_range) && data.week_range.length > 0
-        ? data.week_range
-        : Array.from({ length: (Number.isFinite(maxWeek) ? maxWeek : 26) - (Number.isFinite(minWeek) ? minWeek : 14) + 1 },
-            (_v, i) => (Number.isFinite(minWeek) ? minWeek : 14) + i);
-    const tickText: (number | string)[] = Array.isArray(data.week_tick_labels) && data.week_tick_labels.length === tickVals.length
-        ? data.week_tick_labels
-        : tickVals.map((w) => wrapCalWeek(w));
     const commonXAxis = {
         title: { text: 'Calendar Week Number' },
-        tickmode: 'array',
-        tickvals: tickVals,
-        ticktext: tickText,
+        tickmode: 'linear',
+        tick0: Number.isFinite(minWeek) ? minWeek : 14,
+        dtick: 1,
         range: [
             (Number.isFinite(minWeek) ? minWeek : 14) - 0.5,
-            (Number.isFinite(maxWeek) ? maxWeek : 40) + 0.5,
+            (Number.isFinite(maxWeek) ? maxWeek : 26) + 0.5,
         ],
         showgrid: true,
         gridcolor: '#f0f0f0',
@@ -356,7 +332,7 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
                 </div>
             </div>
             <div style={{ fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: 700, fontSize: '1.1rem', textAlign: 'center', color: '#374151' }}>
-                Weekly Snapshot Analysis - {quarter} Only
+                Weekly Snapshot Analysis - Q1 Only
             </div>
         </div>
     );

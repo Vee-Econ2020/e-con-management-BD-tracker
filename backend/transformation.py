@@ -711,11 +711,12 @@ async def transform_weekly_data(df, week, upload_date, db):
     # STEP 10: Compute Order Backlog
     print("\n[STEP 10/10] Computing Order Backlog...")
     # Order backlog is the sum of Amount - unInvoiced for Closed Won deals
-    backlog_df = dataset_filtered[dataset_filtered['n-Stage'] == 'Closed Won'].groupby(['mRegion', 'OPP_Type']).agg({'Amount - unInvoiced': 'sum'}).reset_index()
+    # Group by closing date FY to track which year the backlog originated from
+    backlog_df = dataset_filtered[dataset_filtered['n-Stage'] == 'Closed Won'].groupby(['mRegion', 'OPP_Type', 'closing date Fy']).agg({'Amount - unInvoiced': 'sum'}).reset_index()
     backlog_df['week'] = week
     backlog_df['upload_date'] = upload_date
     backlog_df['type'] = 'weekly'
-    print(f"  ✓ Computed Order Backlog for {len(backlog_df)} regions")
+    print(f"  ✓ Computed Order Backlog for {len(backlog_df)} regions (breakdown by FY origin)")
 
     print("\n" + "=" * 70)
     print("TRANSFORMATION PIPELINE COMPLETE")
@@ -1255,7 +1256,10 @@ def transform_services_q1_snapshot_data(
                 total = float(fy_totals.get(fy, 0.0))
                 pipeline_total = float(fy_pipeline_totals.get(fy, 0.0))
                 weeks_since_start = (snapshot_date - fy_start_dates[fy]).days // 7
-                if 0 <= weeks_since_start <= 13 and (total > 0 or pipeline_total > 0):
+                # Store the full fiscal year (weeks 0-52) so any quarter can be
+                # selected/filtered downstream. Quarter boundaries by fiscal week:
+                # Q1: 0-13, Q2: 14-26, Q3: 27-39, Q4: 40-52.
+                if 0 <= weeks_since_start <= 52 and (total > 0 or pipeline_total > 0):
                     calendar_week_number = int(snapshot_date.isocalendar().week)
                     documents.append({
                         "upload_week": week,

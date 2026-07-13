@@ -1827,31 +1827,95 @@ async def compute_order_backlog_data(
     final_weeks = combined_weeks[-8:] if len(combined_weeks) >= 8 else combined_weeks
     final_backlogs = combined_backlogs[-8:] if len(combined_backlogs) >= 8 else combined_backlogs
 
-    styles = {
-        'Backlog': {'color': '#1f6e8c', 'name': 'Order Backlog'}
+    # NEW: Compute FY breakdown for each week to create stacked bars
+    print(f"  → Computing FY breakdown for stacked bar chart...")
+    
+    # Get all weeks that have real data (not placeholders)
+    real_db_weeks = [w for w in db_weeks if w > 10]
+    
+    # For each week, get the FY breakdown
+    fy_by_week = {}
+    all_fiscal_years = set()
+    
+    for week_num in real_db_weeks:
+        fy_match = {"week": week_num}
+        if region_name != "Overall":
+            fy_match["mRegion"] = region_name
+        if opp_type_filter:
+            fy_match["OPP_Type"] = opp_type_filter
+        
+        fy_pipeline = [
+            {"$match": fy_match},
+            {"$group": {
+                "_id": "$closing date Fy",
+                "backlog_sum": {"$sum": "$Amount - unInvoiced"}
+            }},
+            {"$sort": {"_id": 1}}
+        ]
+        
+        week_fy_data = {}
+        fy_cursor = collection_data.aggregate(fy_pipeline)
+        async for doc in fy_cursor:
+            if doc["_id"]:  # Only include non-null FY
+                fy_name = doc["_id"]
+                all_fiscal_years.add(fy_name)
+                week_fy_data[fy_name] = doc["backlog_sum"]
+        
+        fy_by_week[week_num] = week_fy_data
+    
+    # Sort fiscal years
+    sorted_fiscal_years = sorted(list(all_fiscal_years))
+    print(f"  ✓ Found backlog data for {len(sorted_fiscal_years)} fiscal years across {len(fy_by_week)} weeks")
+    
+    # Build series data for each FY
+    fy_series = {}
+    for fy in sorted_fiscal_years:
+        fy_series[fy] = []
+        for week_num in real_db_weeks:
+            fy_series[fy].append(fy_by_week.get(week_num, {}).get(fy, 0))
+    
+    # For placeholder weeks, create empty FY data
+    num_placeholder_weeks = len(ph_weeks)
+    for fy in sorted_fiscal_years:
+        # Prepend zeros for placeholder weeks
+        fy_series[fy] = [0] * num_placeholder_weeks + fy_series[fy]
+    
+    # Trim to last 8 weeks
+    for fy in sorted_fiscal_years:
+        fy_series[fy] = fy_series[fy][-8:] if len(fy_series[fy]) >= 8 else fy_series[fy]
+
+    # Color palette for FYs - distinct colors
+    fy_colors = {
+        'FY2021': '#E74C3C',  # Red
+        'FY2022': '#3498DB',  # Blue
+        'FY2023': '#F39C12',  # Orange
+        'FY2024': '#9B59B6',  # Purple
+        'FY2025': '#1ABC9C',  # Teal
+        'FY2026': '#E67E22',  # Dark Orange
+        'FY2027': '#2ECC71',  # Green
+        'FY2028': '#F1C40F',  # Yellow
+        'FY2029': '#95A5A6',  # Gray
+        'FY2030': '#16A085',  # Dark Teal
     }
     
-    annotations = []
-    for idx in range(len(final_weeks)):
-        val = final_backlogs[idx]
-        
-        annotations.append({
-            "x": idx, "y": val,
-            "text": f"<b>${val/1e6:.3f}M</b>",
-            "showarrow": True,
-            "arrowhead": 0, "arrowsize": 1, "arrowwidth": 0,
-            "arrowcolor": styles['Backlog']['color'],
-            "font": {"size": 12, "color": '#000000', "family": "Arial"},
-            "ax": 0, "ay": -20,
-            "week_idx": idx,
-            "type": "dynamic"
-        })
-
+    # Default colors for any FY not in our palette
+    default_colors = ['#4A90E2', '#50E3C2', '#F5A623', '#D0021B', '#7ED321', '#BD10E0', '#9013FE']
+    
+    # Mark which weeks have FY data vs placeholder weeks
+    weeks_with_fy_data = []
+    for i, week_label in enumerate(final_weeks):
+        # Check if this week has any FY data (non-zero in any FY series)
+        has_fy = any(fy_series.get(fy, [])[i] > 0 if i < len(fy_series.get(fy, [])) else False for fy in sorted_fiscal_years)
+        weeks_with_fy_data.append(has_fy)
+    
     return {
         "weeks": final_weeks,
-        "backlog_data": final_backlogs,
-        "styles": styles,
-        "annotations": annotations,
+        "backlog_data": final_backlogs,  # Total for reference
+        "fy_series": fy_series,
+        "fiscal_years": sorted_fiscal_years,
+        "fy_colors": fy_colors,
+        "default_colors": default_colors,
+        "weeks_with_fy_data": weeks_with_fy_data,
         "region": region_name,
         "enable_animation": ENABLE_CHART_ANIMATION,
         "is_services": bool(opp_type_filter),
@@ -1948,37 +2012,85 @@ def format_services_snapshot_value(value: float) -> str:
     return f"${value / 1e6:.1f}M"
 
 
-async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: str = "Overall") -> Dict:
-    """Return latest uploaded Services Q1 snapshot chart data for Overall or a region."""
+async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: str = "Overall", quarter: str = "Q2") -> Dict:
+    """Return latest uploaded Services snapshot chart data for Overall or a region,
+    filtered to the selected fiscal quarter (Q1-Q4).
+
+    Windows are cumulative-ish (they include the immediately preceding quarter,
+    except Q1 which is standalone):
+        Q1 -> fiscal weeks 0-13     (Q1 only)
+        Q2 -> fiscal weeks 0-26     (Q1 + Q2)
+        Q3 -> fiscal weeks 14-39    (Q2 + Q3)
+        Q4 -> fiscal weeks 27-52    (Q3 + Q4)
+
+    The x-axis is a *continuous* week counter that keeps going past 52 (so
+    calendar week 1 of the following year is rendered as 53, week 13 as 65,
+    etc.). Tick labels are wrapped back to real calendar weeks on the client.
+    Missing weeks inside the window are forward-filled with the last known
+    audited total so the line never drops back to zero.
+    """
     collection = db["services_q1_snapshots"]
     normalized_region = SERVICES_Q1_REGION_ALIASES.get(region, region)
+
+    QUARTER_FISCAL_BOUNDS = {"Q1": (0, 13), "Q2": (0, 26), "Q3": (14, 39), "Q4": (27, 52)}
+    normalized_quarter = str(quarter).upper().strip()
+    if normalized_quarter not in QUARTER_FISCAL_BOUNDS:
+        normalized_quarter = "Q2"
+    qs_fw, qe_fw = QUARTER_FISCAL_BOUNDS[normalized_quarter]
 
     latest_doc = await collection.find_one(
         {"type": "services_trend", "category": "q1_snapshot"},
         sort=[("created_at", -1)],
     )
     if not latest_doc:
-        return {"error": "No Services Q1 snapshot data found. Upload the timeline and opportunity CSVs first."}
+        return {"error": "No Services snapshot data found. Upload the timeline and opportunity CSVs first."}
 
     query = {
         "type": "services_trend",
         "category": "q1_snapshot",
         "upload_week": latest_doc["upload_week"],
+        "region": normalized_region,
     }
-    query["region"] = normalized_region
 
-    docs = await collection.find(query).sort([("fiscal_year", 1), ("snapshot_date", 1)]).to_list(length=None)
+    all_docs = await collection.find(query).sort([("fiscal_year", 1), ("snapshot_date", 1)]).to_list(length=None)
+    docs = [d for d in all_docs if qs_fw <= int(d.get("fiscal_week_number", -1)) <= qe_fw]
     if not docs:
-        return {"error": f"No Services Q1 snapshot data found for {region}."}
+        return {"error": f"No Services snapshot data for {normalized_quarter} in {region}."}
 
     today = datetime.now()
     current_calendar_week = int(today.isocalendar().week)
     current_fiscal_year = f"FY{today.year + 1 if today.month >= 4 else today.year}"
-    is_current_fy_q1 = today.month in [4, 5, 6]
+    if 4 <= today.month <= 6:
+        current_quarter = "Q1"
+    elif 7 <= today.month <= 9:
+        current_quarter = "Q2"
+    elif 10 <= today.month <= 12:
+        current_quarter = "Q3"
+    else:
+        current_quarter = "Q4"
+    is_live_quarter = normalized_quarter == current_quarter
+
+    def fy_start_cal_week_for(fy_str: str) -> int:
+        cal_year = int(str(fy_str).replace("FY", "")) - 1
+        d = pd.Timestamp(f"{cal_year}-04-01")
+        while d.dayofweek != 2:  # Wednesday
+            d += pd.Timedelta(days=1)
+        return int(d.isocalendar().week)
+
+    def to_continuous(cal_week: int, fy_start_cw: int) -> int:
+        w = int(cal_week)
+        return w if w >= fy_start_cw else w + 52
+
     fiscal_years = sorted({doc["fiscal_year"] for doc in docs})
-    current_fy_weighted_pipeline_by_week = {}
+
+    # Weighted pipeline supplement from the weekly slide, only relevant when
+    # the selected quarter is the one we are currently living in.
+    current_fy_weighted_pipeline_continuous: dict[int, float] = {}
     pipeline_slide_no = SERVICES_Q1_PIPELINE_SLIDES.get(normalized_region)
-    if pipeline_slide_no:
+    if is_live_quarter and pipeline_slide_no:
+        cur_fy_start = fy_start_cal_week_for(current_fiscal_year)
+        q_start_cont = cur_fy_start + qs_fw
+        q_end_cont = cur_fy_start + qe_fw
         pipeline_slide_data = await compute_slide_services_data(db, pipeline_slide_no)
         if isinstance(pipeline_slide_data, dict) and not pipeline_slide_data.get("error"):
             for week_label, weighted_value in zip(
@@ -1989,43 +2101,86 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
                     week_number = int(str(week_label).replace("Week", "").strip())
                 except ValueError:
                     continue
-                if 14 <= week_number <= 27:
-                    current_fy_weighted_pipeline_by_week[week_number] = float(weighted_value or 0)
+                cont = to_continuous(week_number, cur_fy_start)
+                if q_start_cont <= cont <= q_end_cont:
+                    current_fy_weighted_pipeline_continuous[cont] = float(weighted_value or 0)
 
     series = []
     for fy in fiscal_years:
+        fy_start_cw = fy_start_cal_week_for(fy)
         fy_docs = [doc for doc in docs if doc["fiscal_year"] == fy]
-        x_values = []
+
+        # Continuous-week keyed lookup of uploaded snapshots.
+        by_cw: dict[int, dict] = {}
         for doc in fy_docs:
-            if doc.get("calendar_week_number") is not None:
-                x_values.append(int(doc["calendar_week_number"]))
-            elif doc.get("snapshot_date") is not None:
-                x_values.append(int(doc["snapshot_date"].isocalendar().week))
+            cal_week = doc.get("calendar_week_number")
+            if cal_week is None and doc.get("snapshot_date") is not None:
+                cal_week = int(doc["snapshot_date"].isocalendar().week)
+            if cal_week is None:
+                cal_week = int(doc.get("week_number", 0))
+            cw = to_continuous(cal_week, fy_start_cw)
+            by_cw[cw] = {
+                "audited": float(doc.get("total_amount", 0)),
+                "pipeline": float(doc.get("pipeline_amount", 0)),
+                "date": doc.get("snapshot_date").strftime("%b %d, %Y") if doc.get("snapshot_date") else "",
+            }
+
+        # Full continuous-week range for the selected quarter window.
+        range_start = fy_start_cw + qs_fw
+        range_end = fy_start_cw + qe_fw
+
+        # Cap the drawn range so lines don't extend into the future or beyond
+        # available data.
+        if fy == current_fiscal_year:
+            if is_live_quarter:
+                today_cont = to_continuous(current_calendar_week, fy_start_cw)
+                effective_end = min(range_end, today_cont)
             else:
-                x_values.append(int(doc["week_number"]))
-        y_values = [float(doc.get("total_amount", 0)) for doc in fy_docs]
-        pipeline_values = [float(doc.get("pipeline_amount", 0)) for doc in fy_docs]
-        labels = [format_services_snapshot_value(value) for value in y_values]
-        pipeline_labels = [format_services_snapshot_value(value) for value in pipeline_values]
-        snapshot_dates = [doc.get("snapshot_date").strftime("%b %d, %Y") if doc.get("snapshot_date") else "" for doc in fy_docs]
+                effective_end = min(range_end, max(by_cw.keys())) if by_cw else range_end
+        else:
+            if not by_cw:
+                continue
+            effective_end = min(range_end, max(by_cw.keys()))
 
-        if is_current_fy_q1 and fy == current_fiscal_year and x_values and max(x_values) < current_calendar_week:
-            x_values.append(current_calendar_week)
-            y_values.append(y_values[-1])
-            pipeline_values.append(pipeline_values[-1] if pipeline_values else 0)
-            labels.append(format_services_snapshot_value(y_values[-1]))
-            pipeline_labels.append(format_services_snapshot_value(pipeline_values[-1]))
-            snapshot_dates.append(today.strftime("%b %d, %Y"))
+        weeks_iter = range(range_start, effective_end + 1)
 
-        if fy == current_fiscal_year and current_fy_weighted_pipeline_by_week:
-            totals_by_week = dict(zip(x_values, y_values))
-            dates_by_week = dict(zip(x_values, snapshot_dates))
-            x_values = sorted(set(x_values).union(current_fy_weighted_pipeline_by_week.keys()))
-            y_values = [totals_by_week.get(week, 0.0) for week in x_values]
-            pipeline_values = [current_fy_weighted_pipeline_by_week.get(week, 0.0) for week in x_values]
-            labels = [format_services_snapshot_value(value) for value in y_values]
-            pipeline_labels = [format_services_snapshot_value(value) for value in pipeline_values]
-            snapshot_dates = [dates_by_week.get(week, "") for week in x_values]
+        # Forward-fill audited totals across the window; pipeline uses the
+        # uploaded value when present, otherwise the live weekly-slide value.
+        last_audited = 0.0
+        last_date = ""
+        x_values: list[int] = []
+        y_values: list[float] = []
+        pipeline_values: list[float] = []
+        snapshot_dates: list[str] = []
+        for w in weeks_iter:
+            if w in by_cw:
+                last_audited = by_cw[w]["audited"]
+                if by_cw[w]["date"]:
+                    last_date = by_cw[w]["date"]
+                uploaded_pipeline = by_cw[w]["pipeline"]
+            else:
+                uploaded_pipeline = 0.0
+
+            pipeline_val = uploaded_pipeline
+            if pipeline_val <= 0 and fy == current_fiscal_year and w in current_fy_weighted_pipeline_continuous:
+                pipeline_val = current_fy_weighted_pipeline_continuous[w]
+
+            x_values.append(w)
+            y_values.append(last_audited)
+            pipeline_values.append(pipeline_val)
+            snapshot_dates.append(last_date)
+
+        # Trim leading rows before any real data existed for this FY.
+        first_nonzero = next((i for i, v in enumerate(y_values) if v > 0 or pipeline_values[i] > 0), None)
+        if first_nonzero is None:
+            continue
+        x_values = x_values[first_nonzero:]
+        y_values = y_values[first_nonzero:]
+        pipeline_values = pipeline_values[first_nonzero:]
+        snapshot_dates = snapshot_dates[first_nonzero:]
+
+        labels = [format_services_snapshot_value(v) for v in y_values]
+        pipeline_labels = [format_services_snapshot_value(v) for v in pipeline_values]
 
         series.append({
             "fiscal_year": fy,
@@ -2038,18 +2193,24 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
             "color": SERVICES_Q1_COLORS.get(fy, "#95a5a6"),
         })
 
-    all_weeks = [week for item in series for week in item["weeks"]]
-    week_start = min(all_weeks) if all_weeks else 14
-    week_end = max(all_weeks) if all_weeks else 26
+    all_weeks_flat = [week for item in series for week in item["weeks"]]
+    week_start = min(all_weeks_flat) if all_weeks_flat else 14
+    week_end = max(all_weeks_flat) if all_weeks_flat else 26
+    week_ticks = list(range(week_start, week_end + 1))
+    # Tick labels wrap continuous weeks back to real calendar weeks
+    # (e.g. continuous 53 -> "1", 54 -> "2", ...).
+    week_tick_labels = [((w - 1) % 52) + 1 for w in week_ticks]
 
     return {
         "week": latest_doc.get("upload_week"),
         "file_date": latest_doc.get("file_date"),
         "region": region,
         "normalized_region": normalized_region,
-        "week_range": list(range(week_start, week_end + 1)),
+        "quarter": normalized_quarter,
+        "week_range": week_ticks,
+        "week_tick_labels": week_tick_labels,
         "series": series,
-        "title": f"Q1 Snapshot: {region} - Cumulative Clean Amount (FY Q1 by Calendar Week)",
+        "title": f"{normalized_quarter} Snapshot: {region} - Cumulative Clean Amount (by Calendar Week)",
         "enable_animation": ENABLE_CHART_ANIMATION,
     }
 

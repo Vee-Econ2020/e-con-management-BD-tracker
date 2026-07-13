@@ -148,35 +148,35 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     // that fetches /api/admin/slides/services/{slideNo} and renders the same
     // shared chart with `hideTargets` enabled.
     '3_services':  (props: any) => <ServicesChartSlide slideNo={3}  chartKind="cumulative" regionLabel="Overall" {...props} />,
-    '3_services_q1': () => <ServicesQ1SnapshotSlide region="Overall" />,
+    '3_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Overall" quarter={props.quarter} />,
     '4_services':  (props: any) => <ServicesChartSlide slideNo={4}  chartKind="trend"      regionLabel="Overall" {...props} />,
     '5_services':  (props: any) => <ServicesChartSlide slideNo={5}  chartKind="pipeline"   regionLabel="Overall" {...props} />,
     '7_services':  (props: any) => <ServicesChartSlide slideNo={7}  chartKind="cumulative" regionLabel="US West" {...props} />,
-    '7_services_q1': () => <ServicesQ1SnapshotSlide region="US West" />,
+    '7_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="US West" quarter={props.quarter} />,
     '8_services':  (props: any) => <ServicesChartSlide slideNo={8}  chartKind="trend"      regionLabel="US West" {...props} />,
     '9_services':  (props: any) => <ServicesChartSlide slideNo={9}  chartKind="pipeline"   regionLabel="US West" {...props} />,
     '10_services': (props: any) => <ServicesChartSlide slideNo={10} chartKind="cumulative" regionLabel="Europe"  {...props} />,
-    '10_services_q1': () => <ServicesQ1SnapshotSlide region="Europe" />,
+    '10_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Europe" quarter={props.quarter} />,
     '11_services': (props: any) => <ServicesChartSlide slideNo={11} chartKind="trend"      regionLabel="Europe"  {...props} />,
     '12_services': (props: any) => <ServicesChartSlide slideNo={12} chartKind="pipeline"   regionLabel="Europe"  {...props} />,
     '13_services': (props: any) => <ServicesChartSlide slideNo={13} chartKind="cumulative" regionLabel="US East" {...props} />,
-    '13_services_q1': () => <ServicesQ1SnapshotSlide region="US East" />,
+    '13_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="US East" quarter={props.quarter} />,
     '14_services': (props: any) => <ServicesChartSlide slideNo={14} chartKind="trend"      regionLabel="US East" {...props} />,
     '15_services': (props: any) => <ServicesChartSlide slideNo={15} chartKind="pipeline"   regionLabel="US East" {...props} />,
     '16_services': (props: any) => <ServicesChartSlide slideNo={16} chartKind="cumulative" regionLabel="ASEAN"   {...props} />,
-    '16_services_q1': () => <ServicesQ1SnapshotSlide region="Asean" />,
+    '16_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Asean" quarter={props.quarter} />,
     '17_services': (props: any) => <ServicesChartSlide slideNo={17} chartKind="trend"      regionLabel="ASEAN"   {...props} />,
     '18_services': (props: any) => <ServicesChartSlide slideNo={18} chartKind="pipeline"   regionLabel="ASEAN"   {...props} />,
     '19_services': (props: any) => <ServicesChartSlide slideNo={19} chartKind="cumulative" regionLabel="Japan"   {...props} />,
-    '19_services_q1': () => <ServicesQ1SnapshotSlide region="Japan" />,
+    '19_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Japan" quarter={props.quarter} />,
     '20_services': (props: any) => <ServicesChartSlide slideNo={20} chartKind="trend"      regionLabel="Japan"   {...props} />,
     '21_services': (props: any) => <ServicesChartSlide slideNo={21} chartKind="pipeline"   regionLabel="Japan"   {...props} />,
     '22_services': (props: any) => <ServicesChartSlide slideNo={22} chartKind="cumulative" regionLabel="KANZ"    {...props} />,
-    '22_services_q1': () => <ServicesQ1SnapshotSlide region="KANZ" />,
+    '22_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="KANZ" quarter={props.quarter} />,
     '23_services': (props: any) => <ServicesChartSlide slideNo={23} chartKind="trend"      regionLabel="KANZ"    {...props} />,
     '24_services': (props: any) => <ServicesChartSlide slideNo={24} chartKind="pipeline"   regionLabel="KANZ"    {...props} />,
     '25_services': (props: any) => <ServicesChartSlide slideNo={25} chartKind="cumulative" regionLabel="Legacy"  {...props} />,
-    '25_services_q1': () => <ServicesQ1SnapshotSlide region="Legacy" />,
+    '25_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Legacy" quarter={props.quarter} />,
     '26_services': (props: any) => <ServicesChartSlide slideNo={26} chartKind="trend"      regionLabel="Legacy"  {...props} />,
     '27_services': (props: any) => <ServicesChartSlide slideNo={27} chartKind="pipeline"   regionLabel="Legacy"  {...props} />,
 
@@ -258,6 +258,7 @@ interface StandardSlideFrameProps {
     onDeleteImage: (id: string) => void;
     onNextSlide?: () => void;
     onPreviousSlide?: () => void;
+    quarter?: string;
 }
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -277,12 +278,13 @@ function StandardSlideFrame({
     onDeleteImage,
     onNextSlide,
     onPreviousSlide,
+    quarter,
 }: StandardSlideFrameProps) {
     const frameRef = useRef<HTMLDivElement>(null);
 
     return (
         <div ref={frameRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-            <SlideComponent isEditing={isEditing} onNextSlide={onNextSlide} onPreviousSlide={onPreviousSlide} />
+            <SlideComponent isEditing={isEditing} onNextSlide={onNextSlide} onPreviousSlide={onPreviousSlide} quarter={quarter} />
             <GifOverlay
                 containerRef={frameRef}
                 isEditing={isEditing}
@@ -654,6 +656,12 @@ export default function WeeklyTracker() {
     const [exportingImageSlideId, setExportingImageSlideId] = useState<SlideId | null>(null);
     const exportContainerRef = useRef<HTMLDivElement>(null);
 
+    // Selected fiscal quarter (Q1-Q4) per Services snapshot slide preview.
+    const [servicesQuarterBySlide, setServicesQuarterBySlide] = useState<Record<string, string>>({});
+    const getServicesQuarter = (slideId: SlideId) => servicesQuarterBySlide[String(slideId)] ?? 'Q2';
+    const setServicesQuarter = (slideId: SlideId, quarter: string) =>
+        setServicesQuarterBySlide(prev => ({ ...prev, [String(slideId)]: quarter }));
+
     // Base slides configuration
     const BASE_SLIDES = [
         2, 2.5,
@@ -710,7 +718,7 @@ export default function WeeklyTracker() {
         // Services mirrors: defer to the parent slide's title and prefix it.
         if (idStr.endsWith('_services_q1')) {
             const parentId = idStr.slice(0, -'_services_q1'.length);
-            return `Services Q1 Snapshot — ${getSlideTitle(parentId)}`;
+            return `Services ${getServicesQuarter(slideId)} Snapshot — ${getSlideTitle(parentId)}`;
         }
 
         if (idStr.endsWith('_services')) {
@@ -880,6 +888,7 @@ export default function WeeklyTracker() {
                 onUpdateImage={(id, patch) => updateImageOverlay(slideItem.id, id, patch)}
                 onDeleteText={(id) => deleteTextOverlay(slideItem.id, id)}
                 onDeleteImage={(id) => deleteImageOverlay(slideItem.id, id)}
+                quarter={getServicesQuarter(slideItem.id)}
                 {...navigationProps}
             />
         );
@@ -1913,6 +1922,34 @@ export default function WeeklyTracker() {
                                     )}
                                 </div>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                    {/* Quarter selector (Services snapshot slides only) */}
+                                    {String(slideId).endsWith('_services_q1') && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '20px', padding: '0.15rem' }}>
+                                            {(['Q1', 'Q2', 'Q3', 'Q4'] as const).map((q) => {
+                                                const isSelected = getServicesQuarter(slideId) === q;
+                                                return (
+                                                    <button
+                                                        key={q}
+                                                        onClick={() => setServicesQuarter(slideId, q)}
+                                                        style={{
+                                                            backgroundColor: isSelected ? '#5D9CEC' : 'transparent',
+                                                            border: 'none',
+                                                            padding: '0.25rem 0.7rem',
+                                                            borderRadius: '16px',
+                                                            color: isSelected ? 'white' : '#374151',
+                                                            fontWeight: 700,
+                                                            fontSize: '0.8rem',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s',
+                                                        }}
+                                                        title={`Show ${q} data`}
+                                                    >
+                                                        {q}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                     {/* Start Slideshow From Here */}
                                     <button
                                         onClick={() => handleStartSlideshow(slideIndex)}

@@ -1224,13 +1224,62 @@ async def get_slide_services_data(slide_no: int):
 
 
 @router.get("/slides/services-q1-snapshot")
-async def get_services_q1_snapshot_data(region: str = "Overall"):
-    """Get the latest Services Q1 weekly snapshot chart data."""
+async def get_services_q1_snapshot_data(region: str = "Overall", quarter: str = "Q2"):
+    """Get the latest Services weekly snapshot chart data for the selected quarter."""
     try:
-        result = await compute_services_q1_snapshot_data(db, region)
+        # DEBUG: Log what data is being selected
+        collection = db["services_q1_snapshots"]
+        latest_doc = await collection.find_one(
+            {"type": "services_trend", "category": "q1_snapshot"},
+            sort=[("created_at", -1)],
+        )
+        if latest_doc:
+            print(f"[DEBUG] Services Snapshot ({quarter}) - Using upload_week: {latest_doc.get('upload_week')}, created_at: {latest_doc.get('created_at')}")
+
+        result = await compute_services_q1_snapshot_data(db, region, quarter)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to compute Services Q1 snapshot data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to compute Services snapshot data: {str(e)}")
+
+
+@router.get("/debug/services-uploads")
+async def debug_services_uploads():
+    """DEBUG endpoint to check what Services uploads exist in the database."""
+    try:
+        collection = db["services_q1_snapshots"]
+        
+        # Get all unique upload weeks with their created_at times
+        pipeline = [
+            {"$match": {"type": "services_trend", "category": "q1_snapshot"}},
+            {
+                "$group": {
+                    "_id": "$upload_week",
+                    "created_at": {"$max": "$created_at"},
+                    "count": {"$sum": 1},
+                    "fiscal_years": {"$addToSet": "$fiscal_year"},
+                    "regions": {"$addToSet": "$region"}
+                }
+            },
+            {"$sort": {"created_at": -1}}
+        ]
+        
+        results = await collection.aggregate(pipeline).to_list(length=None)
+        
+        return {
+            "total_uploads": len(results),
+            "uploads": [
+                {
+                    "upload_week": doc["_id"],
+                    "created_at": doc["created_at"],
+                    "document_count": doc["count"],
+                    "fiscal_years": doc["fiscal_years"],
+                    "regions": doc["regions"]
+                }
+                for doc in results
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Debug query failed: {str(e)}")
 
 
 @router.get("/slides/order-backlog")
