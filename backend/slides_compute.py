@@ -2162,7 +2162,7 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
                 uploaded_pipeline = 0.0
 
             pipeline_val = uploaded_pipeline
-            if pipeline_val <= 0 and fy == current_fiscal_year and w in current_fy_weighted_pipeline_continuous:
+            if fy == current_fiscal_year and w in current_fy_weighted_pipeline_continuous:
                 pipeline_val = current_fy_weighted_pipeline_continuous[w]
 
             x_values.append(w)

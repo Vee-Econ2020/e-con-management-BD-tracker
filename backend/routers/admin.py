@@ -1898,3 +1898,103 @@ async def update_custom_slide(slide_id: str, payload: dict = Body(...)):
     except Exception as e:
         print(f"Error updating custom slide: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- WHALE ACCOUNTS API ---
+from datetime import datetime
+from pydantic import BaseModel
+
+class WhaleAccountEntry(BaseModel):
+    account_name: str
+    date_updated: str
+    week_updated: int
+    text_data: str
+
+@router.get("/whale-accounts/names")
+async def get_whale_account_names():
+    try:
+        coll = get_collection("whale_accounts")
+        names = await coll.distinct("account_name")
+        return [n for n in names if n]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/whale-accounts/{account_name}")
+async def get_whale_account_entries(account_name: str):
+    try:
+        coll = get_collection("whale_accounts")
+        cursor = coll.find({"account_name": account_name}).sort("date_updated", -1)
+        entries = []
+        async for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            if "variants" not in doc:
+                log_dt = doc.get("updated_at") or doc.get("created_at") or datetime.utcnow()
+                log_str = log_dt.isoformat() + "Z" if isinstance(log_dt, datetime) else str(log_dt)
+                doc["variants"] = [{
+                    "version": "V1",
+                    "text_data": doc.get("text_data", ""),
+                    "log_date": log_str
+                }]
+            entries.append(doc)
+        return entries
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/whale-accounts/{account_name}")
+async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry):
+    try:
+        coll = get_collection("whale_accounts")
+        doc = await coll.find_one({
+            "account_name": account_name,
+            "date_updated": payload.date_updated
+        })
+        
+        now = datetime.utcnow()
+        new_variant = {
+            "text_data": payload.text_data,
+            "log_date": now.isoformat() + "Z"
+        }
+        
+        if doc:
+            variants = doc.get("variants", [])
+            if not variants:
+                log_dt = doc.get("updated_at") or doc.get("created_at") or now
+                log_str = log_dt.isoformat() + "Z" if isinstance(log_dt, datetime) else str(log_dt)
+                variants = [{
+                    "version": "V1",
+                    "text_data": doc.get("text_data", ""),
+                    "log_date": log_str
+                }]
+                
+            if len(variants) >= 3:
+                raise HTTPException(status_code=400, detail="Maximum of 3 variants reached for this date.")
+            
+            new_version = f"V{len(variants) + 1}"
+            new_variant["version"] = new_version
+            
+            await coll.update_one(
+                {"_id": doc["_id"]},
+                {
+                    "$set": {
+                        "week_updated": payload.week_updated,
+                        "updated_at": now
+                    },
+                    "$push": {
+                        "variants": new_variant
+                    }
+                }
+            )
+        else:
+            new_variant["version"] = "V1"
+            await coll.insert_one({
+                "account_name": account_name,
+                "date_updated": payload.date_updated,
+                "week_updated": payload.week_updated,
+                "created_at": now,
+                "updated_at": now,
+                "variants": [new_variant]
+            })
+        
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

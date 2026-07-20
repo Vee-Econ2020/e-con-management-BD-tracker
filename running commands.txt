@@ -1,5 +1,19 @@
+
+BACKEND --------------------------------------------------------
+cd backend
 py -m pip install -r requirements.txt
 py -m uvicorn main:app --reload --port 8000
 
-npm run dev
+ 
+
+ frontend -----------------------------------------------------------
+ cd frontend
+ npm run build
+
+ first time ?? -------------------------------------------------
+ cd frontend
+ npm install
+ npm run build
+ npm run dev
+
  

@@ -70,6 +70,7 @@ import {
 } from '../components/slides/RegionGMSlides';
 import ServicesChartSlide from '../components/slides/ServicesChartSlide';
 import ServicesBacklogSlide from '../components/slides/ServicesBacklogSlide';
+import { WhaleAccountSlide } from '../components/slides/WhaleAccountSlide';
 import ServicesQ1SnapshotSlide from '../components/slides/ServicesQ1SnapshotSlide';
 
 // --- Configuration ---
@@ -82,6 +83,7 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     5: Slide5,
     6: Slide6,
     6.2: Slide6_2,
+    '6.2.1': WhaleAccountSlide,
     6.3: Slide6_3,
     6.4: Slide6_4,
     7: Slide7,
@@ -666,7 +668,7 @@ export default function WeeklyTracker() {
     const BASE_SLIDES = [
         2, 2.5,
         3, '3_services', '3_services_q1', 4, '4_services', 5, '5_services',
-        6, '6.1', 6.2, '6.2_services', 6.3, 6.4,
+        6, '6.1', 6.2, '6.2.1', '6.2_services', 6.3, 6.4,
         13, '13_services', '13_services_q1', 14, '14_services', 15, '15_services',
         15.1, '15.1.1', 15.2, '15.2.1', '15.5',
         '15.2.2', '15.2.2_services', '15.2.3', '15.2.4',
@@ -734,6 +736,7 @@ export default function WeeklyTracker() {
             '5': 'Actual vs Weighted Pipeline',
             '6': 'Performance Progress',
             '6.2': 'Order Backlog',
+            '6.2.1': 'Whale account',
             '6.3': 'Gross Margin',
             '6.4': 'Gross Margin Summary - Region',
             '7': 'Cumulative Performance vs Targets',
