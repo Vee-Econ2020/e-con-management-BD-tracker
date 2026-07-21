@@ -45,6 +45,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
     const editorRef = useRef(null);
     const oldDataEditorRef = useRef(null);
     const enlargedEditorRef = useRef(null);
+    const latestTextRef = useRef('');
     
     const [entries, setEntries] = useState<WhaleAccountEntry[]>([]);
     const [selectedIndex, setSelectedIndex] = useState<number>(-1);
@@ -169,11 +170,13 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                 const variants = sortedData[0].variants || [];
                 const latestText = variants.length > 0 ? variants[variants.length - 1].text_data : (sortedData[0].text_data || '');
                 setEditableText(latestText);
+                latestTextRef.current = latestText;
                 setEditableDate(sortedData[0].date_updated);
             } else {
                 setSelectedIndex(-1);
                 setSelectedVariantIndex(-1);
                 setEditableText('');
+                latestTextRef.current = '';
                 const todayStr = new Date().toISOString().split('T')[0];
                 setEditableDate(todayStr);
             }
@@ -192,6 +195,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
             setSelectedVariantIndex(-1);
             setExpandedDates({});
             setEditableText('');
+            latestTextRef.current = '';
             setEditableDate(new Date().toISOString().split('T')[0]);
         } else {
             setIsCreatingNew(false);
@@ -222,6 +226,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
         const latestText = variants.length > 0 ? variants[variants.length - 1].text_data : (entry.text_data || '');
         
         setEditableText(latestText);
+        latestTextRef.current = latestText;
         setEditableDate(entry.date_updated);
     };
 
@@ -233,7 +238,9 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
         const entry = entries[entryIndex];
         const variants = entry.variants || [];
         
-        setEditableText(variants[variantIndex].text_data);
+        const text = variants[variantIndex].text_data;
+        setEditableText(text);
+        latestTextRef.current = text;
         setEditableDate(entry.date_updated);
     };
 
@@ -246,17 +253,19 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
     };
 
     const handleSave = async () => {
-        if (!selectedAccount || currentWeek === null) return;
+        if (!selectedAccount || !entries[selectedIndex]) return;
+        
+        const textToSave = latestTextRef.current || editableText;
         
         const payload: WhaleAccountEntry = {
             account_name: selectedAccount,
             date_updated: editableDate,
-            week_updated: getWeekNumber(editableDate) || currentWeek,
-            text_data: editableText,
+            week_updated: getWeekNumber(editableDate) || currentWeek || 0,
+            text_data: textToSave,
             region: region
         };
         
-        const existingEntry = entries.find(e => e.date_updated === editableDate);
+        const existingEntry = entries[selectedIndex];
         if (existingEntry && (existingEntry.variants || []).length >= 3) {
             alert("Maximum of 3 edits (V3) reached for this date.");
             return;
@@ -702,13 +711,31 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                 </button>
                             </div>
                             {canEdit ? (
-                                <input 
-                                    type="date"
-                                    style={{ background: 'transparent', border: 'none', borderBottom: '1px solid #22c55e', color: '#22c55e', fontSize: '1.5rem', textAlign: 'right', outline: 'none', fontWeight: 'bold', fontFamily: 'inherit' }}
-                                    value={editableDate}
-                                    onChange={(e) => setEditableDate(e.target.value)}
-                                    onBlur={handleSave}
-                                />
+                                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                    <input 
+                                        type="date"
+                                        style={{ background: 'transparent', border: 'none', borderBottom: '1px solid #22c55e', color: '#22c55e', fontSize: '1.5rem', textAlign: 'right', outline: 'none', fontWeight: 'bold', fontFamily: 'inherit' }}
+                                        value={editableDate}
+                                        onChange={(e) => setEditableDate(e.target.value)}
+                                        onBlur={(e) => setEditableDate(e.target.value)}
+                                    />
+                                    <button 
+                                        onClick={handleSave} 
+                                        style={{ 
+                                            padding: '0.4rem 1.2rem', 
+                                            backgroundColor: '#22c55e', 
+                                            color: 'white', 
+                                            border: 'none', 
+                                            borderRadius: '6px', 
+                                            cursor: 'pointer', 
+                                            fontWeight: 'bold',
+                                            fontSize: '1rem',
+                                            boxShadow: '0 2px 4px rgba(34, 197, 94, 0.2)'
+                                        }}
+                                    >
+                                        Done
+                                    </button>
+                                </div>
                             ) : (
                                 <span>{formatDateDisplay(editableDate)}</span>
                             )}
@@ -718,10 +745,10 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                 ref={editorRef}
                                 value={editableText}
                                 config={joditConfig}
-                                onChange={() => {}}
+                                onChange={(newContent) => { latestTextRef.current = newContent; }}
                                 onBlur={(newContent) => {
                                     setEditableText(newContent);
-                                    handleSave();
+                                    latestTextRef.current = newContent;
                                 }}
                             />
                         </div>
@@ -753,11 +780,11 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                 ref={enlargedEditorRef}
                                 value={enlargedModal === 'previous' ? previousText : editableText}
                                 config={enlargedJoditConfig}
-                                onChange={() => {}}
+                                onChange={(newContent) => { latestTextRef.current = newContent; }}
                                 onBlur={(newContent) => {
                                     if (enlargedModal === 'current' && canEdit) {
                                         setEditableText(newContent);
-                                        handleSave();
+                                        latestTextRef.current = newContent;
                                     }
                                 }}
                             />
