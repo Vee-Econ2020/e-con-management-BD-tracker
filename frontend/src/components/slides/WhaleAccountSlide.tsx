@@ -519,7 +519,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                     ref={oldDataEditorRef}
                                     value={oldDataText}
                                     config={oldDataJoditConfig}
-                                    onChange={(newContent) => setOldDataText(newContent)}
+                                    onChange={() => {}}
                                     onBlur={(newContent) => setOldDataText(newContent)}
                                 />
                                 <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
@@ -718,7 +718,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                 ref={editorRef}
                                 value={editableText}
                                 config={joditConfig}
-                                onChange={(newContent) => setEditableText(newContent)}
+                                onChange={() => {}}
                                 onBlur={(newContent) => {
                                     setEditableText(newContent);
                                     handleSave();
@@ -753,11 +753,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                 ref={enlargedEditorRef}
                                 value={enlargedModal === 'previous' ? previousText : editableText}
                                 config={enlargedJoditConfig}
-                                onChange={(newContent) => {
-                                    if (enlargedModal === 'current' && canEdit) {
-                                        setEditableText(newContent);
-                                    }
-                                }}
+                                onChange={() => {}}
                                 onBlur={(newContent) => {
                                     if (enlargedModal === 'current' && canEdit) {
                                         setEditableText(newContent);
