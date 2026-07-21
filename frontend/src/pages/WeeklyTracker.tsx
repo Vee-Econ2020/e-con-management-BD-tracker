@@ -4,6 +4,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Download, Loader2, Plus, Play, Eye, EyeOff, Pencil, Trash2, X, PartyPopper, Image as ImageIcon, Type } from 'lucide-react';
 import { ConfettiSideCannons } from '../components/ConfettiSideCannons';
+import { useWeek } from '../context/WeekContext';
 import { ImageUploadSlide } from '../components/slides/ImageUploadSlide';
 import { DEFAULT_GIF_POSITION, DEFAULT_GIF_URL, GifOverlay, type GifPosition } from '../components/slides/GifOverlay';
 import {
@@ -671,7 +672,7 @@ const StatusCard = ({ title, filled = 0, total = 0, onView, onViewWhale, missing
 
 export default function WeeklyTracker() {
     const navigate = useNavigate();
-    const [currentWeek, setCurrentWeek] = useState(1);
+    const { selectedWeek: currentWeek, availableWeeks, setSelectedWeek } = useWeek();
     const [isSlideshowOpen, setIsSlideshowOpen] = useState(false);
     const [activeSlideIndex, setActiveSlideIndex] = useState(0);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -697,6 +698,8 @@ export default function WeeklyTracker() {
     const [exportSlide, setExportSlide] = useState<SlideItem | null>(null);
     const [exportingImageSlideId, setExportingImageSlideId] = useState<SlideId | null>(null);
     const exportContainerRef = useRef<HTMLDivElement>(null);
+    const [exportStartSlide, setExportStartSlide] = useState<number | ''>('');
+    const [exportEndSlide, setExportEndSlide] = useState<number | ''>('');
 
     // Selected fiscal quarter (Q1-Q4) per Services snapshot slide preview.
     const [servicesQuarterBySlide, setServicesQuarterBySlide] = useState<Record<string, string>>({});
@@ -1310,11 +1313,6 @@ export default function WeeklyTracker() {
     }, []);
 
     useEffect(() => {
-        fetch('/api/week/current')
-            .then(res => res.json())
-            .then(data => setCurrentWeek(data.week))
-            .catch(() => setCurrentWeek(1));
-
         // Fetch hidden slides
         fetch('/api/admin/hidden-slides')
             .then(res => res.json())
@@ -1536,9 +1534,14 @@ export default function WeeklyTracker() {
             return;
         }
 
-        const exportSlides = displaySlides.filter(s => !hiddenSlides.has(String(s.id)));
+        let exportSlides = displaySlides.filter(s => !hiddenSlides.has(String(s.id)));
+        
+        if (exportStartSlide !== '' && exportEndSlide !== '') {
+            exportSlides = exportSlides.slice(Number(exportStartSlide), Number(exportEndSlide) + 1);
+        }
+
         if (exportSlides.length === 0) {
-            showToast('All slides are hidden — nothing to export');
+            showToast('No slides in selected range to export');
             return;
         }
 
@@ -1836,9 +1839,32 @@ export default function WeeklyTracker() {
 
             {/* PPT Section */}
             <div style={{ marginBottom: '2rem' }}>
-                <h2 style={{ fontSize: '2.5rem', fontWeight: '700', color: '#9ca3af', marginBottom: '1rem', marginLeft: '1rem' }}>
-                    PPT Section
-                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginLeft: '1rem', marginBottom: '1rem' }}>
+                    <h2 style={{ fontSize: '2.5rem', fontWeight: '700', color: '#9ca3af', margin: 0 }}>
+                        PPT Section
+                    </h2>
+                    {availableWeeks.length > 0 && (
+                        <select
+                            value={currentWeek || ''}
+                            onChange={(e) => setSelectedWeek(Number(e.target.value))}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                fontSize: '1.2rem',
+                                borderRadius: '8px',
+                                border: '2px solid #5D9CEC',
+                                backgroundColor: '#f8fafc',
+                                color: '#334155',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                outline: 'none'
+                            }}
+                        >
+                            {availableWeeks.map(w => (
+                                <option key={w} value={w}>Week {w}</option>
+                            ))}
+                        </select>
+                    )}
+                </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '1rem', marginLeft: '1rem', marginBottom: '1rem' }}>
                     <button
                         onClick={() => handleStartSlideshow()}
@@ -1863,24 +1889,66 @@ export default function WeeklyTracker() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         <div style={{ color: '#0f766e', fontSize: '1rem', fontWeight: '800', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-                            Export
+                            Export Range
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <select
+                                value={exportStartSlide}
+                                onChange={(e) => setExportStartSlide(e.target.value === '' ? '' : Number(e.target.value))}
+                                style={{
+                                    padding: '0.4rem',
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '0.9rem',
+                                    outline: 'none',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <option value="">Start Slide</option>
+                                {displaySlides.filter(s => !hiddenSlides.has(String(s.id))).map((s, idx) => (
+                                    <option key={s.id} value={idx}>Slide {idx + 1}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={exportEndSlide}
+                                onChange={(e) => setExportEndSlide(e.target.value === '' ? '' : Number(e.target.value))}
+                                style={{
+                                    padding: '0.4rem',
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    fontSize: '0.9rem',
+                                    outline: 'none',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <option value="">End Slide</option>
+                                {displaySlides.filter(s => !hiddenSlides.has(String(s.id))).map((s, idx) => (
+                                    <option 
+                                        key={s.id} 
+                                        value={idx} 
+                                        disabled={exportStartSlide !== '' && idx < Number(exportStartSlide)}
+                                    >
+                                        Slide {idx + 1}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <button
                             onClick={handleExportPdf}
-                            disabled={isExporting || exportingImageSlideId !== null}
+                            disabled={isExporting || exportingImageSlideId !== null || exportStartSlide === '' || exportEndSlide === ''}
                             style={{
-                                backgroundColor: isExporting || exportingImageSlideId !== null ? '#94a3b8' : '#0f766e',
+                                backgroundColor: isExporting || exportingImageSlideId !== null || exportStartSlide === '' || exportEndSlide === '' ? '#94a3b8' : '#0f766e',
                                 color: 'white',
                                 border: 'none',
                                 padding: '0.8rem 2rem',
                                 borderRadius: '9999px',
                                 fontWeight: '700',
                                 fontSize: '1rem',
-                                cursor: isExporting || exportingImageSlideId !== null ? 'wait' : 'pointer',
+                                cursor: isExporting || exportingImageSlideId !== null ? 'wait' : (exportStartSlide === '' || exportEndSlide === '' ? 'not-allowed' : 'pointer'),
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '0.5rem',
-                                boxShadow: isExporting || exportingImageSlideId !== null ? 'none' : '0 4px 6px rgba(15, 118, 110, 0.35)'
+                                boxShadow: isExporting || exportingImageSlideId !== null || exportStartSlide === '' || exportEndSlide === '' ? 'none' : '0 4px 6px rgba(15, 118, 110, 0.35)'
                             }}
                         >
                             {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
@@ -1889,7 +1957,7 @@ export default function WeeklyTracker() {
                         <div style={{ color: '#64748b', fontSize: '0.95rem', fontWeight: '600', minHeight: '1.5rem' }}>
                             {exportProgress
                                 ? `Exporting ${exportProgress.current}/${exportProgress.total}: ${exportProgress.title}`
-                                : 'Export all slides as one PDF in 16:9 presentation format'}
+                                : 'Select a start and end slide to export as PDF'}
                         </div>
                     </div>
                 </div>

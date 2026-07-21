@@ -42,6 +42,31 @@ DB_NAME = os.getenv("DB_NAME", "DB tracker")
 client = AsyncIOMotorClient(MONGODB_URL)
 db = client[DB_NAME]
 
+@router.get("/weeks/available")
+async def get_available_weeks():
+    """
+    Get a sorted list of all unique weeks that have data in the system.
+    """
+    try:
+        weeks = set()
+        
+        # Check slide_inputs
+        slide_weeks = await db.slide_inputs.distinct("week_recorded")
+        weeks.update([int(w) for w in slide_weeks if w])
+        
+        # Check weekly_tracker_data
+        tracker_weeks = await db.weekly_tracker_data.distinct("week")
+        weeks.update([int(w) for w in tracker_weeks if w])
+        
+        # Check whale_accounts
+        whale_weeks = await db.whale_accounts.distinct("week_updated")
+        weeks.update([int(w) for w in whale_weeks if w])
+        
+        return sorted(list(weeks), reverse=True)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Models
 class DropdownOption(BaseModel):
     category: str  # e.g., "Financial Year", "Financial QTR", "Category Type", "Category Value"

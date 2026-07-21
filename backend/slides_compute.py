@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, Optional
 import pandas as pd
+from context import target_week_var
 
 # Motor creates `AsyncIOMotorDatabase` dynamically via `create_class_with_framework`,
 # so static type checkers (Pylance) flag it as "variable not allowed in type
@@ -157,8 +158,9 @@ async def get_current_or_closest_week_data(db: AsyncIOMotorDatabase) -> Optional
     Returns:
         DataFrame with week data, or None if no data found
     """
-    # Get current week number
-    current_week = datetime.now().isocalendar()[1]
+    # Get current week number or target week from context
+    requested_week = target_week_var.get()
+    current_week = requested_week if requested_week is not None else datetime.now().isocalendar()[1]
     
     # Try to find current week data
     collection = db["weekly_tracker_data"]

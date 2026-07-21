@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
@@ -10,6 +10,7 @@ load_dotenv()
 
 from routers import admin
 from routers import auth as auth_router
+from context import target_week_var
 
 app = FastAPI(title="e-con Business Development Tracker API")
 
@@ -24,6 +25,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Week Context Middleware
+@app.middleware("http")
+async def add_week_context(request: Request, call_next):
+    week_param = request.query_params.get("week")
+    token = None
+    if week_param and week_param.isdigit():
+        token = target_week_var.set(int(week_param))
+    response = await call_next(request)
+    if token:
+        target_week_var.reset(token)
+    return response
 
 # MongoDB Configuration
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb+srv://Admin_econ:QWERTY%40319113@cluster0.3n9ln1d.mongodb.net/")
@@ -106,7 +119,13 @@ async def get_current_week():
     """
     try:
         current_year = datetime.now().year
-        week_number = calculate_current_week(current_year)
+        
+        # If a specific week was requested via ?week= middleware
+        requested_week = target_week_var.get()
+        if requested_week is not None:
+            week_number = requested_week
+        else:
+            week_number = calculate_current_week(current_year)
         
         return {
             "week": week_number,
