@@ -83,7 +83,6 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     5: Slide5,
     6: Slide6,
     6.2: Slide6_2,
-    '6.2.1': WhaleAccountSlide,
     6.3: Slide6_3,
     6.4: Slide6_4,
     7: Slide7,
@@ -144,6 +143,13 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '21.2.4': Slide21_2_4,
     '24.2.4': Slide24_2_4,
     '27.2.4': Slide27_2_4,
+    '9.2.5': (props: any) => <WhaleAccountSlide {...props} region="USA West" />,
+    '12.2.5': (props: any) => <WhaleAccountSlide {...props} region="Europe" />,
+    '15.2.5': (props: any) => <WhaleAccountSlide {...props} region="USA East" />,
+    '18.2.5': (props: any) => <WhaleAccountSlide {...props} region="Asean" />,
+    '21.2.5': (props: any) => <WhaleAccountSlide {...props} region="Japan" />,
+    '24.2.5': (props: any) => <WhaleAccountSlide {...props} region="Korea" />,
+    '27.2.5': (props: any) => <WhaleAccountSlide {...props} region="Legacy" />,
 
     // ── Services-only chart mirrors ───────────────────────────────────────
     // Each parent chart slide (cumulative/trend/pipeline) has a sibling here
@@ -558,12 +564,13 @@ interface StatusCardProps {
     filled?: number;
     total?: number;
     onView?: () => void;
+    onViewWhale?: () => void;
     missingNames?: string[];
+    whaleAccounts?: string[];
 }
 
-const StatusCard = ({ title, filled = 0, total = 0, onView, missingNames = [] }: StatusCardProps) => {
+const StatusCard = ({ title, filled = 0, total = 0, onView, onViewWhale, missingNames = [], whaleAccounts = [] }: StatusCardProps) => {
     const missing = Math.max(0, total - filled);
-    const percentage = total > 0 ? Math.round((filled / total) * 100) : 0;
     const canView = total > 0 && !!onView;
 
     return (
@@ -604,27 +611,60 @@ const StatusCard = ({ title, filled = 0, total = 0, onView, missingNames = [] }:
                     </ul>
                 </div>
             )}
-            {canView && (
-                <button
-                    onClick={onView}
-                    style={{
-                        marginTop: '0.2rem',
-                        backgroundColor: '#5D9CEC',
-                        color: 'white',
-                        border: 'none',
-                        padding: '0.35rem 0.8rem',
-                        borderRadius: '9999px',
-                        fontWeight: 700,
-                        fontSize: '0.8rem',
-                        cursor: 'pointer',
-                        alignSelf: 'flex-start',
-                        boxShadow: '0 2px 4px rgba(93,156,236,0.35)'
-                    }}
-                    title={`View pending input slides for ${title}`}
-                >
-                    View
-                </button>
+            {title !== 'Overall' && title !== 'Financial Team' && whaleAccounts.length < 2 && (
+                <div style={{ fontSize: '0.75rem', color: '#7c2d12', fontWeight: 600, lineHeight: 1.35, marginTop: '0.2rem' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.15rem' }}>
+                        Whale accounts missing
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+                        {whaleAccounts.length === 1 ? (
+                            <li style={{ marginBottom: '0.1rem' }}>1 more account to add (Added: {whaleAccounts[0]})</li>
+                        ) : (
+                            <li style={{ marginBottom: '0.1rem' }}>2 accounts to add</li>
+                        )}
+                    </ul>
+                </div>
             )}
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+                {canView && (
+                    <button
+                        onClick={onView}
+                        style={{
+                            backgroundColor: '#5D9CEC',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.35rem 0.8rem',
+                            borderRadius: '9999px',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 4px rgba(93,156,236,0.35)'
+                        }}
+                        title={`View pending input slides for ${title}`}
+                    >
+                        View
+                    </button>
+                )}
+                {onViewWhale && (
+                    <button
+                        onClick={onViewWhale}
+                        style={{
+                            backgroundColor: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.35rem 0.8rem',
+                            borderRadius: '9999px',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 4px rgba(16,185,129,0.35)'
+                        }}
+                        title={`View Whale accounts for ${title}`}
+                    >
+                        Whales
+                    </button>
+                )}
+            </div>
         </div>
     );
 };
@@ -668,31 +708,31 @@ export default function WeeklyTracker() {
     const BASE_SLIDES = [
         2, 2.5,
         3, '3_services', '3_services_q1', 4, '4_services', 5, '5_services',
-        6, '6.1', 6.2, '6.2.1', '6.2_services', 6.3, 6.4,
+        6, '6.1', 6.2, '6.2_services', 6.3, 6.4,
         13, '13_services', '13_services_q1', 14, '14_services', 15, '15_services',
         15.1, '15.1.1', 15.2, '15.2.1', '15.5',
-        '15.2.2', '15.2.2_services', '15.2.3', '15.2.4',
+        '15.2.2', '15.2.2_services', '15.2.3', '15.2.4', '15.2.5',
         7, '7_services', '7_services_q1', 8, '8_services', 9, '9_services',
         9.1, '9.1.1', 9.2, '9.2.1', '9.5',
-        '9.2.2', '9.2.2_services', '9.2.3', '9.2.4',
+        '9.2.2', '9.2.2_services', '9.2.3', '9.2.4', '9.2.5',
         10, '10_services', '10_services_q1', 11, '11_services', 12, '12_services',
         12.1, '12.1.1', 12.2, '12.2.1', '12.5',
-        '12.2.2', '12.2.2_services', '12.2.3', '12.2.4',
+        '12.2.2', '12.2.2_services', '12.2.3', '12.2.4', '12.2.5',
         16, '16_services', '16_services_q1', 17, '17_services', 18, '18_services',
         18.1, '18.1.1', 18.2, '18.2.1', '18.5',
-        '18.2.2', '18.2.2_services', '18.2.3', '18.2.4',
+        '18.2.2', '18.2.2_services', '18.2.3', '18.2.4', '18.2.5',
         19, '19_services', '19_services_q1', 20, '20_services',
         21, '21_services',
         21.1, '21.1.1', 21.2, '21.2.1', '21.5',
-        '21.2.2', '21.2.2_services', '21.2.3', '21.2.4',
+        '21.2.2', '21.2.2_services', '21.2.3', '21.2.4', '21.2.5',
         22, '22_services', '22_services_q1', 23, '23_services',
         24, '24_services',
         24.1, '24.1.1', 24.2, '24.2.1', '24.5',
-        '24.2.2', '24.2.2_services', '24.2.3', '24.2.4',
+        '24.2.2', '24.2.2_services', '24.2.3', '24.2.4', '24.2.5',
         25, '25_services', '25_services_q1', 26, '26_services',
         27, '27_services',
         27.1, '27.1.1', 27.2, '27.2.1', '27.5',
-        '27.2.2', '27.2.2_services', '27.2.3', '27.2.4',
+        '27.2.2', '27.2.2_services', '27.2.3', '27.2.4', '27.2.5',
         28
     ];
 
@@ -797,6 +837,7 @@ export default function WeeklyTracker() {
         // most-specific first so e.g. "15.2.1" doesn't match ".1".
         if (titles[idStr]) return titles[idStr];
         if (idStr.includes('.')) {
+            if (idStr.endsWith('.2.5')) return 'Whale accounts';
             if (idStr.endsWith('.1.1')) return 'Account Management - Action Points';
             if (idStr.endsWith('.2.1')) return 'New Business - Action Points';
             if (idStr.endsWith('.1')) return 'Account Management Summary';
@@ -1610,13 +1651,13 @@ export default function WeeklyTracker() {
     // Region -> actual slide preview IDs to highlight when user clicks "View"
     const REGION_SLIDE_IDS: Record<string, string[]> = {
         'Overall': [],
-        'USA West': ['9.1', '9.1.1', '9.2', '9.2.1'],
-        'Europe': ['12.1', '12.1.1', '12.2', '12.2.1'],
-        'USA East': ['15.1', '15.1.1', '15.2', '15.2.1'],
-        'Asean': ['18.1', '18.1.1', '18.2', '18.2.1'],
-        'Japan': ['21.1', '21.1.1', '21.2', '21.2.1'],
-        'Korea': ['24.1', '24.1.1', '24.2', '24.2.1'],
-        'Legacy': ['27.1', '27.1.1', '27.2', '27.2.1'],
+        'USA West': ['9.1', '9.1.1', '9.2', '9.2.1', '9.2.5'],
+        'Europe': ['12.1', '12.1.1', '12.2', '12.2.1', '12.2.5'],
+        'USA East': ['15.1', '15.1.1', '15.2', '15.2.1', '15.2.5'],
+        'Asean': ['18.1', '18.1.1', '18.2', '18.2.1', '18.2.5'],
+        'Japan': ['21.1', '21.1.1', '21.2', '21.2.1', '21.2.5'],
+        'Korea': ['24.1', '24.1.1', '24.2', '24.2.1', '24.2.5'],
+        'Legacy': ['27.1', '27.1.1', '27.2', '27.2.1', '27.2.5'],
         'Financial Team': []
     };
 
@@ -1639,10 +1680,33 @@ export default function WeeklyTracker() {
         }, 5000);
     };
 
-    const [regionCounts, setRegionCounts] = useState<Record<string, { filled: number; total: number; missing: string[] }>>({});
+    const handleViewWhale = (region: string) => {
+        const ids = REGION_SLIDE_IDS[region] || [];
+        const whaleId = ids[ids.length - 1];
+        if (!whaleId) return;
+        setHighlightedSlides(new Set([whaleId]));
+        setTimeout(() => {
+            const el = document.getElementById(`slide-preview-${whaleId}`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+        window.setTimeout(() => setHighlightedSlides(new Set()), 5000);
+    };
+
+    const [regionCounts, setRegionCounts] = useState<Record<string, { filled: number; total: number; missing: string[]; whaleNames: string[] }>>({});
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    useEffect(() => {
+        const handleRefresh = () => setRefreshTrigger(prev => prev + 1);
+        window.addEventListener('tracker_refresh_checklist', handleRefresh);
+        return () => window.removeEventListener('tracker_refresh_checklist', handleRefresh);
+    }, []);
 
     // Human readable name for a slide input key
     const getSlideInputName = (sid: string): string => {
+        if (sid.includes('_whale_account_')) {
+            const num = sid.split('_whale_account_')[1];
+            return `Whale Account ${num}`;
+        }
         if (sid.endsWith('_acc_mgmt_actions')) return 'Account Management - Action Points';
         if (sid.endsWith('_acc_mgmt')) return 'Account Management Summary';
         if (sid.endsWith('_new_biz_actions')) return 'New Business - Action Points';
@@ -1658,7 +1722,6 @@ export default function WeeklyTracker() {
 
         const fetchForRegion = async (region: string) => {
             const slideIds = REGION_SLIDES[region] || [];
-            const total = slideIds.length;
             const missing: string[] = [];
 
             await Promise.all(slideIds.map(async (sid) => {
@@ -1682,23 +1745,41 @@ export default function WeeklyTracker() {
                     missing.push(sid);
                 }
             }));
+            
+            let whaleNames: string[] = [];
+            // Whale Accounts missing items (2 required)
+            if (region !== 'Overall' && region !== 'Financial Team') {
+                try {
+                    const wRes = await fetch(`/api/admin/whale-accounts/stats/${encodeURIComponent(region)}/${currentWeek}`);
+                    if (wRes.ok) {
+                        const data = await wRes.json();
+                        whaleNames = data.names || [];
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch whale account stats", e);
+                }
+            }
+            
+            const expectedTotal = slideIds.length + (region !== 'Overall' && region !== 'Financial Team' ? 2 : 0);
+            const whaleMissingCount = Math.max(0, 2 - whaleNames.length);
 
             // Preserve ordering as defined in REGION_SLIDES
             const orderedMissing = slideIds.filter(s => missing.includes(s)).map(getSlideInputName);
-            return { region, filled: total - orderedMissing.length, total, missing: orderedMissing };
+            
+            return { region, filled: expectedTotal - orderedMissing.length - whaleMissingCount, total: expectedTotal, missing: orderedMissing, whaleNames };
         };
 
         (async () => {
             const results = await Promise.all(regions.map(r => fetchForRegion(r)));
-            const map: Record<string, { filled: number; total: number; missing: string[] }> = {};
+            const map: Record<string, { filled: number; total: number; missing: string[]; whaleNames: string[] }> = {};
             results.forEach(r => {
                 if (!r) return;
-                map[r.region] = { filled: r.filled, total: r.total, missing: r.missing };
+                map[r.region] = { filled: r.filled, total: r.total, missing: r.missing, whaleNames: r.whaleNames };
             });
             setRegionCounts(map);
         })();
 
-    }, [currentWeek]);
+    }, [currentWeek, refreshTrigger]);
 
     return (
         <div className="app-container" style={{ position: 'relative', minHeight: '150vh', padding: '2rem' }}>
@@ -1747,8 +1828,9 @@ export default function WeeklyTracker() {
             {/* Pending Input Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1.5rem', marginBottom: '5rem', maxWidth: '1200px' }}>
                 {['Overall','USA West','Europe','USA East','Asean','Japan','Korea','Legacy','Financial Team'].map(name => {
-                    const stats = regionCounts[name] || { filled: 0, total: REGION_SLIDES[name]?.length || 0, missing: [] as string[] };
-                    return <StatusCard key={name} title={name} filled={stats.filled} total={stats.total} missingNames={stats.missing} onView={() => handleViewRegion(name)} />;
+                    const stats = regionCounts[name] || { filled: 0, total: REGION_SLIDES[name]?.length || 0, missing: [] as string[], whaleNames: [] as string[] };
+                    const hasWhales = name !== 'Overall' && name !== 'Financial Team';
+                    return <StatusCard key={name} title={name} filled={stats.filled} total={stats.total} missingNames={stats.missing} whaleAccounts={stats.whaleNames} onView={() => handleViewRegion(name)} onViewWhale={hasWhales ? () => handleViewWhale(name) : undefined} />;
                 })}
             </div>
 
@@ -1759,7 +1841,7 @@ export default function WeeklyTracker() {
                 </h2>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '1rem', marginLeft: '1rem', marginBottom: '1rem' }}>
                     <button
-                        onClick={handleStartSlideshow}
+                        onClick={() => handleStartSlideshow()}
                         style={{
                             backgroundColor: '#5D9CEC',
                             color: 'white',

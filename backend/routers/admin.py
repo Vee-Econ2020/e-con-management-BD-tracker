@@ -1903,18 +1903,23 @@ async def update_custom_slide(slide_id: str, payload: dict = Body(...)):
 # --- WHALE ACCOUNTS API ---
 from datetime import datetime
 from pydantic import BaseModel
+from typing import Optional
 
 class WhaleAccountEntry(BaseModel):
     account_name: str
     date_updated: str
     week_updated: int
     text_data: str
+    region: Optional[str] = None
 
 @router.get("/whale-accounts/names")
-async def get_whale_account_names():
+async def get_whale_account_names(region: Optional[str] = None):
     try:
         coll = get_collection("whale_accounts")
-        names = await coll.distinct("account_name")
+        query = {}
+        if region:
+            query["region"] = region
+        names = await coll.distinct("account_name", query)
         return [n for n in names if n]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1977,7 +1982,8 @@ async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry
                 {
                     "$set": {
                         "week_updated": payload.week_updated,
-                        "updated_at": now
+                        "updated_at": now,
+                        "region": payload.region
                     },
                     "$push": {
                         "variants": new_variant
@@ -1992,9 +1998,26 @@ async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry
                 "week_updated": payload.week_updated,
                 "created_at": now,
                 "updated_at": now,
+                "region": payload.region,
                 "variants": [new_variant]
             })
         
         return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/whale-accounts/stats/{region}/{week}")
+async def get_whale_account_stats(region: str, week: int):
+    try:
+        coll = get_collection("whale_accounts")
+        pipeline = [
+            {"$match": {"region": region, "week_updated": week}},
+            {"$group": {"_id": "$account_name"}}
+        ]
+        cursor = coll.aggregate(pipeline)
+        names = []
+        async for doc in cursor:
+            names.append(doc["_id"])
+        return {"count": len(names), "names": names}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

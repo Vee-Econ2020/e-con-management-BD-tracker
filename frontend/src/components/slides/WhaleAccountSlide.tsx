@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 interface WhaleAccountSlideProps {
     title?: string;
     isEditing?: boolean;
+    region?: string;
 }
 
 interface WhaleAccountVariant {
@@ -18,9 +19,10 @@ interface WhaleAccountEntry {
     week_updated: number;
     text_data?: string;
     variants?: WhaleAccountVariant[];
+    region?: string;
 }
 
-export function WhaleAccountSlide({ isEditing }: WhaleAccountSlideProps) {
+export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps) {
     const [accountNames, setAccountNames] = useState<string[]>([]);
     const [selectedAccount, setSelectedAccount] = useState<string>('');
     const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -40,7 +42,8 @@ export function WhaleAccountSlide({ isEditing }: WhaleAccountSlideProps) {
 
     const fetchAccountNames = async () => {
         try {
-            const res = await fetch('/api/admin/whale-accounts/names');
+            const url = region ? `/api/admin/whale-accounts/names?region=${encodeURIComponent(region)}` : '/api/admin/whale-accounts/names';
+            const res = await fetch(url);
             const data = await res.json();
             const sortedNames = data.sort((a: string, b: string) => a.localeCompare(b));
             setAccountNames(sortedNames);
@@ -118,12 +121,13 @@ export function WhaleAccountSlide({ isEditing }: WhaleAccountSlideProps) {
 
     const handleNewAccountConfirm = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' && newAccountName.trim() !== '') {
-            setSelectedAccount(newAccountName.trim());
+            const acc = newAccountName.trim();
+            setSelectedAccount(acc);
             setIsCreatingNew(false);
-            setEntries([]);
             setSelectedIndex(-1);
             setSelectedVariantIndex(-1);
             setExpandedDates({});
+            fetchEntries(acc);
         }
     };
 
@@ -177,7 +181,8 @@ export function WhaleAccountSlide({ isEditing }: WhaleAccountSlideProps) {
             account_name: selectedAccount,
             date_updated: editableDate,
             week_updated: getWeekNumber(editableDate) || currentWeek,
-            text_data: editableText
+            text_data: editableText,
+            region: region
         };
         
         const existingEntry = entries.find(e => e.date_updated === editableDate);
@@ -192,6 +197,7 @@ export function WhaleAccountSlide({ isEditing }: WhaleAccountSlideProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+            window.dispatchEvent(new Event('tracker_refresh_checklist'));
             fetchEntries(selectedAccount);
             if (!accountNames.includes(selectedAccount)) {
                 fetchAccountNames();
@@ -255,7 +261,7 @@ export function WhaleAccountSlide({ isEditing }: WhaleAccountSlideProps) {
             <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '2rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{ width: '8px', height: '40px', backgroundColor: '#22c55e' }} />
-                    <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: '#000', margin: 0 }}>Whale account</h1>
+                    <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: '#000', margin: 0 }}>Whale account {region ? `- ${region}` : ''}</h1>
                 </div>
                 <div style={{ marginTop: '1rem', paddingLeft: '24px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     {!isCreatingNew ? (
@@ -292,7 +298,19 @@ export function WhaleAccountSlide({ isEditing }: WhaleAccountSlideProps) {
                             value={newAccountName}
                             onChange={(e) => setNewAccountName(e.target.value)}
                             onKeyDown={handleNewAccountConfirm}
-                            onBlur={() => { if(newAccountName.trim() === '') setIsCreatingNew(false); }}
+                            onBlur={() => { 
+                                if(newAccountName.trim() === '') {
+                                    setIsCreatingNew(false); 
+                                } else {
+                                    const acc = newAccountName.trim();
+                                    setSelectedAccount(acc);
+                                    setIsCreatingNew(false);
+                                    setSelectedIndex(-1);
+                                    setSelectedVariantIndex(-1);
+                                    setExpandedDates({});
+                                    fetchEntries(acc);
+                                }
+                            }}
                         />
                     )}
                 </div>
@@ -416,14 +434,14 @@ export function WhaleAccountSlide({ isEditing }: WhaleAccountSlideProps) {
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                     <div style={{
                         flex: 1,
-                        backgroundColor: '#d1d5db',
+                        backgroundColor: '#ebf2f1',
                         border: '2px solid #3b82f6',
                         padding: '1.5rem',
                         display: 'flex',
                         flexDirection: 'column',
                         position: 'relative'
                     }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#3b82f6' }}>
                             <span>Previous Week</span>
                         </div>
                         <textarea 
@@ -445,19 +463,19 @@ export function WhaleAccountSlide({ isEditing }: WhaleAccountSlideProps) {
                     
                     <div style={{
                         flex: 1,
-                        backgroundColor: '#d1d5db',
+                        backgroundColor: '#ebf2f1',
                         border: '2px solid #22c55e',
                         padding: '1.5rem',
                         display: 'flex',
                         flexDirection: 'column',
                         position: 'relative'
                     }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#22c55e' }}>
                             <span>Current week</span>
                             {canEdit ? (
                                 <input 
                                     type="date"
-                                    style={{ background: 'transparent', border: 'none', borderBottom: '1px solid #000', fontSize: '1.5rem', textAlign: 'right', outline: 'none', fontWeight: 'bold', fontFamily: 'inherit' }}
+                                    style={{ background: 'transparent', border: 'none', borderBottom: '1px solid #22c55e', color: '#22c55e', fontSize: '1.5rem', textAlign: 'right', outline: 'none', fontWeight: 'bold', fontFamily: 'inherit' }}
                                     value={editableDate}
                                     onChange={(e) => setEditableDate(e.target.value)}
                                     onBlur={handleSave}
