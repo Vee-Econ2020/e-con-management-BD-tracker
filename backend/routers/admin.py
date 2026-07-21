@@ -1936,6 +1936,7 @@ class WhaleAccountEntry(BaseModel):
     week_updated: int
     text_data: str
     region: Optional[str] = None
+    is_old_data: Optional[bool] = False
 
 @router.get("/whale-accounts/names")
 async def get_whale_account_names(region: Optional[str] = None):
@@ -2008,7 +2009,8 @@ async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry
                     "$set": {
                         "week_updated": payload.week_updated,
                         "updated_at": now,
-                        "region": payload.region
+                        "region": payload.region,
+                        "is_old_data": payload.is_old_data
                     },
                     "$push": {
                         "variants": new_variant
@@ -2024,6 +2026,7 @@ async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry
                 "created_at": now,
                 "updated_at": now,
                 "region": payload.region,
+                "is_old_data": payload.is_old_data,
                 "variants": [new_variant]
             })
         

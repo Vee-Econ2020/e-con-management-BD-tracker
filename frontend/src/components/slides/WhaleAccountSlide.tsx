@@ -20,6 +20,7 @@ interface WhaleAccountEntry {
     text_data?: string;
     variants?: WhaleAccountVariant[];
     region?: string;
+    is_old_data?: boolean;
 }
 
 export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps) {
@@ -39,6 +40,11 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
     // Form state for current selected/edited entry
     const [editableText, setEditableText] = useState('');
     const [editableDate, setEditableDate] = useState('');
+    
+    // State for Adding Old Data
+    const [isAddingOldData, setIsAddingOldData] = useState(false);
+    const [oldDataDate, setOldDataDate] = useState('');
+    const [oldDataText, setOldDataText] = useState('');
 
     const fetchAccountNames = async () => {
         try {
@@ -207,6 +213,35 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
         }
     };
 
+    const handleSaveOldData = async () => {
+        if (!selectedAccount || currentWeek === null || !oldDataDate.trim() || !oldDataText.trim()) return;
+        
+        const payload: WhaleAccountEntry = {
+            account_name: selectedAccount,
+            date_updated: oldDataDate,
+            week_updated: getWeekNumber(oldDataDate) || currentWeek,
+            text_data: oldDataText,
+            region: region,
+            is_old_data: true
+        };
+        
+        try {
+            await fetch(`/api/admin/whale-accounts/${encodeURIComponent(selectedAccount)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            window.dispatchEvent(new Event('tracker_refresh_checklist'));
+            fetchEntries(selectedAccount);
+            // Reset old data state
+            setIsAddingOldData(false);
+            setOldDataDate('');
+            setOldDataText('');
+        } catch (e) {
+            console.error('Failed to save old data', e);
+        }
+    };
+
     // Derived Data
     const previousEntry = selectedIndex >= 0 && selectedIndex + 1 < entries.length ? entries[selectedIndex + 1] : null;
     let previousText = '';
@@ -314,6 +349,69 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                         />
                     )}
                 </div>
+                {isEditing && selectedAccount && !isCreatingNew && (
+                    <div style={{ marginTop: '1rem', marginLeft: '24px', padding: '1rem', border: '1px solid #d1d5db', borderRadius: '8px', width: 'fit-content', backgroundColor: '#f9fafb' }}>
+                        {!isAddingOldData ? (
+                            <button 
+                                onClick={() => setIsAddingOldData(true)}
+                                style={{
+                                    padding: '0.4rem 1rem',
+                                    backgroundColor: '#4b5563',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.9rem',
+                                    fontWeight: '600'
+                                }}
+                            >
+                                + Add Old Data
+                            </button>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#4b5563' }}>Old Data Date:</span>
+                                    <input 
+                                        type="date" 
+                                        value={oldDataDate} 
+                                        onChange={(e) => setOldDataDate(e.target.value)} 
+                                        style={{ padding: '0.4rem', border: '1px solid #d1d5db', borderRadius: '4px', outline: 'none' }}
+                                    />
+                                </div>
+                                <textarea
+                                    value={oldDataText}
+                                    onChange={(e) => setOldDataText(e.target.value)}
+                                    placeholder="Enter old updates here..."
+                                    style={{
+                                        width: '400px',
+                                        height: '80px',
+                                        padding: '0.5rem',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '4px',
+                                        resize: 'vertical',
+                                        outline: 'none',
+                                        fontSize: '0.9rem'
+                                    }}
+                                />
+                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                    <button 
+                                        onClick={() => { setIsAddingOldData(false); setOldDataDate(''); setOldDataText(''); }}
+                                        style={{ padding: '0.4rem 1rem', backgroundColor: '#e5e7eb', color: '#4b5563', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        onClick={handleSaveOldData}
+                                        disabled={!oldDataDate || !oldDataText}
+                                        style={{ padding: '0.4rem 1rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: (!oldDataDate || !oldDataText) ? 'not-allowed' : 'pointer', fontWeight: '600', opacity: (!oldDataDate || !oldDataText) ? 0.6 : 1 }}
+                                    >
+                                        Done
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
             
             <div style={{ display: 'flex', flex: 1, gap: '4rem', paddingLeft: '24px' }}>
@@ -370,7 +468,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                         width: '12px',
                                         height: '12px',
                                         borderRadius: '50%',
-                                        backgroundColor: '#3b82f6',
+                                        backgroundColor: entry.is_old_data ? '#9ca3af' : '#3b82f6',
                                         marginRight: '1rem',
                                         flexShrink: 0
                                     }} />
