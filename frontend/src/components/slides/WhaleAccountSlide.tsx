@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Maximize2, X } from 'lucide-react';
+import JoditEditor from 'jodit-react';
 
 interface WhaleAccountSlideProps {
     title?: string;
@@ -21,13 +23,28 @@ interface WhaleAccountEntry {
     variants?: WhaleAccountVariant[];
     region?: string;
     is_old_data?: boolean;
+    is_missing?: boolean;
 }
+
+const getWeekNumber = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    const target = new Date(d.valueOf());
+    const dayNr = (d.getDay() + 6) % 7;
+    target.setDate(target.getDate() - dayNr + 3);
+    const jan4 = new Date(target.getFullYear(), 0, 4);
+    const dayDiff = (target.getTime() - jan4.getTime()) / 86400000;
+    return 1 + Math.ceil(dayDiff / 7);
+};
 
 export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps) {
     const [accountNames, setAccountNames] = useState<string[]>([]);
     const [selectedAccount, setSelectedAccount] = useState<string>('');
     const [isCreatingNew, setIsCreatingNew] = useState(false);
     const [newAccountName, setNewAccountName] = useState('');
+    const editorRef = useRef(null);
+    const oldDataEditorRef = useRef(null);
+    const enlargedEditorRef = useRef(null);
     
     const [entries, setEntries] = useState<WhaleAccountEntry[]>([]);
     const [selectedIndex, setSelectedIndex] = useState<number>(-1);
@@ -45,6 +62,10 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
     const [isAddingOldData, setIsAddingOldData] = useState(false);
     const [oldDataDate, setOldDataDate] = useState('');
     const [oldDataText, setOldDataText] = useState('');
+    
+    // Modal state for enlarging text
+    const [enlargedModal, setEnlargedModal] = useState<'previous' | 'current' | null>(null);
+
 
     const fetchAccountNames = async () => {
         try {
@@ -78,8 +99,63 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
             const res = await fetch(`/api/admin/whale-accounts/${encodeURIComponent(account)}`);
             const data = await res.json();
             
-            // Ensure data is always sorted from newest to oldest
-            const sortedData = data.sort((a: WhaleAccountEntry, b: WhaleAccountEntry) => {
+            
+            const today = new Date();
+            const day = today.getDay();
+            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(today.getFullYear(), today.getMonth(), diff);
+            const currentWednesday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 2);
+            let walkDate = new Date(currentWednesday.getTime());
+            
+            let minTime = walkDate.getTime();
+            if (data.length > 0) {
+                const dates = data.map((d: any) => new Date(d.date_updated).getTime());
+                const dataMin = Math.min(...dates);
+                if (!isNaN(dataMin) && dataMin < minTime) {
+                    minTime = dataMin;
+                }
+            }
+            
+            const paddedData: WhaleAccountEntry[] = [];
+            const processedIds = new Set();
+            
+            while (walkDate.getTime() >= minTime || paddedData.length === 0) {
+                const walkDateStr = walkDate.toISOString().split('T')[0];
+                const walkWeek = getWeekNumber(walkDateStr);
+                
+                const matchingEntries = data.filter((d: any) => {
+                    const dWeek = d.week_updated || getWeekNumber(d.date_updated);
+                    return dWeek === walkWeek;
+                });
+                
+                if (matchingEntries.length > 0) {
+                    matchingEntries.forEach((m: any) => {
+                        if (!processedIds.has(m._id || m.date_updated)) {
+                            paddedData.push(m);
+                            processedIds.add(m._id || m.date_updated);
+                        }
+                    });
+                } else {
+                    paddedData.push({
+                        account_name: account,
+                        date_updated: walkDateStr,
+                        week_updated: walkWeek || 0,
+                        text_data: '',
+                        variants: [],
+                        is_missing: true
+                    });
+                }
+                
+                walkDate.setDate(walkDate.getDate() - 7);
+            }
+            
+            data.forEach((d: any) => {
+                if (!processedIds.has(d._id || d.date_updated)) {
+                    paddedData.push(d);
+                }
+            });
+            
+            const sortedData = paddedData.sort((a, b) => {
                 const tA = new Date(a.date_updated).getTime() || 0;
                 const tB = new Date(b.date_updated).getTime() || 0;
                 return tB - tA;
@@ -98,8 +174,8 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                 setSelectedIndex(-1);
                 setSelectedVariantIndex(-1);
                 setEditableText('');
-                const today = new Date().toISOString().split('T')[0];
-                setEditableDate(today);
+                const todayStr = new Date().toISOString().split('T')[0];
+                setEditableDate(todayStr);
             }
         } catch (e) {
             console.error(e);
@@ -167,17 +243,6 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
             ...prev,
             [index]: !prev[index]
         }));
-    };
-
-    const getWeekNumber = (dateStr: string) => {
-        const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return null;
-        const target = new Date(d.valueOf());
-        const dayNr = (d.getDay() + 6) % 7;
-        target.setDate(target.getDate() - dayNr + 3);
-        const jan4 = new Date(target.getFullYear(), 0, 4);
-        const dayDiff = (target.getTime() - jan4.getTime()) / 86400000;
-        return 1 + Math.ceil(dayDiff / 7);
     };
 
     const handleSave = async () => {
@@ -252,11 +317,83 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
     
     const currentEntry = selectedIndex >= 0 ? entries[selectedIndex] : null;
     let canEdit = isEditing;
-    if (currentEntry && currentEntry.date_updated === editableDate) {
-        if ((currentEntry.variants || []).length >= 3) {
+    if (currentEntry) {
+        if (currentEntry.date_updated === editableDate) {
+            if ((currentEntry.variants || []).length >= 3) {
+                canEdit = false;
+            }
+        }
+        if (currentEntry.is_missing && currentEntry.week_updated !== currentWeek) {
             canEdit = false;
         }
     }
+
+    const joditConfig = useMemo(() => ({
+        readonly: !canEdit,
+        toolbar: canEdit,
+        showCharsCounter: false,
+        showWordsCounter: false,
+        showXPathInStatusbar: false,
+        buttons: ['bold', 'italic', 'underline', '|', 'ul', 'ol', '|', 'outdent', 'indent', '|', 'table', '|', 'undo', 'redo'],
+        height: '100%',
+        style: {
+            background: 'transparent',
+            fontFamily: 'inherit',
+            fontSize: '1.25rem'
+        },
+        placeholder: currentEntry?.is_missing && !canEdit ? "No data for this week. Use '+ Add Old Data' to backfill." : (canEdit ? 'Type here...' : '')
+    }), [canEdit, currentEntry?.is_missing]);
+
+    const oldDataJoditConfig = useMemo(() => ({
+        readonly: false,
+        toolbar: true,
+        showCharsCounter: false,
+        showWordsCounter: false,
+        showXPathInStatusbar: false,
+        buttons: ['bold', 'italic', 'underline', '|', 'ul', 'ol', '|', 'outdent', 'indent', '|', 'table', '|', 'undo', 'redo'],
+        height: 200,
+        style: {
+            background: 'transparent',
+            fontFamily: 'inherit',
+            fontSize: '1rem'
+        },
+        placeholder: 'Enter old data here...'
+    }), []);
+
+    const previousJoditConfig = useMemo(() => ({
+        readonly: true,
+        toolbar: false,
+        showCharsCounter: false,
+        showWordsCounter: false,
+        showXPathInStatusbar: false,
+        height: '100%',
+        style: {
+            background: 'transparent',
+            border: 'none',
+            fontFamily: 'inherit',
+            fontSize: '1.25rem',
+            color: '#000'
+        },
+        placeholder: previousEntry ? '' : 'No previous week data'
+    }), [previousEntry]);
+
+    const enlargedJoditConfig = useMemo(() => ({
+        readonly: enlargedModal === 'previous' || !canEdit,
+        toolbar: enlargedModal === 'current' && canEdit,
+        showCharsCounter: false,
+        showWordsCounter: false,
+        showXPathInStatusbar: false,
+        buttons: ['bold', 'italic', 'underline', '|', 'ul', 'ol', '|', 'outdent', 'indent', '|', 'table', '|', 'undo', 'redo'],
+        height: '100%',
+        style: {
+            background: '#f9fafb',
+            fontFamily: 'inherit',
+            fontSize: '1.5rem',
+            color: '#000',
+            border: 'none'
+        },
+        placeholder: enlargedModal === 'current' && currentEntry?.is_missing && !canEdit ? "No data for this week. Use '+ Add Old Data' to backfill." : (enlargedModal === 'current' && canEdit ? 'Type here...' : (enlargedModal === 'previous' && !previousEntry ? 'No previous week data' : ''))
+    }), [enlargedModal, canEdit, currentEntry?.is_missing, previousEntry]);
 
     const formatDateDisplay = (dateStr: string) => {
         if (!dateStr) return '';
@@ -378,20 +515,12 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                         style={{ padding: '0.4rem', border: '1px solid #d1d5db', borderRadius: '4px', outline: 'none' }}
                                     />
                                 </div>
-                                <textarea
+                                <JoditEditor
+                                    ref={oldDataEditorRef}
                                     value={oldDataText}
-                                    onChange={(e) => setOldDataText(e.target.value)}
-                                    placeholder="Enter old updates here..."
-                                    style={{
-                                        width: '400px',
-                                        height: '80px',
-                                        padding: '0.5rem',
-                                        border: '1px solid #d1d5db',
-                                        borderRadius: '4px',
-                                        resize: 'vertical',
-                                        outline: 'none',
-                                        fontSize: '0.9rem'
-                                    }}
+                                    config={oldDataJoditConfig}
+                                    onChange={(newContent) => setOldDataText(newContent)}
+                                    onBlur={(newContent) => setOldDataText(newContent)}
                                 />
                                 <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                                     <button 
@@ -468,7 +597,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                         width: '12px',
                                         height: '12px',
                                         borderRadius: '50%',
-                                        backgroundColor: entry.is_old_data ? '#9ca3af' : '#3b82f6',
+                                        backgroundColor: entry.is_missing ? '#ef4444' : (entry.is_old_data ? '#9ca3af' : '#3b82f6'),
                                         marginRight: '1rem',
                                         flexShrink: 0
                                     }} />
@@ -539,24 +668,21 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                         flexDirection: 'column',
                         position: 'relative'
                     }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#3b82f6' }}>
-                            <span>Previous Week</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#3b82f6', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span>Previous Week</span>
+                                <button onClick={() => setEnlargedModal('previous')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6', display: 'flex', padding: 0 }} title="Enlarge Text">
+                                    <Maximize2 size={20} />
+                                </button>
+                            </div>
                         </div>
-                        <textarea 
-                            readOnly 
-                            value={previousText} 
-                            placeholder={previousEntry ? '' : 'No previous week data'}
-                            style={{
-                                flex: 1,
-                                background: 'transparent',
-                                border: 'none',
-                                outline: 'none',
-                                resize: 'none',
-                                fontSize: '1.25rem',
-                                fontFamily: 'inherit',
-                                color: '#000'
-                            }}
-                        />
+                        <div style={{ flex: 1, overflow: 'auto' }}>
+                            <JoditEditor
+                                value={previousText}
+                                config={previousJoditConfig}
+                                onBlur={() => {}}
+                            />
+                        </div>
                     </div>
                     
                     <div style={{
@@ -568,8 +694,13 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                         flexDirection: 'column',
                         position: 'relative'
                     }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#22c55e' }}>
-                            <span>Current week</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#22c55e', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span>Current week</span>
+                                <button onClick={() => setEnlargedModal('current')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#22c55e', display: 'flex', padding: 0 }} title="Enlarge Text">
+                                    <Maximize2 size={20} />
+                                </button>
+                            </div>
                             {canEdit ? (
                                 <input 
                                     type="date"
@@ -582,26 +713,62 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                 <span>{formatDateDisplay(editableDate)}</span>
                             )}
                         </div>
-                        <textarea 
-                            readOnly={!canEdit}
-                            value={editableText}
-                            onChange={(e) => setEditableText(e.target.value)}
-                            onBlur={handleSave}
-                            placeholder={canEdit ? 'Type here...' : ''}
-                            style={{
-                                flex: 1,
-                                background: 'transparent',
-                                border: 'none',
-                                outline: 'none',
-                                resize: 'none',
-                                fontSize: '1.25rem',
-                                fontFamily: 'inherit',
-                                color: '#000'
-                            }}
-                        />
+                        <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+                            <JoditEditor
+                                ref={editorRef}
+                                value={editableText}
+                                config={joditConfig}
+                                onChange={(newContent) => setEditableText(newContent)}
+                                onBlur={(newContent) => {
+                                    setEditableText(newContent);
+                                    handleSave();
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
+            
+            {enlargedModal && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div style={{
+                        backgroundColor: '#fff', padding: '2rem', borderRadius: '8px',
+                        width: '80%', height: '80%', display: 'flex', flexDirection: 'column',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'center' }}>
+                            <h2 style={{ margin: 0, fontSize: '2rem', color: enlargedModal === 'previous' ? '#3b82f6' : '#22c55e' }}>
+                                {enlargedModal === 'previous' ? 'Previous Week' : 'Current week'}
+                            </h2>
+                            <button onClick={() => setEnlargedModal(null)} style={{ cursor: 'pointer', background: 'transparent', border: 'none', color: '#6b7280', display: 'flex' }} title="Close">
+                                <X size={32} />
+                            </button>
+                        </div>
+                        <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+                            <JoditEditor
+                                ref={enlargedEditorRef}
+                                value={enlargedModal === 'previous' ? previousText : editableText}
+                                config={enlargedJoditConfig}
+                                onChange={(newContent) => {
+                                    if (enlargedModal === 'current' && canEdit) {
+                                        setEditableText(newContent);
+                                    }
+                                }}
+                                onBlur={(newContent) => {
+                                    if (enlargedModal === 'current' && canEdit) {
+                                        setEditableText(newContent);
+                                        handleSave();
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -15,6 +15,8 @@
     "@types/three": "^0.182.0",
     "canvas-confetti": "^1.9.4",
     "html2canvas": "^1.4.1",
+    "jodit": "^4.13.5",
+    "jodit-react": "^5.3.21",
     "jspdf": "^3.0.3",
     "lucide-react": "^0.562.0",
     "plotly.js": "^3.3.1",
