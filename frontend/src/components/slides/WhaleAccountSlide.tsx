@@ -437,9 +437,11 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
             display: 'flex',
             flexDirection: 'column',
             padding: '2rem 4rem',
-            fontFamily: "'Inter', system-ui, sans-serif"
+            fontFamily: "'Inter', system-ui, sans-serif",
+            boxSizing: 'border-box',
+            overflow: 'hidden'
         }}>
-            <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '1.5rem', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{ width: '8px', height: '40px', backgroundColor: '#22c55e' }} />
                     <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: '#000', margin: 0 }}>Whale account {region ? `- ${region}` : ''}</h1>
@@ -552,15 +554,16 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                 )}
             </div>
             
-            <div style={{ display: 'flex', flex: 1, gap: '4rem', paddingLeft: '24px' }}>
+            <div style={{ display: 'flex', flex: 1, gap: '2.5rem', paddingLeft: '24px', minHeight: 0, overflow: 'hidden' }}>
                 <div style={{
                     position: 'relative',
-                    width: '320px',
-                    maxHeight: '400px',
+                    width: '280px',
+                    height: '100%',
                     overflowY: 'auto',
                     paddingLeft: '10px',
                     scrollbarWidth: 'none',
-                    msOverflowStyle: 'none'
+                    msOverflowStyle: 'none',
+                    flexShrink: 0
                 }}>
                     <div style={{ position: 'relative' }}>
                         {entries.length > 0 && (
@@ -667,17 +670,21 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                     </div>
                 </div>
                 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: 0, height: '100%', overflow: 'hidden' }}>
                     <div style={{
-                        flex: 1,
+                        flex: '1 1 50%',
+                        minHeight: 0,
                         backgroundColor: '#ebf2f1',
                         border: '2px solid #3b82f6',
-                        padding: '1.5rem',
+                        padding: '1rem 1.5rem',
                         display: 'flex',
                         flexDirection: 'column',
-                        position: 'relative'
+                        position: 'relative',
+                        borderRadius: '8px',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
                     }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#3b82f6', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#3b82f6', alignItems: 'center', flexShrink: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <span>Previous Week</span>
                                 <button onClick={() => setEnlargedModal('previous')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6', display: 'flex', padding: 0 }} title="Enlarge Text">
@@ -685,7 +692,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                 </button>
                             </div>
                         </div>
-                        <div style={{ flex: 1, overflow: 'auto' }}>
+                        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
                             <JoditEditor
                                 value={previousText}
                                 config={previousJoditConfig}
@@ -695,15 +702,19 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                     </div>
                     
                     <div style={{
-                        flex: 1,
+                        flex: '1 1 50%',
+                        minHeight: 0,
                         backgroundColor: '#ebf2f1',
                         border: '2px solid #22c55e',
-                        padding: '1.5rem',
+                        padding: '1rem 1.5rem',
                         display: 'flex',
                         flexDirection: 'column',
-                        position: 'relative'
+                        position: 'relative',
+                        borderRadius: '8px',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
                     }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#22c55e', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#22c55e', alignItems: 'center', flexShrink: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <span>Current week</span>
                                 <button onClick={() => setEnlargedModal('current')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#22c55e', display: 'flex', padding: 0 }} title="Enlarge Text">
@@ -740,7 +751,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                 <span>{formatDateDisplay(editableDate)}</span>
                             )}
                         </div>
-                        <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                             <JoditEditor
                                 ref={editorRef}
                                 value={editableText}
