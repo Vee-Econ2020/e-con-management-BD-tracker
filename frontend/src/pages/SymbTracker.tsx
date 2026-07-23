@@ -107,7 +107,7 @@ function ProductionProgressChart({ records, versionTitle }: { records: Productio
     }, [records, versionTitle]);
 
     // Compute cumulative line traces grouped by Data category aligned on a UNIFIED master timeline
-    const { traces, annotations, sortedPrettyDates, allDateObjs } = useMemo(() => {
+    const { traces, annotations, sortedPrettyDates, allDateObjs, maxY } = useMemo(() => {
         // 1. Build a master list of all unique dates across all filtered records sorted chronologically
         const dateMap = new Map<string, { dateStr: string; dateObj: Date; timestamp: number }>();
 
@@ -135,6 +135,7 @@ function ProductionProgressChart({ records, versionTitle }: { records: Productio
 
         const traceList: any[] = [];
         const annotationList: any[] = [];
+        let maxY = 0;
 
         categories.forEach((cat, idx) => {
             const catRows = filtered.filter(r => String(r['Data category'] || '').trim() === cat);
@@ -179,6 +180,7 @@ function ProductionProgressChart({ records, versionTitle }: { records: Productio
             if (traceX.length === 0) return;
 
             const color = colorPalette[idx % colorPalette.length];
+            if (runningSum > maxY) maxY = runningSum;
 
             traceList.push({
                 x: traceX,
@@ -186,7 +188,9 @@ function ProductionProgressChart({ records, versionTitle }: { records: Productio
                 name: cat,
                 mode: 'lines+markers+text',
                 text: traceText,
-                textposition: 'top center',
+                // Alternate top/bottom placement per category so labels from
+                // nearby lines never stack on top of one another.
+                textposition: idx % 2 === 0 ? 'top center' : 'bottom center',
                 textfont: { size: 16, color: '#0f172a', weight: 'bold' },
                 marker: {
                     size: traceMarkerSizes,
@@ -212,7 +216,7 @@ function ProductionProgressChart({ records, versionTitle }: { records: Productio
             });
         });
 
-        return { traces: traceList, annotations: annotationList, sortedPrettyDates: allDateStrs, allDateObjs };
+        return { traces: traceList, annotations: annotationList, sortedPrettyDates: allDateStrs, allDateObjs, maxY };
     }, [filtered]);
 
     // Auto-scroll to show past 10 days and next 3 days relative to today
@@ -367,12 +371,12 @@ function ProductionProgressChart({ records, versionTitle }: { records: Productio
                 </div>
             ) : (
                 <div ref={scrollContainerRef} style={{ width: '100%', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                    <div style={{ width: `${chartWidth}px`, height: '560px' }}>
+                    <div style={{ width: `${chartWidth}px`, height: 'clamp(520px, 62vh, 700px)' }}>
                         <Plot
                             data={traces}
                             layout={{
                                 autosize: true,
-                                margin: { t: 50, b: 110, l: 80, r: 180 },
+                                margin: { t: 50, b: 130, l: 80, r: 180 },
                                 xaxis: {
                                     title: { text: 'Day', font: { size: 16, color: '#1e293b' } },
                                     type: 'category',
@@ -385,7 +389,10 @@ function ProductionProgressChart({ records, versionTitle }: { records: Productio
                                 yaxis: {
                                     title: { text: 'Cumulative Completed', font: { size: 16, color: '#1e293b' } },
                                     tickfont: { size: 14, color: '#0f172a' },
-                                    gridcolor: '#f1f5f9'
+                                    gridcolor: '#f1f5f9',
+                                    // Extra headroom above/below the data so top/bottom text
+                                    // labels never get clipped or overlap the axes.
+                                    range: [-(maxY * 0.12 || 5), maxY * 1.18 || 10]
                                 },
                                 legend: {
                                     orientation: 'h',
@@ -545,7 +552,10 @@ function CategoryPlannedVsCompletedChart({
                 name: 'Completed Cumulative',
                 mode: 'lines+markers+text',
                 text: traceTextCompleted,
-                textposition: 'top center',
+                // Placed below its own point (Planned stays above) so the two
+                // cumulative labels never sit on top of each other, even when
+                // Planned and Completed values are nearly identical.
+                textposition: 'bottom center',
                 textfont: { size: 15, color: '#16a34a', weight: 'bold' },
                 marker: { size: markerSizesCompleted, color: '#16a34a' },
                 line: { shape: 'spline', width: 3, color: '#16a34a' },
@@ -702,12 +712,12 @@ function CategoryPlannedVsCompletedChart({
                 </div>
             ) : (
                 <div ref={scrollContainerRef} style={{ width: '100%', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                    <div style={{ width: `${chartWidth}px`, height: '500px' }}>
+                    <div style={{ width: `${chartWidth}px`, height: 'clamp(480px, 60vh, 680px)' }}>
                         <Plot
                             data={traces}
                             layout={{
                                 autosize: true,
-                                margin: { t: 40, b: 110, l: 80, r: 180 },
+                                margin: { t: 40, b: 130, l: 80, r: 180 },
                                 xaxis: {
                                     title: { text: 'Day', font: { size: 15, color: '#1e293b' } },
                                     type: 'category',
@@ -720,7 +730,13 @@ function CategoryPlannedVsCompletedChart({
                                 yaxis: {
                                     title: { text: 'Units', font: { size: 15, color: '#1e293b' } },
                                     tickfont: { size: 14, color: '#0f172a' },
-                                    gridcolor: '#f1f5f9'
+                                    gridcolor: '#f1f5f9',
+                                    // Extra headroom so the top (Planned) and bottom (Completed)
+                                    // labels always have clear space and never get clipped.
+                                    range: [
+                                        -(Math.max(totalPlanned, totalCompleted) * 0.12 || 5),
+                                        Math.max(totalPlanned, totalCompleted) * 1.15 || 10
+                                    ]
                                 },
                                 legend: { orientation: 'h', x: 0, y: 1.12, font: { size: 15, color: '#0f172a' } },
                                 annotations: annotations,
@@ -758,7 +774,7 @@ function ActiveAlignmentDailyChart({
         });
     }, [records, versionTitle]);
 
-    const { traces, annotations, sortedPrettyDates, allDateObjs, avgUPD, peakDaily, activeDaysCount } = useMemo(() => {
+    const { traces, annotations, sortedPrettyDates, allDateObjs, avgUPD, peakDaily, activeDaysCount, maxDailyValue } = useMemo(() => {
         const dateMap = new Map<string, { dateStr: string; dateObj: Date; timestamp: number }>();
 
         filtered.forEach(r => {
@@ -823,6 +839,7 @@ function ActiveAlignmentDailyChart({
         });
 
         const avgUPD = activeDaysCount > 0 ? Math.round(totalCompletedSum / activeDaysCount) : 0;
+        const maxDailyValue = Math.max(0, ...traceDailyPlanned, ...traceDailyCompleted);
 
         const traceList: any[] = [];
         const annotationList: any[] = [];
@@ -848,7 +865,9 @@ function ActiveAlignmentDailyChart({
                 name: 'Daily Completed',
                 mode: 'lines+markers+text',
                 text: traceTextCompleted,
-                textposition: 'top center',
+                // Placed below its own point (Daily Planned stays above) so the
+                // two labels never stack on top of each other.
+                textposition: 'bottom center',
                 textfont: { size: 14, color: '#059669', weight: 'bold' },
                 marker: { size: 8, color: '#059669' },
                 line: { shape: 'spline', width: 3, color: '#059669' },
@@ -885,7 +904,8 @@ function ActiveAlignmentDailyChart({
             allDateObjs,
             avgUPD,
             peakDaily,
-            activeDaysCount
+            activeDaysCount,
+            maxDailyValue
         };
     }, [filtered]);
 
@@ -1000,12 +1020,12 @@ function ActiveAlignmentDailyChart({
                 </div>
             ) : (
                 <div ref={scrollContainerRef} style={{ width: '100%', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                    <div style={{ width: `${chartWidth}px`, height: '500px' }}>
+                    <div style={{ width: `${chartWidth}px`, height: 'clamp(480px, 60vh, 680px)' }}>
                         <Plot
                             data={traces}
                             layout={{
                                 autosize: true,
-                                margin: { t: 40, b: 110, l: 80, r: 180 },
+                                margin: { t: 40, b: 130, l: 80, r: 180 },
                                 xaxis: {
                                     title: { text: 'Day', font: { size: 15, color: '#1e293b' } },
                                     type: 'category',
@@ -1018,7 +1038,10 @@ function ActiveAlignmentDailyChart({
                                 yaxis: {
                                     title: { text: 'Daily Units', font: { size: 15, color: '#1e293b' } },
                                     tickfont: { size: 14, color: '#0f172a' },
-                                    gridcolor: '#f1f5f9'
+                                    gridcolor: '#f1f5f9',
+                                    // Extra headroom so the top (Planned) and bottom (Completed)
+                                    // labels always have clear space and never get clipped.
+                                    range: [-(maxDailyValue * 0.18 || 5), maxDailyValue * 1.2 || 10]
                                 },
                                 legend: { orientation: 'h', x: 0, y: 1.12, font: { size: 15, color: '#0f172a' } },
                                 annotations: annotations,

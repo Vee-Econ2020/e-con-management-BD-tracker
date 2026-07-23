@@ -582,7 +582,7 @@ async def process_symb_tracker_upload(
 
     # Generate and save flag mapping
     df_flags = generate_flag_mapping_df()
-    flag_records = df_flags.to_dict('records')
+    flag_records = sanitize_records_for_mongo(df_flags)
     coll_flags = db["symb_flag_mapping"]
     await coll_flags.delete_many({})
     await coll_flags.insert_many(flag_records, ordered=False)

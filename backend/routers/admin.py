@@ -1109,6 +1109,20 @@ async def upload_symb_jabil_production(file: UploadFile = File(...)):
 # SYMB PRODUCTION PROGRESS ENDPOINTS (V1 & V2)
 # ====================================================================
 
+import math
+
+def clean_json_nan(obj):
+    """Recursively replace NaN and Inf float values in dicts/lists with None to prevent FastAPI JSON serialization errors."""
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    elif isinstance(obj, dict):
+        return {k: clean_json_nan(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_json_nan(v) for v in obj]
+    return obj
+
 @router.get("/symb-production-progress/data")
 async def get_symb_production_progress():
     """Get all stored SYMB Production Progress records."""
@@ -1120,7 +1134,7 @@ async def get_symb_production_progress():
             doc["id"] = str(doc["_id"])
             del doc["_id"]
             items.append(doc)
-        return items
+        return clean_json_nan(items)
     except Exception as e:
         print(f"Error fetching SYMB production progress data: {e}")
         return []
@@ -1184,7 +1198,7 @@ async def get_symb_tracker_data(week: Optional[int] = None):
             del doc["_id"]
             flags.append(doc)
 
-        return {"records": records, "flags": flags, "count": len(records)}
+        return clean_json_nan({"records": records, "flags": flags, "count": len(records)})
     except Exception as e:
         print(f"Error fetching SYMB tracker data: {e}")
         return {"records": [], "flags": [], "count": 0}
