@@ -7,7 +7,7 @@ import os
 import uuid
 import asyncio
 from dotenv import load_dotenv
-from progress_tracker import update_progress, get_progress, clear_progress
+from progress_tracker import update_progress, get_progress, clear_progress, progress_store
 
 router = APIRouter()
 
@@ -320,6 +320,37 @@ async def process_upload_background(upload_id: str, contents: bytes, week: int, 
             )
             return
 
+        # ── SYMB Tracker branch ───────────────────────────────────────
+        if type == "symb_tracker" or type == "symb":
+            progress_update(upload_id, 3, 11, "Saving Upload Log", "Creating upload log entry...", "processing")
+            log_dict = {
+                "week": week,
+                "file_date": file_date,
+                "file_name": file_name,
+                "type": type,
+                "created_at": datetime.now()
+            }
+            await coll_logs.insert_one(log_dict)
+
+            _client = AsyncIOMotorClient(MONGODB_URL)
+            _db = _client[DB_NAME]
+
+            from SYMB_transformation import process_symb_tracker_upload
+            try:
+                def symb_progress(step_name, msg, **kwargs):
+                    progress_update(upload_id, 6, 11, step_name, msg, "processing", **kwargs)
+
+                await process_symb_tracker_upload(df, week, file_date, _db, progress_callback=symb_progress)
+                progress_update(upload_id, 11, 11, "Complete", f"Successfully processed SYMB Tracker data for week {week}", "completed")
+            except Exception as symb_err:
+                import traceback
+                traceback.print_exc()
+                progress_update(upload_id, 11, 11, "Error", f"SYMB Tracker pipeline error: {symb_err}", "error")
+
+            await asyncio.sleep(10)
+            clear_progress(upload_id)
+            return
+
         # ── Weekly / Revenue branch (original pipeline) ───────────────
         from transformation import transform_weekly_data
 
@@ -434,8 +465,35 @@ async def process_upload_background(upload_id: str, contents: bytes, week: int, 
                 print(f"  ❌ MongoDB backlog insertion error: {insert_err}")
         else:
             print("  ⚠️  No backlog records to insert!")
-        
-        progress_update(upload_id, 11, 11, "Complete", f"Successfully processed {len(records)} records for week {week}", "completed")
+
+        # STEP 12: Automated Services Trend Pipeline / SYMB Tracker Pipeline
+        if type == "weekly":
+            progress_update(upload_id, 12, 13, "Services Trend", "Executing automated Services Trend pipeline (Zoho API & Snapshots)...", "processing")
+            from transformation import generate_services_trend_from_weekly_df
+            try:
+                def svc_progress(step_name, msg, **kwargs):
+                    progress_update(upload_id, 12, 13, step_name, msg, "processing", **kwargs)
+
+                await generate_services_trend_from_weekly_df(df, week, file_date, _db, progress_callback=svc_progress)
+            except Exception as svc_err:
+                print(f"  ⚠️ Automated Services Trend pipeline failed: {svc_err}")
+                import traceback
+                traceback.print_exc()
+
+        elif type == "symb_tracker" or type == "symb":
+            progress_update(upload_id, 12, 13, "SYMB Tracker Pipeline", "Executing automated SYMB Tracker pipeline (Zoho Sales Orders API)...", "processing")
+            from SYMB_transformation import process_symb_tracker_upload
+            try:
+                def symb_progress(step_name, msg, **kwargs):
+                    progress_update(upload_id, 12, 13, step_name, msg, "processing", **kwargs)
+
+                await process_symb_tracker_upload(df, week, file_date, _db, progress_callback=symb_progress)
+            except Exception as symb_err:
+                print(f"  ⚠️ Automated SYMB Tracker pipeline failed: {symb_err}")
+                import traceback
+                traceback.print_exc()
+
+        progress_update(upload_id, 13, 13, "Complete", f"Successfully processed {len(records)} records for week {week}", "completed")
         
         # Clear progress after 10 seconds
         await asyncio.sleep(10)
@@ -444,7 +502,64 @@ async def process_upload_background(upload_id: str, contents: bytes, week: int, 
     except Exception as e:
         import traceback
         traceback.print_exc()
-        progress_update(upload_id, 11, 11, "Error", str(e), "error")
+        progress_update(upload_id, 13, 13, "Error", str(e), "error")
+
+
+@router.post("/trigger-services-trend-sync")
+async def trigger_services_trend_sync(
+    week: int = Form(...),
+    background_tasks: BackgroundTasks = None
+):
+    """Trigger automated Services Trend sync for a given week using existing weekly data in DB."""
+    import pandas as pd
+    from transformation import generate_services_trend_from_weekly_df
+
+    try:
+        coll_logs = get_collection("upload_logs")
+        log_doc = await coll_logs.find_one({"week": week, "type": "weekly"})
+        if not log_doc:
+            raise HTTPException(status_code=404, detail=f"No weekly upload found for week {week}")
+
+        coll_data = get_collection("weekly_tracker_data")
+        cursor = coll_data.find({"week": week})
+        docs = await cursor.to_list(length=100000)
+        if not docs:
+            raise HTTPException(status_code=404, detail=f"No data records found for week {week}")
+
+        df = pd.DataFrame(docs)
+        upload_id = str(uuid.uuid4())
+        file_date = log_doc.get("file_date", datetime.now().strftime("%d-%m-%Y"))
+
+        update_progress(upload_id, 0, 5, "Starting", "Services Trend sync initiated", "processing")
+        
+        _client = AsyncIOMotorClient(MONGODB_URL)
+        _db = _client[DB_NAME]
+
+        async def _run_sync():
+            try:
+                def progress_cb(step_name, msg, **kwargs):
+                    update_progress(upload_id, 2, 5, step_name, msg, "processing", **kwargs)
+                
+                await generate_services_trend_from_weekly_df(df, week, file_date, _db, progress_callback=progress_cb)
+                update_progress(upload_id, 5, 5, "Complete", f"Successfully synced Services Trend for week {week}", "completed")
+                await asyncio.sleep(10)
+                clear_progress(upload_id)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                update_progress(upload_id, 5, 5, "Error", str(e), "error")
+
+        background_tasks.add_task(_run_sync)
+        return {
+            "status": "started",
+            "upload_id": upload_id,
+            "message": "Services Trend sync started."
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.post("/upload-services-trend")
@@ -628,6 +743,38 @@ async def _process_gross_margin_upload(
         progress_update(upload_id, total_steps, total_steps, "Error", str(e), "error")
 
 
+@router.get("/active-upload")
+async def get_active_upload():
+    """
+    Check if there is any ongoing upload task currently processing in memory.
+    """
+    for upload_id, progress in list(progress_store.items()):
+        if progress.status == 'processing':
+            sub_pct = (progress.items_processed / progress.items_total) if (progress.items_total and progress.items_processed is not None) else None
+            if sub_pct is not None:
+                calc_pct = int((((progress.step - 1) + sub_pct) / progress.total_steps) * 100)
+            else:
+                calc_pct = int((progress.step / progress.total_steps) * 100)
+            
+            return {
+                "active": True,
+                "upload_id": upload_id,
+                "step": progress.step,
+                "total_steps": progress.total_steps,
+                "step_name": progress.step_name,
+                "message": progress.message,
+                "status": progress.status,
+                "error": progress.error,
+                "progress_percent": min(99, max(1, calc_pct)),
+                "start_time_str": progress.start_time_str,
+                "est_completion_time_str": progress.est_completion_time_str,
+                "time_remaining_str": progress.time_remaining_str,
+                "items_processed": progress.items_processed,
+                "items_total": progress.items_total,
+            }
+    return {"active": False}
+
+
 @router.get("/upload-progress/{upload_id}")
 async def get_upload_progress(upload_id: str):
     """
@@ -637,6 +784,12 @@ async def get_upload_progress(upload_id: str):
     if not progress:
         raise HTTPException(status_code=404, detail="Upload ID not found or progress expired")
     
+    sub_pct = (progress.items_processed / progress.items_total) if (progress.items_total and progress.items_processed is not None) else None
+    if sub_pct is not None:
+        calc_pct = int((((progress.step - 1) + sub_pct) / progress.total_steps) * 100)
+    else:
+        calc_pct = int((progress.step / progress.total_steps) * 100)
+
     return {
         "upload_id": upload_id,
         "step": progress.step,
@@ -645,7 +798,12 @@ async def get_upload_progress(upload_id: str):
         "message": progress.message,
         "status": progress.status,
         "error": progress.error,
-        "progress_percent": int((progress.step / progress.total_steps) * 100)
+        "progress_percent": min(99, max(1, calc_pct)),
+        "start_time_str": progress.start_time_str,
+        "est_completion_time_str": progress.est_completion_time_str,
+        "time_remaining_str": progress.time_remaining_str,
+        "items_processed": progress.items_processed,
+        "items_total": progress.items_total,
     }
 
 
@@ -848,6 +1006,188 @@ async def delete_all_region_mappings():
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ====================================================================
+# SYMB TRACKER REFERENCE DATA & DASHBOARD ENDPOINTS
+# ====================================================================
+
+@router.get("/symb-so-numbers")
+async def get_symb_so_numbers():
+    """Get all stored SYMB SO Numbers reference data."""
+    try:
+        coll = get_collection("symb_so_numbers")
+        cursor = coll.find({})
+        items = []
+        async for doc in cursor:
+            doc["id"] = str(doc["_id"])
+            del doc["_id"]
+            items.append(doc)
+        return items
+    except Exception as e:
+        print(f"Error fetching SYMB SO numbers: {e}")
+        return []
+
+@router.post("/symb-so-numbers/upload")
+async def upload_symb_so_numbers(file: UploadFile = File(...)):
+    """Upload CSV with SYMB SO numbers and replace existing collection."""
+    import io
+    import pandas as pd
+    try:
+        if not file.filename.lower().endswith('.csv'):
+            raise HTTPException(status_code=400, detail="Only .csv files allowed.")
+        contents = await file.read()
+        try:
+            df = pd.read_csv(io.BytesIO(contents), dtype=str)
+        except (UnicodeDecodeError, Exception):
+            df = pd.read_csv(io.BytesIO(contents), dtype=str, encoding='latin-1')
+
+        if len(df) == 0:
+            raise HTTPException(status_code=400, detail="CSV file is empty.")
+        
+        coll = get_collection("symb_so_numbers")
+        await coll.delete_many({})
+        records = df.to_dict('records')
+        for r in records:
+            for k, v in list(r.items()):
+                if pd.isna(v):
+                    r[k] = None
+        if records:
+            await coll.insert_many(records, ordered=False)
+        return {"status": "success", "message": f"Successfully stored {len(records)} SYMB SO numbers", "count": len(records)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/symb-jabil-production")
+async def get_symb_jabil_production():
+    """Get all stored Jabil Production List Price reference data."""
+    try:
+        coll = get_collection("symb_jabil_production")
+        cursor = coll.find({})
+        items = []
+        async for doc in cursor:
+            doc["id"] = str(doc["_id"])
+            del doc["_id"]
+            items.append(doc)
+        return items
+    except Exception as e:
+        print(f"Error fetching Jabil production data: {e}")
+        return []
+
+@router.post("/symb-jabil-production/upload")
+async def upload_symb_jabil_production(file: UploadFile = File(...)):
+    """Upload CSV with Jabil Production list prices and replace existing collection."""
+    import io
+    import pandas as pd
+    try:
+        if not file.filename.lower().endswith('.csv'):
+            raise HTTPException(status_code=400, detail="Only .csv files allowed.")
+        contents = await file.read()
+        try:
+            df = pd.read_csv(io.BytesIO(contents), dtype=str)
+        except (UnicodeDecodeError, Exception):
+            df = pd.read_csv(io.BytesIO(contents), dtype=str, encoding='latin-1')
+
+        if len(df) == 0:
+            raise HTTPException(status_code=400, detail="CSV file is empty.")
+        
+        coll = get_collection("symb_jabil_production")
+        await coll.delete_many({})
+        records = df.to_dict('records')
+        for r in records:
+            for k, v in list(r.items()):
+                if pd.isna(v):
+                    r[k] = None
+        if records:
+            await coll.insert_many(records, ordered=False)
+        return {"status": "success", "message": f"Successfully stored {len(records)} Jabil Production records", "count": len(records)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ====================================================================
+# SYMB PRODUCTION PROGRESS ENDPOINTS (V1 & V2)
+# ====================================================================
+
+@router.get("/symb-production-progress/data")
+async def get_symb_production_progress():
+    """Get all stored SYMB Production Progress records."""
+    try:
+        coll = get_collection("symb_production_progress")
+        cursor = coll.find({})
+        items = []
+        async for doc in cursor:
+            doc["id"] = str(doc["_id"])
+            del doc["_id"]
+            items.append(doc)
+        return items
+    except Exception as e:
+        print(f"Error fetching SYMB production progress data: {e}")
+        return []
+
+@router.post("/symb-production-progress/upload")
+async def upload_symb_production_progress(file: UploadFile = File(...)):
+    """Upload CSV with SYMB Production Progress data as-is and replace existing collection."""
+    import io
+    import pandas as pd
+    try:
+        if not file.filename.lower().endswith('.csv'):
+            raise HTTPException(status_code=400, detail="Only .csv files allowed.")
+        contents = await file.read()
+        try:
+            df = pd.read_csv(io.BytesIO(contents))
+        except (UnicodeDecodeError, Exception):
+            df = pd.read_csv(io.BytesIO(contents), encoding='latin-1')
+
+        if len(df) == 0:
+            raise HTTPException(status_code=400, detail="CSV file is empty.")
+
+        # Clean column names (strip whitespace)
+        df.columns = [str(c).strip() for c in df.columns]
+
+        coll = get_collection("symb_production_progress")
+        await coll.delete_many({})
+        records = df.to_dict('records')
+        for r in records:
+            r.pop('_id', None)
+            for k, v in list(r.items()):
+                if pd.isna(v):
+                    r[k] = None
+        if records:
+            await coll.insert_many(records, ordered=False)
+        return {
+            "status": "success",
+            "message": f"Successfully stored {len(records)} SYMB Production Progress records",
+            "count": len(records)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/symb-tracker/data")
+async def get_symb_tracker_data(week: Optional[int] = None):
+    """Retrieve processed SYMB tracker data and flag mappings."""
+    try:
+        coll_data = get_collection("symb_tracker_data")
+        query = {"upload_week": week} if week else {}
+        cursor = coll_data.find(query)
+        records = []
+        async for doc in cursor:
+            doc["id"] = str(doc["_id"])
+            del doc["_id"]
+            records.append(doc)
+
+        coll_flags = get_collection("symb_flag_mapping")
+        flag_cursor = coll_flags.find({})
+        flags = []
+        async for doc in flag_cursor:
+            doc["id"] = str(doc["_id"])
+            del doc["_id"]
+            flags.append(doc)
+
+        return {"records": records, "flags": flags, "count": len(records)}
+    except Exception as e:
+        print(f"Error fetching SYMB tracker data: {e}")
+        return {"records": [], "flags": [], "count": 0}
 
 # ====================================================================
 # PRESENTATION SLIDES ENDPOINTS

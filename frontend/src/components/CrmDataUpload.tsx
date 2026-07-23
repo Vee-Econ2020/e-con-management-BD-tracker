@@ -18,10 +18,8 @@ interface RegionMapping {
 }
 
 export function CrmDataUpload() {
-    const [activeTab, setActiveTab] = useState<'weekly' | 'revenue' | 'region' | 'gross_margin' | 'services_trend'>('weekly');
+    const [activeTab, setActiveTab] = useState<'weekly' | 'revenue' | 'region' | 'gross_margin' | 'services_trend' | 'symb_tracker' | 'symb_reference'>('weekly');
     const [file, setFile] = useState<File | null>(null);
-    const [timelineFile, setTimelineFile] = useState<File | null>(null);
-    const [oppFile, setOppFile] = useState<File | null>(null);
     const [logs, setLogs] = useState<UploadLog[]>([]);
     const [regionMappings, setRegionMappings] = useState<RegionMapping[]>([]);
     const [statusMsg, setStatusMsg] = useState('');
@@ -34,10 +32,29 @@ export function CrmDataUpload() {
         stepName: string;
         message: string;
         progressPercent: number;
+        startTimeStr?: string;
+        estCompletionTimeStr?: string;
+        timeRemainingStr?: string;
+        itemsProcessed?: number;
+        itemsTotal?: number;
     } | null>(null);
 
+    const [terminalLogs, setTerminalLogs] = useState<{time: string, msg: string}[]>([]);
+    const [frontendTimerStartedAt, setFrontendTimerStartedAt] = useState<number | null>(null);
+    const [frontendTimerTotalSecs, setFrontendTimerTotalSecs] = useState<number | null>(null);
+    const [frontendTimerRemaining, setFrontendTimerRemaining] = useState<number | null>(null);
 
-
+    // Run a fast frontend timer
+    useEffect(() => {
+        if (frontendTimerTotalSecs !== null && frontendTimerStartedAt !== null && uploadProgress) {
+            const timer = setInterval(() => {
+                const elapsedSecs = Math.floor((Date.now() - frontendTimerStartedAt) / 1000);
+                const remaining = frontendTimerTotalSecs - elapsedSecs;
+                setFrontendTimerRemaining(remaining > 0 ? remaining : 0);
+            }, 1000);
+            return () => clearInterval(timer);
+        }
+    }, [frontendTimerTotalSecs, frontendTimerStartedAt, uploadProgress]);
 
     // ISO week calculation: Weeks run Monday-Sunday.
     // Week 1 is the first week containing a Thursday (or containing Jan 4).
@@ -60,11 +77,43 @@ export function CrmDataUpload() {
     };
 
 
+    const checkActiveUpload = async () => {
+        try {
+            const res = await fetch('/api/admin/active-upload');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.active && data.upload_id) {
+                    const savedStart = localStorage.getItem('active_upload_started_at');
+                    if (savedStart) {
+                        setFrontendTimerStartedAt(parseInt(savedStart, 10));
+                    }
+                    setUploadProgress({
+                        isUploading: true,
+                        step: data.step,
+                        totalSteps: data.total_steps,
+                        stepName: data.step_name,
+                        message: data.message,
+                        progressPercent: data.progress_percent,
+                        startTimeStr: data.start_time_str,
+                        estCompletionTimeStr: data.est_completion_time_str,
+                        timeRemainingStr: data.time_remaining_str,
+                        itemsProcessed: data.items_processed,
+                        itemsTotal: data.items_total,
+                    });
+                    pollProgress(data.upload_id, 0);
+                }
+            }
+        } catch (err) {
+            console.error('Check active upload error:', err);
+        }
+    };
+
     useEffect(() => {
         if (activeTab === 'region') {
             fetchRegionMappings();
         } else {
             fetchLogs();
+            checkActiveUpload();
         }
     }, [activeTab]);
 
@@ -74,6 +123,7 @@ export function CrmDataUpload() {
             case 'revenue': return 'revenue-tracker';
             case 'gross_margin': return 'Gross-margin';
             case 'services_trend': return 'services-trend';
+            case 'symb_tracker': return 'symb-tracker';
             default: return '';
         }
     };
@@ -100,18 +150,78 @@ export function CrmDataUpload() {
         }
     };
 
+    const handleSymbSoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            setStatusMsg('Uploading SYMB SO Numbers...');
+            const res = await fetch('/api/admin/symb-so-numbers/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setStatusMsg(`Success: ${data.message}`);
+            } else {
+                setStatusMsg(`Error: ${data.detail}`);
+            }
+        } catch (err: any) {
+            setStatusMsg(`Error: ${err.message}`);
+        }
+    };
+
+    const handleJabilUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            setStatusMsg('Uploading Jabil Production List Price...');
+            const res = await fetch('/api/admin/symb-jabil-production/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setStatusMsg(`Success: ${data.message}`);
+            } else {
+                setStatusMsg(`Error: ${data.detail}`);
+            }
+        } catch (err: any) {
+            setStatusMsg(`Error: ${err.message}`);
+        }
+    };
+
+    const handleProductionProgressUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            setStatusMsg('Uploading SYMB Production Progress CSV...');
+            const res = await fetch('/api/admin/symb-production-progress/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setStatusMsg(`Success: ${data.message}`);
+            } else {
+                setStatusMsg(`Error: ${data.detail}`);
+            }
+        } catch (err: any) {
+            setStatusMsg(`Error: ${err.message}`);
+        }
+    };
+
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             setFile(e.target.files[0]);
             setStatusMsg('');
         }
-    };
-
-    const handleServicesTrendFileChange = (kind: 'timeline' | 'opp', fileList: FileList | null) => {
-        const selectedFile = fileList?.[0] || null;
-        if (kind === 'timeline') setTimelineFile(selectedFile);
-        if (kind === 'opp') setOppFile(selectedFile);
-        setStatusMsg('');
     };
 
     const validateAndUpload = async () => {
@@ -167,6 +277,7 @@ export function CrmDataUpload() {
             formData.append('file', file);  // ← ACTUAL CSV FILE
 
             // Start upload
+            localStorage.setItem('active_upload_started_at', Date.now().toString());
             setUploadProgress({
                 isUploading: true,
                 step: 0,
@@ -220,25 +331,65 @@ export function CrmDataUpload() {
                     totalSteps: progress.total_steps,
                     stepName: progress.step_name,
                     message: progress.message,
-                    progressPercent: progress.progress_percent
+                    progressPercent: progress.progress_percent,
+                    startTimeStr: progress.start_time_str,
+                    estCompletionTimeStr: progress.est_completion_time_str,
+                    timeRemainingStr: progress.time_remaining_str,
+                    itemsProcessed: progress.items_processed,
+                    itemsTotal: progress.items_total,
                 });
+
+                if (progress.message) {
+                    setTerminalLogs(prev => {
+                        const newLogs = progress.message.split('\n').map((m: string) => m.trim()).filter((m: string) => m.length > 0);
+                        let updated = [...prev];
+                        let changed = false;
+                        
+                        const existingMsgs = new Set(prev.map(l => l.msg));
+                        for (const m of newLogs) {
+                            if (!existingMsgs.has(m)) {
+                                updated.push({ time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}), msg: m });
+                                changed = true;
+                                existingMsgs.add(m);
+                            }
+                        }
+                        return changed ? updated : prev;
+                    });
+                    
+                    const preparedMatch = progress.message.match(/Prepared (\d+) closed won\/lost opportunity records/i);
+                    const fetchingMatch = progress.message.match(/Fetching \d+\/(\d+) records/i);
+                    
+                    let totalRecords = 0;
+                    if (preparedMatch) {
+                        totalRecords = parseInt(preparedMatch[1], 10);
+                    } else if (fetchingMatch) {
+                        totalRecords = parseInt(fetchingMatch[1], 10);
+                    }
+            
+                    if (totalRecords > 0) {
+                        setFrontendTimerTotalSecs(prev => {
+                            if (prev === null) {
+                                const secs = Math.ceil(totalRecords * 1.2);
+                                setFrontendTimerStartedAt(Date.now());
+                                return secs;
+                            }
+                            return prev;
+                        });
+                    }
+                }
 
                 // Check if completed or error
                 if (progress.status === 'completed') {
+                    localStorage.removeItem('active_upload_started_at');
                     clearInterval(pollInterval);
                     setStatusMsg(progress.message || `Success! Week ${weekNum} processed.`);
                     setUploadProgress(null);
                     setFile(null);
-                    setTimelineFile(null);
-                    setOppFile(null);
                     fetchLogs();
                     const fileInput = document.getElementById('csv-upload') as HTMLInputElement;
                     if (fileInput) fileInput.value = '';
-                    const timelineInput = document.getElementById('services-timeline-upload') as HTMLInputElement;
-                    if (timelineInput) timelineInput.value = '';
-                    const oppInput = document.getElementById('services-opp-upload') as HTMLInputElement;
-                    if (oppInput) oppInput.value = '';
                 } else if (progress.status === 'error') {
+                    localStorage.removeItem('active_upload_started_at');
                     clearInterval(pollInterval);
                     setStatusMsg(`Error: ${progress.error || progress.message}`);
                     setUploadProgress(null);
@@ -248,70 +399,38 @@ export function CrmDataUpload() {
                 clearInterval(pollInterval);
                 setUploadProgress(null);
             }
-        }, 500);  // Poll every 500ms
+        }, 2000);  // Poll every 2000ms
     };
-
-    const validateServicesTrendAndUpload = async () => {
-        if (!timelineFile || !oppFile) {
-            setStatusMsg('Please select both Services trend files.');
+    const triggerAutomatedServicesTrendSync = async (weekToSync?: number) => {
+        let weekNum = weekToSync;
+        if (!weekNum) {
+            const weeklyLog = logs.find(l => l.type === 'weekly');
+            if (weeklyLog) {
+                weekNum = weeklyLog.week;
+            }
+        }
+        if (!weekNum) {
+            setStatusMsg("No weekly tracker uploads found to sync.");
             return;
         }
 
-        if (!timelineFile.name.toLowerCase().endsWith('.csv') || !oppFile.name.toLowerCase().endsWith('.csv')) {
-            setStatusMsg('Invalid file type. Only .csv allowed.');
-            return;
-        }
-
-        const timelineRegex = /^timeline_filtered_moneyball_FY2027_(\d{2}-\d{2}-(\d{4}|\d{2}))\.csv$/i;
-        const oppRegex = /^closed_won_opportunities_moneyball_(\d{2}-\d{2}-(\d{4}|\d{2}))\.csv$/i;
-        const timelineMatch = timelineFile.name.match(timelineRegex);
-        const oppMatch = oppFile.name.match(oppRegex);
-
-        if (!timelineMatch) {
-            setStatusMsg('Invalid timeline filename. Expected: timeline_filtered_moneyball_FY2027_DD-MM-YYYY.csv');
-            return;
-        }
-        if (!oppMatch) {
-            setStatusMsg('Invalid opportunity filename. Expected: closed_won_opportunities_moneyball_DD-MM-YYYY.csv');
-            return;
-        }
-        if (timelineMatch[1] !== oppMatch[1]) {
-            setStatusMsg('Both Services trend files must use the same date in the filename.');
-            return;
-        }
-
-        const dateStr = timelineMatch[1];
-        const [dayRaw, monthRaw, yearRaw] = dateStr.split('-').map(Number);
-        const year = yearRaw < 100 ? yearRaw + 2000 : yearRaw;
-        const dateObj = new Date(year, monthRaw - 1, dayRaw);
-        if (isNaN(dateObj.getTime())) {
-            setStatusMsg('Invalid date in filename.');
-            return;
-        }
-
-        const weekNum = getSimpleWeekNumber(dateObj);
-        if (!window.confirm(`Process Services trend files for Week ${weekNum}?`)) return;
+        if (!window.confirm(`Run automated Services Trend sync for Week ${weekNum}?`)) return;
 
         try {
             const formData = new FormData();
             formData.append('week', weekNum.toString());
-            formData.append('file_date', dateStr);
-            formData.append('timeline_file_name', timelineFile.name);
-            formData.append('opp_file_name', oppFile.name);
-            formData.append('timeline_file', timelineFile);
-            formData.append('opp_file', oppFile);
 
             setUploadProgress({
                 isUploading: true,
                 step: 0,
-                totalSteps: 6,
+                totalSteps: 5,
                 stepName: 'Starting',
-                message: 'Initiating Services trend upload...',
+                message: 'Initiating automated Services Trend sync...',
                 progressPercent: 0
             });
             setStatusMsg('');
 
-            const res = await fetch('/api/admin/upload-services-trend', {
+            const res = await fetch('/api/admin/trigger-services-trend-sync', {
                 method: 'POST',
                 body: formData
             });
@@ -474,6 +593,40 @@ export function CrmDataUpload() {
                 >
                     Services Trend
                 </button>
+                <button
+                    onClick={() => setActiveTab('symb_tracker')}
+                    style={{
+                        backgroundColor: activeTab === 'symb_tracker' ? '#f5ad42' : '#6b7280',
+                        color: activeTab === 'symb_tracker' ? '#000000' : 'white',
+                        border: 'none',
+                        padding: '0.8rem 2rem',
+                        fontSize: '1rem',
+                        fontWeight: '700',
+                        clipPath: 'polygon(0 0, 90% 0, 100% 100%, 0 100%)',
+                        cursor: 'pointer',
+                        minWidth: '150px',
+                        textAlign: 'left'
+                    }}
+                >
+                    SYMB Tracker
+                </button>
+                <button
+                    onClick={() => setActiveTab('symb_reference')}
+                    style={{
+                        backgroundColor: activeTab === 'symb_reference' ? '#d97706' : '#6b7280',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.8rem 2rem',
+                        fontSize: '1rem',
+                        fontWeight: '700',
+                        clipPath: 'polygon(0 0, 90% 0, 100% 100%, 0 100%)',
+                        cursor: 'pointer',
+                        minWidth: '150px',
+                        textAlign: 'left'
+                    }}
+                >
+                    SYMB References
+                </button>
             </div>
 
             {/* Main Content Area */}
@@ -485,13 +638,13 @@ export function CrmDataUpload() {
             }}>
                 {/* Upload Section */}
                 <div style={{
-                    backgroundColor: '#6b7280', // Darker grey box
+                    backgroundColor: activeTab === 'symb_tracker' || activeTab === 'symb_reference' ? '#7c2d12' : '#6b7280',
                     padding: '3rem',
                     borderRadius: '4px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '1rem', // Reduced gap to accommodate format line
+                    gap: '1rem',
                     marginBottom: '4rem',
                     boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
                 }}>
@@ -506,90 +659,114 @@ export function CrmDataUpload() {
                             : activeTab === 'gross_margin'
                                 ? 'Gross Margin data upload'
                                 : activeTab === 'services_trend'
-                                    ? 'Services trend data upload'
-                                    : `${activeTab} tracker data upload`}
+                                    ? 'Services Trend Automated Pipeline'
+                                    : activeTab === 'symb_tracker'
+                                        ? 'SYMB Mass Orders Data Upload'
+                                        : activeTab === 'symb_reference'
+                                            ? 'SYMB One-Time Reference Tables Upload'
+                                            : `${activeTab} tracker data upload`}
                     </div>
                     <div style={{
                         fontSize: '0.9rem',
                         color: '#d1d5db',
-                        marginBottom: '1rem'
+                        marginBottom: '1rem',
+                        textAlign: 'center',
+                        maxWidth: '600px'
                     }}>
                         {activeTab === 'region'
                             ? 'CSV must have two columns: "Opportunities Owner" and "Region"'
                             : activeTab === 'services_trend'
-                                ? 'file name formats: "timeline_filtered_moneyball_FY2027_dd-mm-yyyy.csv" and "closed_won_opportunities_moneyball_dd-mm-yyyy.csv"'
-                                : `file name format: "${getUploadPrefix()}_dd-mm-yyyy.csv"`
+                                ? 'Services Trend data is automatically generated every time a Weekly Tracker CSV is uploaded. Click below to manually re-sync.'
+                                : activeTab === 'symb_reference'
+                                    ? 'Upload SYMB SO Numbers and Jabil Production List Price reference CSV files below (uploaded once, updated anytime).'
+                                    : `file name format: "${getUploadPrefix()}_dd-mm-yyyy.csv"`
                         }
                     </div>
 
-                    {activeTab === 'services_trend' ? (
-                        <div style={{ display: 'grid', gap: '0.75rem', width: '100%', maxWidth: '680px' }}>
-                            <label style={{ color: 'white', fontWeight: 700, display: 'grid', gap: '0.35rem' }}>
-                                Timeline CSV
-                                <input
-                                    id="services-timeline-upload"
-                                    type="file"
-                                    accept=".csv"
-                                    onChange={(e) => handleServicesTrendFileChange('timeline', e.target.files)}
-                                    style={{ color: 'white' }}
-                                />
-                            </label>
-                            <label style={{ color: 'white', fontWeight: 700, display: 'grid', gap: '0.35rem' }}>
-                                Closed Won Opportunities CSV
-                                <input
-                                    id="services-opp-upload"
-                                    type="file"
-                                    accept=".csv"
-                                    onChange={(e) => handleServicesTrendFileChange('opp', e.target.files)}
-                                    style={{ color: 'white' }}
-                                />
-                            </label>
+                    {activeTab === 'symb_reference' ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', width: '100%', maxWidth: '950px', backgroundColor: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', color: 'white' }}>
+                                <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>1. SYMB SO Numbers (.csv)</label>
+                                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Contains column "SO NUMBER"</span>
+                                <input type="file" accept=".csv" onChange={handleSymbSoUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', color: 'white' }}>
+                                <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>2. Jabil Production (.csv)</label>
+                                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Contains columns "SO Number", "Total"</span>
+                                <input type="file" accept=".csv" onChange={handleJabilUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', color: 'white' }}>
+                                <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>3. Production Progress (V1/V2) (.csv)</label>
+                                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Contains "Customer Name", "completed", "Data category"</span>
+                                <input type="file" accept=".csv" onChange={handleProductionProgressUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
+                            </div>
+                        </div>
+                    ) : activeTab === 'services_trend' ? (
+                        <div style={{ textAlign: 'center', padding: '1rem' }}>
+                            <button
+                                onClick={() => triggerAutomatedServicesTrendSync()}
+                                style={{
+                                    backgroundColor: '#22c55e',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    padding: '0.8rem 2.5rem',
+                                    fontWeight: '700',
+                                    fontSize: '1.1rem',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 6px rgba(0,0,0,0.15)'
+                                }}
+                            >
+                                ⚡ Run Automated Services Trend Sync
+                            </button>
                         </div>
                     ) : (
-                        <input
-                            id="csv-upload"
-                            type="file"
-                            accept=".csv"
-                            onChange={handleFileChange}
-                            style={{ color: 'white' }}
-                        />
-                    )}
+                        <>
+                            <input
+                                id="csv-upload"
+                                type="file"
+                                accept=".csv"
+                                onChange={handleFileChange}
+                                style={{ color: 'white' }}
+                            />
 
-                    {/* Submit / Confirm Button Group */}
-                    <div style={{
-                        display: 'flex',
-                        backgroundColor: '#4b5563',
-                        borderRadius: '9999px',
-                        padding: '4px',
-                        border: '1px solid #374151'
-                    }}>
-                        <button
-                            onClick={activeTab === 'region' ? handleRegionUpload : activeTab === 'services_trend' ? validateServicesTrendAndUpload : validateAndUpload}
-                            style={{
-                                backgroundColor: '#3b82f6', // Blue
-                                color: 'white',
-                                border: 'none',
+                            {/* Submit / Confirm Button Group */}
+                            <div style={{
+                                display: 'flex',
+                                backgroundColor: '#4b5563',
                                 borderRadius: '9999px',
-                                padding: '0.6rem 2.5rem',
-                                fontWeight: '700',
-                                fontSize: '1.2rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            Submit
-                        </button>
-                        <div style={{
-                            padding: '0.6rem 2rem',
-                            color: '#9ca3af',
-                            fontWeight: '700',
-                            fontSize: '1.2rem',
-                            display: 'flex',
-                            alignItems: 'center'
-                        }}>
-                            confirm
-                        </div>
-                    </div>
+                                padding: '4px',
+                                border: '1px solid #374151'
+                            }}>
+                                <button
+                                    onClick={activeTab === 'region' ? handleRegionUpload : validateAndUpload}
+                                    style={{
+                                        backgroundColor: '#3b82f6', // Blue
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '9999px',
+                                        padding: '0.6rem 2.5rem',
+                                        fontWeight: '700',
+                                        fontSize: '1.2rem',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    Submit
+                                </button>
+                                <div style={{
+                                    padding: '0.6rem 2rem',
+                                    color: '#9ca3af',
+                                    fontWeight: '700',
+                                    fontSize: '1.2rem',
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }}>
+                                    confirm
+                                </div>
+                            </div>
+                        </>
+                    )}
 
                     {/* Progress Bar - shown when uploading */}
                     {uploadProgress && (
@@ -630,14 +807,103 @@ export function CrmDataUpload() {
                                     justifyContent: 'center'
                                 }}></div>
                             </div>
-                            <div style={{
-                                marginTop: '0.5rem',
-                                color: 'rgba(255,255,255,0.8)',
-                                fontSize: '0.85rem',
-                                fontStyle: 'italic'
-                            }}>
-                                {uploadProgress.message}
-                            </div>
+                            {frontendTimerRemaining !== null && frontendTimerStartedAt !== null ? (
+                                <div style={{
+                                    marginTop: '0.85rem',
+                                    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                                    borderRadius: '8px',
+                                    padding: '0.85rem 1.1rem',
+                                    display: 'grid',
+                                    gap: '0.6rem'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#60a5fa', fontWeight: 600, fontSize: '0.92rem' }}>
+                                        <span>⚡ Automated Services Trend Extraction</span>
+                                        <span style={{ backgroundColor: '#1d4ed8', color: 'white', padding: '0.15rem 0.55rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 600 }}>
+                                            ~1.2s / record
+                                        </span>
+                                    </div>
+                                    <div style={{
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        gap: '1.2rem',
+                                        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                                        padding: '0.55rem 0.9rem',
+                                        borderRadius: '6px',
+                                        fontSize: '0.88rem',
+                                        color: '#e5e7eb'
+                                    }}>
+                                        <span>🕒 <strong>Started:</strong> {new Date(frontendTimerStartedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                        <span style={{ color: '#fbbf24', fontWeight: 700 }}>
+                                            ⏳ <strong>Remaining:</strong> {Math.floor(frontendTimerRemaining / 60)}m {frontendTimerRemaining % 60}s
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : uploadProgress.startTimeStr ? (
+                                <div style={{
+                                    marginTop: '0.85rem',
+                                    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                                    borderRadius: '8px',
+                                    padding: '0.85rem 1.1rem',
+                                    display: 'grid',
+                                    gap: '0.6rem'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#60a5fa', fontWeight: 600, fontSize: '0.92rem' }}>
+                                        <span>⚡ {uploadProgress.itemsProcessed !== undefined && uploadProgress.itemsTotal !== undefined ? `Fetching Zoho Timelines (${uploadProgress.itemsProcessed} / ${uploadProgress.itemsTotal} records)` : "Processing"}</span>
+                                    </div>
+                                    <div style={{
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        gap: '1.2rem',
+                                        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                                        padding: '0.55rem 0.9rem',
+                                        borderRadius: '6px',
+                                        fontSize: '0.88rem',
+                                        color: '#e5e7eb'
+                                    }}>
+                                        <span>🕒 <strong>Started:</strong> {uploadProgress.startTimeStr}</span>
+                                        <span>🏁 <strong>Est. Completion:</strong> {uploadProgress.estCompletionTimeStr}</span>
+                                        {uploadProgress.timeRemainingStr && (
+                                            <span style={{ color: '#fbbf24', fontWeight: 700 }}>
+                                                ⏳ <strong>Remaining:</strong> {uploadProgress.timeRemainingStr}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{
+                                    marginTop: '0.5rem',
+                                    color: 'rgba(255,255,255,0.8)',
+                                    fontSize: '0.85rem',
+                                    fontStyle: 'italic'
+                                }}>
+                                    {uploadProgress.message}
+                                </div>
+                            )}
+
+                            {/* Terminal Logs */}
+                            {terminalLogs.length > 0 && (
+                                <div style={{
+                                    marginTop: '1rem',
+                                    backgroundColor: '#0f172a',
+                                    borderRadius: '6px',
+                                    padding: '0.75rem',
+                                    border: '1px solid #334155',
+                                    maxHeight: '180px',
+                                    overflowY: 'auto',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.8rem',
+                                    color: '#a5b4fc',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '4px'
+                                }}>
+                                    {terminalLogs.map((log, i) => (
+                                        <div key={i}><span style={{ color: '#4ade80' }}>[{log.time}]</span> {log.msg}</div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 

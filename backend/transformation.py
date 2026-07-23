@@ -18,6 +18,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import warnings
 import numpy as np
+import asyncio
 
 # Load environment variables
 load_dotenv()
@@ -40,9 +41,11 @@ def normalize_record_id(rid):
     return rid_str
 
 
-def get_access_token():
+def get_access_token(logger=None):
     """Get fresh access token from Zoho."""
-    print("  → Requesting fresh access token from Zoho OAuth...")
+    msg1 = "  → Requesting fresh access token from Zoho OAuth..."
+    if logger: logger(msg1)
+    else: print(msg1)
     url = "https://accounts.zoho.com/oauth/v2/token"
     params = {
         'refresh_token': ZOHO_REFRESH_TOKEN,
@@ -52,7 +55,9 @@ def get_access_token():
     }
     response = requests.post(url, params=params)
     response.raise_for_status()
-    print("  ✓ Access token obtained successfully")
+    msg2 = "  ✓ Access token obtained successfully"
+    if logger: logger(msg2)
+    else: print(msg2)
     return response.json()
 
 
@@ -1107,6 +1112,8 @@ def transform_services_q1_snapshot_data(
     file_date: str,
     timeline_file_name: str,
     opp_file_name: str,
+    current_fy_pipeline_map: dict[str, float] | None = None,
+    curr_fy_str: str | None = None,
 ) -> list[dict]:
     """
     Transform the uploaded Services timeline + closed-won opportunity CSVs into
@@ -1254,11 +1261,13 @@ def transform_services_q1_snapshot_data(
                 if fy not in fy_start_dates:
                     continue
                 total = float(fy_totals.get(fy, 0.0))
-                pipeline_total = float(fy_pipeline_totals.get(fy, 0.0))
+
+                if fy == curr_fy_str and current_fy_pipeline_map is not None:
+                    pipeline_total = float(current_fy_pipeline_map.get(region_filter or "Overall", 0.0))
+                else:
+                    pipeline_total = float(fy_pipeline_totals.get(fy, 0.0))
+
                 weeks_since_start = (snapshot_date - fy_start_dates[fy]).days // 7
-                # Store the full fiscal year (weeks 0-52) so any quarter can be
-                # selected/filtered downstream. Quarter boundaries by fiscal week:
-                # Q1: 0-13, Q2: 14-26, Q3: 27-39, Q4: 40-52.
                 if 0 <= weeks_since_start <= 52 and (total > 0 or pipeline_total > 0):
                     calendar_week_number = int(snapshot_date.isocalendar().week)
                     documents.append({
@@ -1289,3 +1298,330 @@ def transform_services_q1_snapshot_data(
 
     print(f"  ✓ Created {len(documents)} Services Q1 snapshot documents")
     return documents
+
+
+async def generate_services_trend_from_weekly_df(
+    df: pd.DataFrame,
+    week: int,
+    file_date: str,
+    db,
+    progress_callback=None
+) -> list[dict]:
+    """
+    Automated Services Trend Pipeline (Code 1 + Code 2 + Code 3 + Snapshot Transformation).
+    1. Extract opportunity data (opp_df) and deal record IDs (Code 1).
+    2. Fetch timeline events from Zoho API for those record IDs (Code 2).
+    3. Flatten and filter timeline events (Code 3).
+    4. Pass timeline_df and opp_df to transform_services_q1_snapshot_data.
+    5. Save snapshot documents to MongoDB collection `services_q1_snapshots`.
+    """
+    print("\n" + "=" * 70)
+    print("AUTOMATED SERVICES TREND PIPELINE START")
+    print("=" * 70)
+
+    setup_logs = []
+    def log_setup(msg):
+        print(msg)
+        setup_logs.append(msg)
+        if progress_callback:
+            progress_callback("Extracting Service Deals", "\n".join(setup_logs))
+
+    raw_df = df.copy()
+
+    # Find Record Id column
+    col_map = {str(col).strip(): col for col in raw_df.columns}
+    rec_id_col = None
+    for candidate in ["Record Id", "record_id", "RecordId", "id"]:
+        if candidate in col_map:
+            rec_id_col = col_map[candidate]
+            break
+
+    if not rec_id_col:
+        print("  ⚠️ No Record Id column found in weekly data — skipping automated Services Trend pipeline.")
+        return []
+
+    # Parse Closing Date & Determine Fiscal Year
+    closing_date_col = None
+    for candidate in ["Closing Date", "closing_date", "ClosingDate"]:
+        if candidate in col_map:
+            closing_date_col = col_map[candidate]
+            break
+
+    if closing_date_col:
+        raw_df['Closing Date Parsed'] = pd.to_datetime(raw_df[closing_date_col], errors='coerce')
+    else:
+        raw_df['Closing Date Parsed'] = pd.NaT
+
+    month = raw_df['Closing Date Parsed'].dt.month
+    year = raw_df['Closing Date Parsed'].dt.year
+    fy_year = np.where(month >= 4, year + 1, year)
+    raw_df['Closing_Date_FY'] = [f"FY{int(y)}" if not np.isnan(y) else None for y in fy_year]
+
+    # Determine Current FY and Previous FY based on file_date or today
+    file_dt = pd.to_datetime(file_date, dayfirst=True, errors='coerce')
+    ref_date = file_dt if not pd.isna(file_dt) else datetime.now()
+    curr_fy_year = ref_date.year + 1 if ref_date.month >= 4 else ref_date.year
+    curr_fy = f"FY{curr_fy_year}"
+    prev_fy = f"FY{curr_fy_year - 1}"
+    target_fys = [prev_fy, curr_fy]
+    log_setup(f"  → Target Fiscal Years for Services Trend: {target_fys}")
+
+    # Filter for Service opportunities (OPP Category contains Service, NRE, or PPV)
+    opp_cat_col = None
+    for candidate in ["OPP Category", "opp_category", "OPP_Category", "Opp Category"]:
+        if candidate in col_map:
+            opp_cat_col = col_map[candidate]
+            break
+
+    if opp_cat_col:
+        is_service = raw_df[opp_cat_col].astype(str).str.contains("Service|NRE|PPV", case=False, na=False)
+    else:
+        is_service = pd.Series(True, index=raw_df.index)
+
+    # Filter for Target FYs
+    is_target_fy = raw_df['Closing_Date_FY'].isin(target_fys)
+    filtered_service_df = raw_df[is_service & is_target_fy].copy()
+    log_setup(f"  → Filtered for Service deals in {target_fys}: {len(filtered_service_df)} rows out of {len(raw_df)} total")
+
+    # Stage filter: Strictly Closed Won (excluding Closed Lost)
+    stage_col = None
+    for candidate in ["Stage", "stage"]:
+        if candidate in col_map:
+            stage_col = col_map[candidate]
+            break
+
+    if stage_col:
+        is_closed_won = filtered_service_df[stage_col].astype(str).str.contains('Closed Won', case=False, na=False)
+        bd_closed_won = filtered_service_df[is_closed_won].copy()
+    else:
+        bd_closed_won = filtered_service_df.copy()
+
+    log_setup(f"  → Filtered for Closed Won Service deals in {target_fys}: {len(bd_closed_won)} rows out of {len(filtered_service_df)} service rows")
+
+    # Code 1: Clean & Extract Record IDs ONLY from Closed Won Service deals
+    bd_record_id_clean = bd_closed_won[[rec_id_col]].dropna()
+    split_ids = bd_record_id_clean[rec_id_col].astype(str).str.split('_', expand=True)
+    if split_ids.shape[1] >= 2:
+        bd_record_id_clean['record_id'] = split_ids[1]
+    else:
+        bd_record_id_clean['record_id'] = split_ids[0]
+
+    bd_record_id_clean['record_id'] = bd_record_id_clean['record_id'].apply(normalize_record_id)
+    clean_record_ids = bd_record_id_clean['record_id'].dropna().str.strip().unique().tolist()
+    clean_record_ids = [r for r in clean_record_ids if r and r.lower() not in ("none", "nan", "null")]
+    log_setup(f"  ✓ Extracted {len(clean_record_ids)} unique Closed Won Service deal record IDs for {target_fys}")
+
+    if not clean_record_ids:
+        print("  ⚠️ No valid Closed Won Service record IDs found — skipping automated Services Trend pipeline.")
+        return []
+
+    # Prepare opp_df matching SERVICES_OPP_REQUIRED_COLUMNS
+    opp_df = pd.DataFrame()
+    opp_split_ids = bd_closed_won[rec_id_col].astype(str).str.split('_', expand=True)
+    if opp_split_ids.shape[1] >= 2:
+        opp_df['record_id'] = opp_split_ids[1]
+    else:
+        opp_df['record_id'] = opp_split_ids[0]
+
+    opp_df['closing_date_final'] = bd_closed_won['Closing Date Parsed']
+    opp_df['account_owner_final'] = bd_closed_won[col_map['Account Owner']] if 'Account Owner' in col_map else ''
+    opp_df['amount_final'] = bd_closed_won[col_map['Amount']] if 'Amount' in col_map else 0
+    opp_df['expected_revenue_final'] = bd_closed_won[col_map['Expected Revenue']] if 'Expected Revenue' in col_map else 0
+    opp_df['probability_percentage_final'] = bd_closed_won[col_map['Probability (%)']] if 'Probability (%)' in col_map else 100
+    opp_df['opportunities_owner_final'] = bd_closed_won[col_map['Opportunities Owner']] if 'Opportunities Owner' in col_map else ''
+    opp_df['First_created_time'] = bd_closed_won[col_map['Created Time']] if 'Created Time' in col_map else bd_closed_won['Closing Date Parsed']
+    opp_df['econ-Region'] = bd_closed_won[col_map['econ-Region']] if 'econ-Region' in col_map else 'USA East'
+
+    opp_df = opp_df.dropna(subset=['record_id']).drop_duplicates(subset=['record_id'])
+    log_setup(f"  ✓ Prepared {len(opp_df)} closed won/lost opportunity records")
+
+    # Code 2: Fetch Timeline Events from Zoho API
+    total_recs = len(clean_record_ids)
+    est_total_sec = int(total_recs * 1.2)
+
+    start_dt = datetime.now()
+    est_completion_dt = start_dt + timedelta(seconds=est_total_sec)
+
+    # Format computer times in 12-hour AM/PM format
+    start_time_str = start_dt.strftime("%I:%M %p").lstrip("0")
+    comp_time_str = est_completion_dt.strftime("%I:%M %p").lstrip("0")
+
+    est_m, est_s = divmod(est_total_sec, 60)
+    est_str = f"{est_m}m {est_s}s" if est_m > 0 else f"{est_s}s"
+
+    def update_cb(step_name, msg, items_proc=None, rem_time_str=None):
+        if progress_callback:
+            try:
+                progress_callback(
+                    step_name,
+                    msg,
+                    start_time_str=start_time_str,
+                    est_completion_time_str=comp_time_str,
+                    time_remaining_str=rem_time_str or est_str,
+                    items_processed=items_proc,
+                    items_total=total_recs
+                )
+            except TypeError:
+                progress_callback(step_name, msg)
+
+    token_data = await asyncio.to_thread(get_access_token, log_setup)
+    access_token = token_data.get("access_token")
+
+    update_cb("Fetching Zoho Timelines", f"Fetching 0/{total_recs} records (1.2s/rec) | Started: {start_time_str} | Est. Completion: {comp_time_str} ({est_str} remaining)", 0, est_str)
+
+    raw_zoho_results = []
+    for idx, rid in enumerate(clean_record_ids, 1):
+        if not rid or rid == "None" or rid == "nan":
+            continue
+        try:
+            timeline_data, status_code = await asyncio.to_thread(fetch_timeline_paginated, rid, access_token)
+            if status_code == 401:
+                token_data = await asyncio.to_thread(get_access_token)
+                access_token = token_data.get("access_token")
+                timeline_data, status_code = await asyncio.to_thread(fetch_timeline_paginated, rid, access_token)
+
+            if status_code not in (200, 201):
+                print(f"  ⚠️ Timeline fetch for {rid} returned status {status_code}")
+
+            raw_zoho_results.append({
+                "record_id": rid,
+                "status_code": status_code,
+                "result": timeline_data
+            })
+        except Exception as err:
+            print(f"  ⚠️ Error fetching timeline for {rid}: {err}")
+
+        if idx % 25 == 0 or idx == total_recs or idx == 1:
+            rem_sec = int((total_recs - idx) * 1.2)
+            rem_m, rem_s = divmod(rem_sec, 60)
+            rem_str = f"{rem_m}m {rem_s}s" if rem_m > 0 else f"{rem_s}s"
+            pct = int((idx / total_recs) * 100)
+
+            msg = f"Fetching {idx}/{total_recs} records ({pct}%) | Started: {start_time_str} | Est. Completion: {comp_time_str} ({rem_str} remaining)"
+            print(f"  → Fetched timeline {idx}/{total_recs} records ({pct}%) • Est. remaining: {rem_str}")
+            update_cb("Fetching Zoho Timelines", msg, idx, rem_str)
+
+    # Code 3: Flatten Timeline Data
+    if progress_callback:
+        progress_callback("Flattening Timelines", "Processing and flattening timeline field changes")
+
+    flattened_rows = []
+    for record in raw_zoho_results:
+        rid = record.get('record_id')
+        status_code = record.get('status_code')
+        results = record.get('result', [])
+
+        if isinstance(results, dict):
+            results = [results]
+
+        for result in (results or []):
+            if not isinstance(result, dict):
+                continue
+            timeline_events = result.get('__timeline', [])
+            info = result.get('info', {})
+
+            for event in timeline_events:
+                row = {
+                    'record_id': rid,
+                    'status_code': status_code,
+                    'event_id': event.get('id'),
+                    'action': event.get('action'),
+                    'source': event.get('source'),
+                    'audited_time': event.get('audited_time'),
+                    'automation_name': event.get('automation_details', {}).get('name') if event.get('automation_details') else None,
+                }
+
+                field_history = event.get('field_history', [])
+                if field_history:
+                    for field_change in field_history:
+                        api_name = field_change.get('api_name', 'unknown_field')
+                        field_id = field_change.get('id')
+                        value_info = field_change.get('_value') or {}
+                        old_value = value_info.get('old')
+                        new_value = value_info.get('new')
+
+                        row[f'{api_name}_id'] = field_id
+                        row[f'{api_name}_old'] = old_value
+                        row[f'{api_name}_new'] = new_value
+
+                flattened_rows.append(row)
+
+    if not flattened_rows:
+        print("  ⚠️ No timeline events flattened — creating fallback structure.")
+        timeline_df = pd.DataFrame(columns=SERVICES_TIMELINE_REQUIRED_COLUMNS)
+    else:
+        timeline_df = pd.DataFrame(flattened_rows)
+        print(f"  ✓ Created {len(timeline_df)} flattened timeline rows")
+
+    # Ensure required columns for transform_services_q1_snapshot_data exist
+    for col in SERVICES_TIMELINE_REQUIRED_COLUMNS:
+        if col not in timeline_df.columns:
+            timeline_df[col] = np.nan
+
+    # Calculate Current FY Open Weighted Pipeline from uploaded weekly tracker data
+    is_curr_fy_deal = filtered_service_df['Closing_Date_FY'] == curr_fy
+    prob_col = col_map.get('Probability (%)') or col_map.get('Probability')
+    if prob_col:
+        prob = pd.to_numeric(filtered_service_df[prob_col].astype(str).str.replace('%', ''), errors='coerce').fillna(0)
+        is_open = (prob > 0) & (prob < 100)
+    else:
+        is_open = pd.Series(True, index=filtered_service_df.index)
+
+    open_service_df = filtered_service_df[is_curr_fy_deal & is_open].copy()
+
+    exp_rev_col = col_map.get('Expected Revenue') or col_map.get('expected_revenue')
+    amount_col = col_map.get('Amount') or col_map.get('amount')
+
+    if exp_rev_col:
+        exp_rev = pd.to_numeric(open_service_df[exp_rev_col].astype(str).str.replace(r'[$,\s]', '', regex=True), errors='coerce').fillna(0.0)
+    elif amount_col and prob_col:
+        amt = pd.to_numeric(open_service_df[amount_col].astype(str).str.replace(r'[$,\s]', '', regex=True), errors='coerce').fillna(0.0)
+        exp_rev = amt * (prob / 100.0)
+    else:
+        exp_rev = pd.Series(0.0, index=open_service_df.index)
+
+    open_service_df['weighted_pipeline'] = exp_rev
+    region_col = col_map.get('econ-Region') or col_map.get('Region')
+    if region_col:
+        open_service_df['region_clean'] = open_service_df[region_col].apply(clean_services_region)
+    else:
+        open_service_df['region_clean'] = 'USA East'
+
+    pipeline_map = open_service_df.groupby('region_clean')['weighted_pipeline'].sum().to_dict()
+    pipeline_map['Overall'] = float(open_service_df['weighted_pipeline'].sum())
+    print(f"  ✓ Computed Current FY ({curr_fy}) Open Weighted Pipeline from weekly tracker: {pipeline_map}")
+
+    # Transform to snapshot documents
+    if progress_callback:
+        progress_callback("Calculating Snapshots", "Computing Services Q1 cumulative snapshot analysis")
+
+    documents = transform_services_q1_snapshot_data(
+        timeline_df,
+        opp_df,
+        week,
+        file_date,
+        f"auto_timeline_w{week}.csv",
+        f"auto_opp_w{week}.csv",
+        current_fy_pipeline_map=pipeline_map,
+        curr_fy_str=curr_fy,
+    )
+
+    # Save to MongoDB
+    if documents:
+        if progress_callback:
+            progress_callback("Saving Snapshots", f"Saving {len(documents)} snapshot documents to MongoDB")
+
+        coll_snapshots = db["services_q1_snapshots"]
+        existing = await coll_snapshots.count_documents({"upload_week": week, "type": "services_trend"})
+        if existing > 0:
+            await coll_snapshots.delete_many({"upload_week": week, "type": "services_trend"})
+
+        await coll_snapshots.insert_many(documents, ordered=False)
+        print(f"  ✓ Successfully saved {len(documents)} Services Q1 snapshot records to MongoDB for week {week}")
+
+    print("=" * 70)
+    print("AUTOMATED SERVICES TREND PIPELINE COMPLETE")
+    print("=" * 70 + "\n")
+
+    return documents
+

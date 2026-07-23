@@ -16,7 +16,12 @@ class ProgressStatus:
     status: str  # 'processing', 'completed', 'error'
     error: Optional[str] = None
     timestamp: datetime = None
-    
+    start_time_str: Optional[str] = None
+    est_completion_time_str: Optional[str] = None
+    time_remaining_str: Optional[str] = None
+    items_processed: Optional[int] = None
+    items_total: Optional[int] = None
+
     def __post_init__(self):
         if self.timestamp is None:
             self.timestamp = datetime.now()
@@ -25,14 +30,31 @@ class ProgressStatus:
 # Format: {upload_id: ProgressStatus}
 progress_store: Dict[str, ProgressStatus] = {}
 
-def update_progress(upload_id: str, step: int, total_steps: int, step_name: str, message: str, status: str = 'processing'):
+def update_progress(
+    upload_id: str,
+    step: int,
+    total_steps: int,
+    step_name: str,
+    message: str,
+    status: str = 'processing',
+    start_time_str: Optional[str] = None,
+    est_completion_time_str: Optional[str] = None,
+    time_remaining_str: Optional[str] = None,
+    items_processed: Optional[int] = None,
+    items_total: Optional[int] = None
+):
     """Update progress for an upload task"""
     progress_store[upload_id] = ProgressStatus(
         step=step,
         total_steps=total_steps,
         step_name=step_name,
         message=message,
-        status=status
+        status=status,
+        start_time_str=start_time_str,
+        est_completion_time_str=est_completion_time_str,
+        time_remaining_str=time_remaining_str,
+        items_processed=items_processed,
+        items_total=items_total
     )
 
 def get_progress(upload_id: str) -> Optional[ProgressStatus]:

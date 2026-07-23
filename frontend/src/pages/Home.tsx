@@ -77,6 +77,18 @@ function Home() {
 
                 <button
                     className="nav-button"
+                    onClick={() => navigate('/symb')}
+                    style={{
+                        borderLeft: '12px solid #f5ad42', // Yellow folder accent
+                        '--hover-bg-color': '#f5ad42'
+                    } as React.CSSProperties}
+                >
+                    <span className="btn-title">SYMB</span>
+                    <span className="btn-subtitle">Tracker</span>
+                </button>
+
+                <button
+                    className="nav-button"
                     onClick={() => navigate('/admin')}
                     style={{
                         borderLeft: '12px solid #8a55b3ff', // Purple
