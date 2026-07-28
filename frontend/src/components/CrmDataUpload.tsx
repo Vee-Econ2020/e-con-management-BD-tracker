@@ -765,6 +765,31 @@ export function CrmDataUpload() {
                                     confirm
                                 </div>
                             </div>
+                            
+                            {/* CRM Report Link Button */}
+                            <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center', width: '100%' }}>
+                                <a 
+                                    href="https://crm.zoho.com/crm/org1644714/tab/Reports/38660000432721500" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        backgroundColor: '#3b82f6',
+                                        color: 'white',
+                                        padding: '0.6rem 2.5rem',
+                                        borderRadius: '9999px',
+                                        fontWeight: '700',
+                                        fontSize: '1.2rem',
+                                        textDecoration: 'none',
+                                        display: 'inline-block',
+                                        textAlign: 'center',
+                                        transition: 'all 0.2s',
+                                        border: 'none',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    GET CRM REPORT FROM HERE
+                                </a>
+                            </div>
                         </>
                     )}
 

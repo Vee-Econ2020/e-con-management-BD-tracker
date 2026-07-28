@@ -2085,27 +2085,50 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
 
     fiscal_years = sorted({doc["fiscal_year"] for doc in docs})
 
-    # Weighted pipeline supplement from the weekly slide, only relevant when
+    # Weighted pipeline and PO achieved supplement from the weekly slide, only relevant when
     # the selected quarter is the one we are currently living in.
     current_fy_weighted_pipeline_continuous: dict[int, float] = {}
+    current_fy_po_achieved_continuous: dict[int, float] = {}
+    
     pipeline_slide_no = SERVICES_Q1_PIPELINE_SLIDES.get(normalized_region)
-    if is_live_quarter and pipeline_slide_no:
+    trend_slide_no = pipeline_slide_no - 1 if pipeline_slide_no else None
+    
+    if is_live_quarter:
         cur_fy_start = fy_start_cal_week_for(current_fiscal_year)
         q_start_cont = cur_fy_start + qs_fw
         q_end_cont = cur_fy_start + qe_fw
-        pipeline_slide_data = await compute_slide_services_data(db, pipeline_slide_no)
-        if isinstance(pipeline_slide_data, dict) and not pipeline_slide_data.get("error"):
-            for week_label, weighted_value in zip(
-                pipeline_slide_data.get("weeks", []),
-                pipeline_slide_data.get("weighted_pipeline", []),
-            ):
-                try:
-                    week_number = int(str(week_label).replace("Week", "").strip())
-                except ValueError:
-                    continue
-                cont = to_continuous(week_number, cur_fy_start)
-                if q_start_cont <= cont <= q_end_cont:
-                    current_fy_weighted_pipeline_continuous[cont] = float(weighted_value or 0)
+        
+        # Pipeline Data
+        if pipeline_slide_no:
+            pipeline_slide_data = await compute_slide_services_data(db, pipeline_slide_no)
+            if isinstance(pipeline_slide_data, dict) and not pipeline_slide_data.get("error"):
+                for week_label, weighted_value in zip(
+                    pipeline_slide_data.get("weeks", []),
+                    pipeline_slide_data.get("weighted_pipeline", []),
+                ):
+                    try:
+                        week_number = int(str(week_label).replace("Week", "").strip())
+                    except ValueError:
+                        continue
+                    cont = to_continuous(week_number, cur_fy_start)
+                    if q_start_cont <= cont <= q_end_cont:
+                        current_fy_weighted_pipeline_continuous[cont] = float(weighted_value or 0)
+        
+        # PO Closed Won Data
+        if trend_slide_no:
+            trend_slide_data = await compute_slide_services_data(db, trend_slide_no)
+            if isinstance(trend_slide_data, dict) and not trend_slide_data.get("error"):
+                for week_label, po_value in zip(
+                    trend_slide_data.get("weeks", []),
+                    trend_slide_data.get("po_achieved", []),
+                ):
+                    try:
+                        week_number = int(str(week_label).replace("Week", "").strip())
+                    except ValueError:
+                        continue
+                    cont = to_continuous(week_number, cur_fy_start)
+                    if q_start_cont <= cont <= q_end_cont:
+                        current_fy_po_achieved_continuous[cont] = float(po_value or 0)
 
     series = []
     for fy in fiscal_years:
@@ -2146,7 +2169,7 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
 
         weeks_iter = range(range_start, effective_end + 1)
 
-        # Forward-fill audited totals across the window; pipeline uses the
+            # Forward-fill audited totals across the window; pipeline uses the
         # uploaded value when present, otherwise the live weekly-slide value.
         last_audited = 0.0
         last_date = ""
@@ -2156,6 +2179,7 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
         snapshot_dates: list[str] = []
         for w in weeks_iter:
             if w in by_cw:
+                # Normal behavior for past FYs
                 last_audited = by_cw[w]["audited"]
                 if by_cw[w]["date"]:
                     last_date = by_cw[w]["date"]
@@ -2164,11 +2188,17 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
                 uploaded_pipeline = 0.0
 
             pipeline_val = uploaded_pipeline
-            if fy == current_fiscal_year and w in current_fy_weighted_pipeline_continuous:
-                pipeline_val = current_fy_weighted_pipeline_continuous[w]
-
+            audited_val = last_audited
+            
+            if fy == current_fiscal_year:
+                if w in current_fy_weighted_pipeline_continuous:
+                    pipeline_val = current_fy_weighted_pipeline_continuous[w]
+                if w in current_fy_po_achieved_continuous:
+                    audited_val = current_fy_po_achieved_continuous[w]
+                    last_audited = audited_val  # Make sure we carry this forward as well
+                    
             x_values.append(w)
-            y_values.append(last_audited)
+            y_values.append(audited_val)
             pipeline_values.append(pipeline_val)
             snapshot_dates.append(last_date)
 

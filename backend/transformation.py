@@ -1366,6 +1366,19 @@ async def generate_services_trend_from_weekly_df(
     target_fys = [prev_fy, curr_fy]
     log_setup(f"  → Target Fiscal Years for Services Trend: {target_fys}")
 
+    # Check if we already have previous FY snapshot data. 
+    # If yes, skip the pipeline because current FY uses live weekly_tracker_data.
+    coll_snapshots = db["services_q1_snapshots"]
+    existing_prev_fy_docs = await coll_snapshots.count_documents({
+        "type": "services_trend",
+        "fiscal_year": prev_fy
+    })
+
+    if existing_prev_fy_docs > 0:
+        log_setup(f"  → Found existing snapshot data for {prev_fy} ({existing_prev_fy_docs} records). Skipping Zoho API fetch since Current FY uses live weekly tracker data.")
+        print("  ✓ Skipping automated Services Trend pipeline (data already exists).")
+        return []
+
     # Filter for Service opportunities (OPP Category contains Service, NRE, or PPV)
     opp_cat_col = None
     for candidate in ["OPP Category", "opp_category", "OPP_Category", "Opp Category"]:
