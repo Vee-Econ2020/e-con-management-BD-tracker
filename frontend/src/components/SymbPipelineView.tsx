@@ -143,18 +143,50 @@ const SymbPipelineView: React.FC = () => {
         return groups;
     }, [filteredAndSortedData]);
 
+    const getWeekBackfillInfo = (rows: SymbPlanRow[]) => {
+        const variants = ["Varient 1", "Varient 2"];
+        const maxNativeCompletedIdxMap: Record<string, number> = {};
+        const maxNativeCompletedStageNameMap: Record<string, string> = {};
+
+        variants.forEach(variantKey => {
+            let maxIdx = -1;
+            let stageName = '';
+
+            EVENT_ORDER.forEach((evt, idx) => {
+                const row = rows.find(r => r["Event Type"] === evt && (r["Variant Type"] || "").toLowerCase() === variantKey.toLowerCase());
+                if (row) {
+                    const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
+                    if (isNativeCompleted) {
+                        maxIdx = idx;
+                        stageName = evt;
+                    }
+                }
+            });
+
+            maxNativeCompletedIdxMap[variantKey.toLowerCase()] = maxIdx;
+            maxNativeCompletedStageNameMap[variantKey.toLowerCase()] = stageName;
+        });
+
+        return { maxNativeCompletedIdxMap, maxNativeCompletedStageNameMap };
+    };
+
     const { completedWeeks, activeWeeks } = useMemo(() => {
         const completed: [string, SymbPlanRow[], number][] = [];
         const active: [string, SymbPlanRow[], number][] = [];
 
         Object.entries(groupedByWeek).forEach(([weekStr, rows]) => {
+            const { maxNativeCompletedIdxMap } = getWeekBackfillInfo(rows);
             let completedSlots = 0;
 
-            EVENT_ORDER.forEach(evt => {
+            EVENT_ORDER.forEach((evt, stageIdx) => {
                 const eventRows = rows.filter(r => r["Event Type"] === evt);
                 eventRows.forEach(r => {
-                    const isRowCompleted = r["Material Covered"] === "Yes" || (r["planned Value"] > 0 && r.completed >= r["planned Value"]);
-                    if (isRowCompleted) {
+                    const variantKey = (r["Variant Type"] || "").toLowerCase();
+                    const maxCompletedIdx = maxNativeCompletedIdxMap[variantKey] ?? -1;
+                    const isNativeCompleted = r["Material Covered"] === "Yes" || (r["planned Value"] > 0 && r.completed >= r["planned Value"]);
+                    const isBackfilled = !isNativeCompleted && stageIdx < maxCompletedIdx;
+
+                    if (isNativeCompleted || isBackfilled) {
                         completedSlots++;
                     }
                 });
@@ -250,37 +282,45 @@ const SymbPipelineView: React.FC = () => {
         });
     }, [data]);
 
-    const renderVariantSection = (row: SymbPlanRow) => {
-        const isCompleted = row["Material Covered"] === "Yes";
+    const renderVariantSection = (row: SymbPlanRow, isBackfilled: boolean, backfillSourceStage?: string) => {
+        const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
+        const isCompleted = isNativeCompleted || isBackfilled;
         const isDelayed = !isCompleted && row["Delayed by days"] > 0;
         
         return (
             <div key={row.id} style={{ 
                 padding: '0.75rem', 
-                backgroundColor: '#f8fafc', 
+                backgroundColor: isBackfilled ? '#f1f5f9' : '#f8fafc', 
                 borderRadius: '8px',
-                borderLeft: `4px solid ${isCompleted ? '#10b981' : isDelayed ? '#ef4444' : '#f59e0b'}`,
+                borderLeft: `4px solid ${isNativeCompleted ? '#10b981' : isBackfilled ? '#94a3b8' : isDelayed ? '#ef4444' : '#f59e0b'}`,
                 marginBottom: '0.5rem',
                 fontSize: '0.85rem'
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                    <span style={{ fontWeight: 700, color: '#1e293b' }}>{row["Variant Type"]}</span>
+                    <span style={{ fontWeight: 700, color: isBackfilled ? '#475569' : '#1e293b' }}>{row["Variant Type"]}</span>
                     <span style={{
                         padding: '0.15rem 0.5rem',
                         borderRadius: '12px',
                         fontSize: '0.7rem',
                         fontWeight: 700,
-                        backgroundColor: isCompleted ? '#dcfce7' : isDelayed ? '#fee2e2' : '#fef3c7',
-                        color: isCompleted ? '#166534' : isDelayed ? '#991b1b' : '#92400e'
+                        backgroundColor: isNativeCompleted ? '#dcfce7' : isBackfilled ? '#e2e8f0' : isDelayed ? '#fee2e2' : '#fef3c7',
+                        color: isNativeCompleted ? '#166534' : isBackfilled ? '#475569' : isDelayed ? '#991b1b' : '#92400e'
                     }}>
-                        {isCompleted ? 'Completed' : isDelayed ? 'Delayed' : 'Pending'}
+                        {isNativeCompleted ? 'Completed' : isBackfilled ? 'Auto-Completed' : isDelayed ? 'Delayed' : 'Pending'}
                     </span>
                 </div>
                 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem', color: '#475569' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem', color: isBackfilled ? '#64748b' : '#475569' }}>
                     <span>Planned: <strong>{row["planned Value"] || 0}</strong></span>
-                    <span>Completed: <strong>{row["completed"] || 0}</strong></span>
+                    <span>Completed: <strong>{isBackfilled ? (row["planned Value"] || 0) : (row.completed || 0)}</strong></span>
                 </div>
+
+                {isBackfilled && (
+                    <div style={{ color: '#475569', fontSize: '0.73rem', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.3rem', backgroundColor: '#e2e8f0', padding: '0.25rem 0.4rem', borderRadius: '4px' }}>
+                        <CheckCircle2 size={12} style={{ color: '#64748b', flexShrink: 0 }} />
+                        <span>Auto-completed (Data not updated; backfilled from {backfillSourceStage})</span>
+                    </div>
+                )}
 
                 {isDelayed && (
                     <div style={{ color: '#dc2626', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.3rem' }}>
@@ -301,6 +341,7 @@ const SymbPipelineView: React.FC = () => {
 
     const renderWeekCardBlock = (weekStr: string, rows: SymbPlanRow[], pct: number) => {
         const isComplete = pct === 100;
+        const { maxNativeCompletedIdxMap, maxNativeCompletedStageNameMap } = getWeekBackfillInfo(rows);
 
         return (
             <div key={weekStr} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
@@ -324,7 +365,12 @@ const SymbPipelineView: React.FC = () => {
                         
                         const missingPlanVariants = eventRows
                             .filter(row => {
-                                const isCompleted = row["Material Covered"] === "Yes";
+                                const variantKey = (row["Variant Type"] || "").toLowerCase();
+                                const maxCompletedIdx = maxNativeCompletedIdxMap[variantKey] ?? -1;
+                                const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
+                                const isBackfilled = !isNativeCompleted && idx < maxCompletedIdx;
+                                const isCompleted = isNativeCompleted || isBackfilled;
+
                                 const hasEstDate = row["Estimated Completion Date"] && 
                                                    row["Estimated Completion Date"] !== "None" && 
                                                    row["Estimated Completion Date"] !== "N/A" && 
@@ -373,7 +419,15 @@ const SymbPipelineView: React.FC = () => {
                                         {eventRows.length === 0 ? (
                                             <div style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '0.85rem', marginTop: '1rem' }}>No data</div>
                                         ) : (
-                                            eventRows.map(row => renderVariantSection(row))
+                                            eventRows.map(row => {
+                                                const variantKey = (row["Variant Type"] || "").toLowerCase();
+                                                const maxCompletedIdx = maxNativeCompletedIdxMap[variantKey] ?? -1;
+                                                const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
+                                                const isBackfilled = !isNativeCompleted && idx < maxCompletedIdx;
+                                                const backfillSourceStage = isBackfilled ? maxNativeCompletedStageNameMap[variantKey] : '';
+
+                                                return renderVariantSection(row, isBackfilled, backfillSourceStage);
+                                            })
                                         )}
 
                                         {criticalMsg && (
