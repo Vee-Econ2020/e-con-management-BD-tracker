@@ -223,14 +223,77 @@ async def get_upload_logs(type: Optional[str] = None):
     try:
         coll = get_collection("upload_logs")
         query = {}
-        if type:
+        if type == "symb_reference":
+            query = {"type": {"$in": ["symb_ref_so", "symb_ref_jabil", "symb_ref_progress", "symb_ref_plan"]}}
+        elif type:
             query["type"] = type
         cursor = coll.find(query).sort("created_at", -1)
         logs = []
+        found_types = set()
         async for doc in cursor:
             doc["id"] = str(doc["_id"])
             del doc["_id"]
             logs.append(doc)
+            found_types.add(doc.get("type"))
+
+        # Fallback check for SYMB reference collections if logs do not exist yet in upload_logs
+        if type in [None, "symb_reference", "symb_ref_so"] and "symb_ref_so" not in found_types:
+            count = await get_collection("symb_so_numbers").count_documents({})
+            if count > 0:
+                logs.append({
+                    "id": "ref_so_existing",
+                    "week": 0,
+                    "file_date": "Active",
+                    "file_name": f"symb_so_numbers.csv ({count} records in DB)",
+                    "type": "symb_ref_so",
+                    "created_at": datetime.now()
+                })
+        if type in [None, "symb_reference", "symb_ref_jabil"] and "symb_ref_jabil" not in found_types:
+            count = await get_collection("symb_jabil_production").count_documents({})
+            if count > 0:
+                logs.append({
+                    "id": "ref_jabil_existing",
+                    "week": 0,
+                    "file_date": "Active",
+                    "file_name": f"jabil_production.csv ({count} records in DB)",
+                    "type": "symb_ref_jabil",
+                    "created_at": datetime.now()
+                })
+        if type in [None, "symb_reference", "symb_ref_progress"] and "symb_ref_progress" not in found_types:
+            count = await get_collection("symb_production_progress").count_documents({})
+            if count > 0:
+                logs.append({
+                    "id": "ref_progress_existing",
+                    "week": 0,
+                    "file_date": "Active",
+                    "file_name": f"production_progress.csv ({count} records in DB)",
+                    "type": "symb_ref_progress",
+                    "created_at": datetime.now()
+                })
+        if type in [None, "symb_reference", "symb_ref_plan"] and "symb_ref_plan" not in found_types:
+            count = await get_collection("symb_plan_raw").count_documents({})
+            if count > 0:
+                logs.append({
+                    "id": "ref_plan_existing",
+                    "week": 0,
+                    "file_date": "Active",
+                    "file_name": f"SYMB Plan ({count} records in DB)",
+                    "type": "symb_ref_plan",
+                    "created_at": datetime.now()
+                })
+        if type in [None, "symb_reference", "symb_ref_erp"] and "symb_ref_erp" not in found_types:
+            count = await get_collection("symb_erp_mech_raw").count_documents({})
+            if count > 0:
+                logs.append({
+                    "id": "ref_erp_existing",
+                    "week": 0,
+                    "file_date": "Active",
+                    "file_name": f"ERP MECH ({count} records in DB)",
+                    "type": "symb_ref_erp",
+                    "created_at": datetime.now()
+                })
+
+
         return logs
     except Exception as e:
         print(f"Error getting upload logs: {e}")
@@ -256,9 +319,14 @@ async def add_upload_log_with_file(
         coll_logs = get_collection("upload_logs")
         
         # STEP 1: Check duplicate upload log
-        existing_log = await coll_logs.find_one({"week": week, "type": type})
-        if existing_log:
-            raise HTTPException(status_code=400, detail=f"Data for week {week} already exists. Please delete it first.")
+        if type in ["symb_tracker", "symb"]:
+            existing_log = await coll_logs.find_one({"file_date": file_date, "type": type})
+            if existing_log:
+                raise HTTPException(status_code=400, detail=f"SYMB Tracker data for date {file_date} already exists. Please delete it first if you wish to re-upload.")
+        else:
+            existing_log = await coll_logs.find_one({"week": week, "type": type})
+            if existing_log:
+                raise HTTPException(status_code=400, detail=f"Data for week {week} already exists. Please delete it first.")
         
         # STEP 2: Read CSV file into memory
         contents = await file.read()
@@ -866,6 +934,45 @@ async def delete_upload_log(log_id: str):
                 "data_records_deleted": delete_result.deleted_count
             }
 
+        if type_val in ["symb_tracker", "symb"]:
+            coll_symb = get_collection("symb_tracker_data")
+            file_date_val = log.get("file_date")
+            query = {"file_date": file_date_val} if file_date_val else {"upload_week": week}
+            delete_result = await coll_symb.delete_many(query)
+            print(f"CASCADE: Deleted {delete_result.deleted_count} SYMB tracker records for date {file_date_val or week}")
+            return {
+                "status": "success",
+                "message": f"Log deleted. Removed {delete_result.deleted_count} SYMB tracker records.",
+                "week": week,
+                "type": type_val,
+                "data_records_deleted": delete_result.deleted_count
+            }
+
+        if type_val == "symb_ref_so" or log_id == "ref_so_existing":
+            coll = get_collection("symb_so_numbers")
+            delete_result = await coll.delete_many({})
+            return {"status": "success", "message": f"Deleted SYMB SO reference numbers log and {delete_result.deleted_count} records.", "type": "symb_ref_so"}
+
+        if type_val == "symb_ref_jabil" or log_id == "ref_jabil_existing":
+            coll = get_collection("symb_jabil_production")
+            delete_result = await coll.delete_many({})
+            return {"status": "success", "message": f"Deleted Jabil production reference log and {delete_result.deleted_count} records.", "type": "symb_ref_jabil"}
+
+        if type_val == "symb_ref_progress" or log_id == "ref_progress_existing":
+            coll = get_collection("symb_production_progress")
+            delete_result = await coll.delete_many({})
+            return {"status": "success", "message": f"Deleted production progress reference log and {delete_result.deleted_count} records.", "type": "symb_ref_progress"}
+
+        if type_val == "symb_ref_plan" or log_id == "ref_plan_existing":
+            coll = get_collection("symb_plan_raw")
+            delete_result = await coll.delete_many({})
+            return {"status": "success", "message": f"Deleted SYMB plan reference log and {delete_result.deleted_count} records.", "type": "symb_ref_plan"}
+
+        if type_val == "symb_ref_erp" or log_id == "ref_erp_existing":
+            coll = get_collection("symb_erp_mech_raw")
+            delete_result = await coll.delete_many({})
+            return {"status": "success", "message": f"Deleted ERP MECH reference log and {delete_result.deleted_count} records.", "type": "symb_ref_erp"}
+
         # Default: weekly / revenue cascade
         delete_result = await coll_data.delete_many({
             "week": week,
@@ -1054,6 +1161,20 @@ async def upload_symb_so_numbers(file: UploadFile = File(...)):
                     r[k] = None
         if records:
             await coll.insert_many(records, ordered=False)
+        
+        # Log this upload in upload_logs for metadata tracking
+        coll_logs = get_collection("upload_logs")
+        today_str = datetime.now().strftime("%d-%m-%Y")
+        await coll_logs.delete_many({"type": "symb_ref_so"})
+        await coll_logs.insert_one({
+            "week": 0,
+            "file_date": today_str,
+            "file_name": file.filename,
+            "type": "symb_ref_so",
+            "created_at": datetime.now(),
+            "records_count": len(records)
+        })
+
         return {"status": "success", "message": f"Successfully stored {len(records)} SYMB SO numbers", "count": len(records)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1100,6 +1221,20 @@ async def upload_symb_jabil_production(file: UploadFile = File(...)):
                     r[k] = None
         if records:
             await coll.insert_many(records, ordered=False)
+        
+        # Log this upload in upload_logs for metadata tracking
+        coll_logs = get_collection("upload_logs")
+        today_str = datetime.now().strftime("%d-%m-%Y")
+        await coll_logs.delete_many({"type": "symb_ref_jabil"})
+        await coll_logs.insert_one({
+            "week": 0,
+            "file_date": today_str,
+            "file_name": file.filename,
+            "type": "symb_ref_jabil",
+            "created_at": datetime.now(),
+            "records_count": len(records)
+        })
+
         return {"status": "success", "message": f"Successfully stored {len(records)} Jabil Production records", "count": len(records)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1123,11 +1258,14 @@ def clean_json_nan(obj):
         return [clean_json_nan(v) for v in obj]
     return obj
 
-@router.get("/symb-production-progress/data")
-async def get_symb_production_progress():
-    """Get all stored SYMB Production Progress records."""
+
+
+@router.get("/symb-plan/transformed")
+async def get_symb_plan_transformed():
     try:
-        coll = get_collection("symb_production_progress")
+        from SYMB_plan_transformation import run_symb_plan_pipeline
+        await run_symb_plan_pipeline(db)
+        coll = get_collection("symb_plan_transformed")
         cursor = coll.find({})
         items = []
         async for doc in cursor:
@@ -1136,46 +1274,73 @@ async def get_symb_production_progress():
             items.append(doc)
         return clean_json_nan(items)
     except Exception as e:
-        print(f"Error fetching SYMB production progress data: {e}")
+        print(f"Error fetching SYMB plan transformed data: {e}")
         return []
 
-@router.post("/symb-production-progress/upload")
-async def upload_symb_production_progress(file: UploadFile = File(...)):
-    """Upload CSV with SYMB Production Progress data as-is and replace existing collection."""
+@router.post("/symb-plan/upload")
+async def upload_symb_plan(file: UploadFile = File(...), background_tasks: BackgroundTasks = BackgroundTasks()):
     import io
     import pandas as pd
+    from SYMB_plan_transformation import run_symb_plan_pipeline
     try:
-        if not file.filename.lower().endswith('.csv'):
-            raise HTTPException(status_code=400, detail="Only .csv files allowed.")
         contents = await file.read()
         try:
             df = pd.read_csv(io.BytesIO(contents))
-        except (UnicodeDecodeError, Exception):
+        except:
             df = pd.read_csv(io.BytesIO(contents), encoding='latin-1')
-
-        if len(df) == 0:
-            raise HTTPException(status_code=400, detail="CSV file is empty.")
-
-        # Clean column names (strip whitespace)
         df.columns = [str(c).strip() for c in df.columns]
-
-        coll = get_collection("symb_production_progress")
+        coll = get_collection("symb_plan_raw")
         await coll.delete_many({})
         records = df.to_dict('records')
         for r in records:
             r.pop('_id', None)
             for k, v in list(r.items()):
-                if pd.isna(v):
-                    r[k] = None
+                if pd.isna(v): r[k] = None
         if records:
             await coll.insert_many(records, ordered=False)
-        return {
-            "status": "success",
-            "message": f"Successfully stored {len(records)} SYMB Production Progress records",
-            "count": len(records)
-        }
+        coll_logs = get_collection("upload_logs")
+        today_str = datetime.now().strftime("%d-%m-%Y")
+        await coll_logs.delete_many({"type": "symb_ref_plan"})
+        await coll_logs.insert_one({
+            "week": 0, "file_date": today_str, "file_name": file.filename, "type": "symb_ref_plan", "created_at": datetime.now(), "records_count": len(records)
+        })
+        background_tasks.add_task(run_symb_plan_pipeline, db)
+        return {"status": "success", "message": f"Successfully stored {len(records)} SYMB Plan records", "count": len(records)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/symb-erp-mech/upload")
+async def upload_symb_erp_mech(file: UploadFile = File(...), background_tasks: BackgroundTasks = BackgroundTasks()):
+    import io
+    import pandas as pd
+    from SYMB_plan_transformation import run_symb_plan_pipeline
+    try:
+        contents = await file.read()
+        try:
+            df = pd.read_excel(io.BytesIO(contents), engine='calamine')
+        except:
+            df = pd.read_excel(io.BytesIO(contents), engine='openpyxl')
+        df.columns = [str(c).strip() for c in df.columns]
+        coll = get_collection("symb_erp_mech_raw")
+        await coll.delete_many({})
+        records = df.to_dict('records')
+        for r in records:
+            r.pop('_id', None)
+            for k, v in list(r.items()):
+                if pd.isna(v) or str(v).lower() == "nan": r[k] = None
+        if records:
+            await coll.insert_many(records, ordered=False)
+        coll_logs = get_collection("upload_logs")
+        today_str = datetime.now().strftime("%d-%m-%Y")
+        await coll_logs.delete_many({"type": "symb_ref_erp"})
+        await coll_logs.insert_one({
+            "week": 0, "file_date": today_str, "file_name": file.filename, "type": "symb_ref_erp", "created_at": datetime.now(), "records_count": len(records)
+        })
+        background_tasks.add_task(run_symb_plan_pipeline, db)
+        return {"status": "success", "message": f"Successfully stored {len(records)} ERP MECH records", "count": len(records)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/symb-tracker/data")
 async def get_symb_tracker_data(week: Optional[int] = None):
@@ -2401,5 +2566,176 @@ async def get_whale_account_stats(region: str, week: int):
         async for doc in cursor:
             names.append(doc["_id"])
         return {"count": len(names), "names": names}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class SymbTrackerBulkCreate(BaseModel):
+    variant: str
+    event_type: str
+    start_date: str
+    end_date: str
+    upd: int
+
+class SymbTrackerUpdateRow(BaseModel):
+    plan_date: Optional[str] = None
+    planned_qty: Optional[int] = None
+    completed: Optional[int] = None
+
+class SymbTrackerDeletePayload(BaseModel):
+    admin_id: str
+    admin_password: str
+    record_ids: List[str]
+
+@router.get("/symb-updated-tracker")
+async def get_symb_updated_tracker():
+    try:
+        coll = get_collection("SYMB_Updated_progress_tracker")
+        # Clean up any legacy soft-deleted documents
+        await coll.delete_many({"status": "deleted"})
+        cursor = coll.find().sort([("variant", 1), ("event_type", 1), ("plan_date", 1)])
+        records = []
+        async for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            records.append(doc)
+        return records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/symb-updated-tracker/delete-bulk")
+async def delete_bulk_symb_updated_tracker(payload: SymbTrackerDeletePayload):
+    from bson.objectid import ObjectId
+    from routers.auth import _verify_password
+    
+    try:
+        auth_coll = get_collection("admin_users")
+        user = await auth_coll.find_one({"username": payload.admin_id})
+        if not user:
+            user = await auth_coll.find_one({"username": {"$regex": f"^{payload.admin_id}$", "$options": "i"}})
+            
+        if not user or not _verify_password(payload.admin_password, user.get("salt", ""), user.get("password_hash", "")):
+            raise HTTPException(status_code=401, detail="Invalid Admin ID or Password")
+            
+        coll = get_collection("SYMB_Updated_progress_tracker")
+        obj_ids = []
+        for r_id in payload.record_ids:
+            try:
+                obj_ids.append(ObjectId(r_id))
+            except Exception:
+                pass
+                
+        deleted_count = 0
+        if obj_ids:
+            res = await coll.delete_many({"_id": {"$in": obj_ids}})
+            deleted_count = res.deleted_count
+            
+        return {"status": "success", "deleted_count": deleted_count}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/symb-updated-tracker/bulk")
+async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate):
+    from datetime import datetime, timedelta
+    try:
+        coll = get_collection("SYMB_Updated_progress_tracker")
+        start = datetime.strptime(payload.start_date, "%Y-%m-%d")
+        end = datetime.strptime(payload.end_date, "%Y-%m-%d")
+        
+        current_date = start
+        while current_date <= end:
+            current_date_str = current_date.strftime("%d-%b-%Y").upper() # like 08-AUG-2026
+            
+            doc = await coll.find_one({
+                "variant": payload.variant,
+                "event_type": payload.event_type,
+                "plan_date": current_date_str
+            })
+            
+            if doc:
+                if doc.get("planned_qty") != payload.upd:
+                    edit_history = doc.get("edit_history", {"planned_qty": [], "completed": [], "plan_date": []})
+                    pq_hist = edit_history.get("planned_qty", [])
+                    pq_hist.append({
+                        "value": doc.get("planned_qty"),
+                        "timestamp": datetime.now().isoformat(),
+                        "edit": len(pq_hist) + 1
+                    })
+                    edit_history["planned_qty"] = pq_hist
+                    
+                    await coll.update_one(
+                        {"_id": doc["_id"]},
+                        {"$set": {"planned_qty": payload.upd, "edit_history": edit_history}}
+                    )
+            else:
+                await coll.insert_one({
+                    "variant": payload.variant,
+                    "event_type": payload.event_type,
+                    "plan_date": current_date_str,
+                    "planned_qty": payload.upd,
+                    "completed": 0,
+                    "acc_comp_date": None,
+                    "edit_history": {
+                        "planned_qty": [],
+                        "completed": [],
+                        "plan_date": []
+                    }
+                })
+                
+            current_date += timedelta(days=1)
+            
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/symb-updated-tracker/{id}")
+async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow):
+    from bson.objectid import ObjectId
+    from datetime import datetime
+    try:
+        coll = get_collection("SYMB_Updated_progress_tracker")
+        doc = await coll.find_one({"_id": ObjectId(id)})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Record not found")
+            
+        updates = {}
+        edit_history = doc.get("edit_history", {"planned_qty": [], "completed": [], "plan_date": []})
+        
+        if payload.plan_date is not None and payload.plan_date != doc.get("plan_date"):
+            hist = edit_history.get("plan_date", [])
+            hist.append({
+                "value": doc.get("plan_date"),
+                "timestamp": datetime.now().isoformat(),
+                "edit": len(hist) + 1
+            })
+            edit_history["plan_date"] = hist
+            updates["plan_date"] = payload.plan_date
+            
+        if payload.planned_qty is not None and payload.planned_qty != doc.get("planned_qty"):
+            hist = edit_history.get("planned_qty", [])
+            hist.append({
+                "value": doc.get("planned_qty"),
+                "timestamp": datetime.now().isoformat(),
+                "edit": len(hist) + 1
+            })
+            edit_history["planned_qty"] = hist
+            updates["planned_qty"] = payload.planned_qty
+            
+        if payload.completed is not None and payload.completed != doc.get("completed"):
+            hist = edit_history.get("completed", [])
+            hist.append({
+                "value": doc.get("completed"),
+                "timestamp": datetime.now().isoformat(),
+                "edit": len(hist) + 1
+            })
+            edit_history["completed"] = hist
+            updates["completed"] = payload.completed
+            updates["acc_comp_date"] = datetime.now().isoformat()
+            
+        if updates:
+            updates["edit_history"] = edit_history
+            await coll.update_one({"_id": ObjectId(id)}, {"$set": updates})
+            
+        return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

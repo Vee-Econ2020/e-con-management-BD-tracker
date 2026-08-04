@@ -575,10 +575,10 @@ async def process_symb_tracker_upload(
 
     # Save to MongoDB
     coll_data = db["symb_tracker_data"]
-    await coll_data.delete_many({"upload_week": week})
+    await coll_data.delete_many({"file_date": file_date})
     if final_records:
         await coll_data.insert_many(final_records, ordered=False)
-        print(f"  ✓ Successfully saved {len(final_records)} SYMB tracker records to MongoDB for week {week}")
+        print(f"  ✓ Successfully saved {len(final_records)} SYMB tracker records to MongoDB for date {file_date}")
 
     # Generate and save flag mapping
     df_flags = generate_flag_mapping_df()

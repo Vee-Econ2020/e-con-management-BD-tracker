@@ -21,6 +21,7 @@ export function CrmDataUpload() {
     const [activeTab, setActiveTab] = useState<'weekly' | 'revenue' | 'region' | 'gross_margin' | 'services_trend' | 'symb_tracker' | 'symb_reference'>('weekly');
     const [file, setFile] = useState<File | null>(null);
     const [logs, setLogs] = useState<UploadLog[]>([]);
+    const [refLogs, setRefLogs] = useState<Record<string, UploadLog>>({});
     const [regionMappings, setRegionMappings] = useState<RegionMapping[]>([]);
     const [statusMsg, setStatusMsg] = useState('');
 
@@ -130,9 +131,20 @@ export function CrmDataUpload() {
 
     const fetchLogs = async () => {
         try {
-            const res = await fetch(`/api/admin/upload-logs?type=${activeTab}`);
+            const fetchType = activeTab === 'symb_reference' ? 'symb_reference' : activeTab;
+            const res = await fetch(`/api/admin/upload-logs?type=${fetchType}`);
             if (res.ok) {
-                setLogs(await res.json());
+                const data: UploadLog[] = await res.json();
+                setLogs(data);
+                if (activeTab === 'symb_reference') {
+                    const resMap: Record<string, UploadLog> = {};
+                    for (const log of data) {
+                        if (!resMap[log.type]) {
+                            resMap[log.type] = log;
+                        }
+                    }
+                    setRefLogs(resMap);
+                }
             }
         } catch (error) {
             console.error(error);
@@ -164,6 +176,7 @@ export function CrmDataUpload() {
             const data = await res.json();
             if (res.ok) {
                 setStatusMsg(`Success: ${data.message}`);
+                fetchLogs();
             } else {
                 setStatusMsg(`Error: ${data.detail}`);
             }
@@ -186,6 +199,7 @@ export function CrmDataUpload() {
             const data = await res.json();
             if (res.ok) {
                 setStatusMsg(`Success: ${data.message}`);
+                fetchLogs();
             } else {
                 setStatusMsg(`Error: ${data.detail}`);
             }
@@ -194,27 +208,33 @@ export function CrmDataUpload() {
         }
     };
 
-    const handleProductionProgressUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+
+    const handleSymbPlanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const file = e.target.files[0];
         const formData = new FormData();
         formData.append('file', file);
         try {
-            setStatusMsg('Uploading SYMB Production Progress CSV...');
-            const res = await fetch('/api/admin/symb-production-progress/upload', {
-                method: 'POST',
-                body: formData
-            });
+            setStatusMsg('Uploading SYMB Plan CSV...');
+            const res = await fetch('/api/admin/symb-plan/upload', { method: 'POST', body: formData });
             const data = await res.json();
-            if (res.ok) {
-                setStatusMsg(`Success: ${data.message}`);
-            } else {
-                setStatusMsg(`Error: ${data.detail}`);
-            }
-        } catch (err: any) {
-            setStatusMsg(`Error: ${err.message}`);
-        }
+            if (res.ok) { setStatusMsg(`Success: ${data.message}`); fetchLogs(); } else { setStatusMsg(`Error: ${data.detail}`); }
+        } catch (err: any) { setStatusMsg(`Error: ${err.message}`); }
     };
+
+    const handleErpMechUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            setStatusMsg('Uploading ERP MECH Excel...');
+            const res = await fetch('/api/admin/symb-erp-mech/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (res.ok) { setStatusMsg(`Success: ${data.message}`); fetchLogs(); } else { setStatusMsg(`Error: ${data.detail}`); }
+        } catch (err: any) { setStatusMsg(`Error: ${err.message}`); }
+    };
+
 
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -450,8 +470,11 @@ export function CrmDataUpload() {
         }
     };
 
-    const handleDelete = async (id: string, week: number) => {
-        if (!confirm(`Are you sure you want to delete logs for Week ${week}?`)) return;
+    const handleDelete = async (id: string, week?: number, fileName?: string) => {
+        const confirmMsg = week && week > 0
+            ? `Are you sure you want to delete logs for Week ${week}?`
+            : `Are you sure you want to delete log and data for ${fileName || 'this upload'}?`;
+        if (!confirm(confirmMsg)) return;
         try {
             const res = await fetch(`/api/admin/upload-logs/${id}`, { method: 'DELETE' });
             if (res.ok) fetchLogs();
@@ -679,7 +702,9 @@ export function CrmDataUpload() {
                                 ? 'Services Trend data is automatically generated every time a Weekly Tracker CSV is uploaded. Click below to manually re-sync.'
                                 : activeTab === 'symb_reference'
                                     ? 'Upload SYMB SO Numbers and Jabil Production List Price reference CSV files below (uploaded once, updated anytime).'
-                                    : `file name format: "${getUploadPrefix()}_dd-mm-yyyy.csv"`
+                                    : activeTab === 'symb_tracker'
+                                        ? 'Upload daily SYMB Mass Orders CSV. Duplicate uploads are restricted per DATE (file_date), allowing daily uploads.'
+                                        : `file name format: "${getUploadPrefix()}_dd-mm-yyyy.csv"`
                         }
                     </div>
 
@@ -689,17 +714,56 @@ export function CrmDataUpload() {
                                 <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>1. SYMB SO Numbers (.csv)</label>
                                 <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Contains column "SO NUMBER"</span>
                                 <input type="file" accept=".csv" onChange={handleSymbSoUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
+                                {refLogs['symb_ref_so'] ? (
+                                    <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '0.75rem', color: '#86efac' }}>
+                                        <div><strong>Last Uploaded:</strong> {refLogs['symb_ref_so'].file_name}</div>
+                                        <div><strong>Date:</strong> {refLogs['symb_ref_so'].file_date || (refLogs['symb_ref_so'].created_at ? new Date(refLogs['symb_ref_so'].created_at).toLocaleDateString() : '')}</div>
+                                    </div>
+                                ) : (
+                                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.3rem' }}>No upload history recorded yet</span>
+                                )}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', color: 'white' }}>
                                 <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>2. Jabil Production (.csv)</label>
                                 <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Contains columns "SO Number", "Total"</span>
                                 <input type="file" accept=".csv" onChange={handleJabilUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
+                                {refLogs['symb_ref_jabil'] ? (
+                                    <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '0.75rem', color: '#86efac' }}>
+                                        <div><strong>Last Uploaded:</strong> {refLogs['symb_ref_jabil'].file_name}</div>
+                                        <div><strong>Date:</strong> {refLogs['symb_ref_jabil'].file_date || (refLogs['symb_ref_jabil'].created_at ? new Date(refLogs['symb_ref_jabil'].created_at).toLocaleDateString() : '')}</div>
+                                    </div>
+                                ) : (
+                                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.3rem' }}>No upload history recorded yet</span>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', color: 'white' }}>
+                                <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>4. SYMB Plan (.csv)</label>
+                                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Detailed plan data</span>
+                                <input type="file" accept=".csv" onChange={handleSymbPlanUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
+                                {refLogs['symb_ref_plan'] ? (
+                                    <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '0.75rem', color: '#86efac' }}>
+                                        <div><strong>Last Uploaded:</strong> {refLogs['symb_ref_plan'].file_name}</div>
+                                        <div><strong>Date:</strong> {refLogs['symb_ref_plan'].file_date || (refLogs['symb_ref_plan'].created_at ? new Date(refLogs['symb_ref_plan'].created_at).toLocaleDateString() : '')}</div>
+                                    </div>
+                                ) : (
+                                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.3rem' }}>No upload history recorded yet</span>
+                                )}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', color: 'white' }}>
-                                <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>3. Production Progress (V1/V2) (.csv)</label>
-                                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Contains "Customer Name", "completed", "Data category"</span>
-                                <input type="file" accept=".csv" onChange={handleProductionProgressUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
+                                <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>5. ERP MECH (.xlsx)</label>
+                                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>CTB Tracker Excel</span>
+                                <input type="file" accept=".xlsx,.xls" onChange={handleErpMechUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
+                                {refLogs['symb_ref_erp'] ? (
+                                    <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '0.75rem', color: '#86efac' }}>
+                                        <div><strong>Last Uploaded:</strong> {refLogs['symb_ref_erp'].file_name}</div>
+                                        <div><strong>Date:</strong> {refLogs['symb_ref_erp'].file_date || (refLogs['symb_ref_erp'].created_at ? new Date(refLogs['symb_ref_erp'].created_at).toLocaleDateString() : '')}</div>
+                                    </div>
+                                ) : (
+                                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.3rem' }}>No upload history recorded yet</span>
+                                )}
                             </div>
+
                         </div>
                     ) : activeTab === 'services_trend' ? (
                         <div style={{ textAlign: 'center', padding: '1rem' }}>
@@ -998,12 +1062,14 @@ export function CrmDataUpload() {
                                 <tbody>
                                     {logs.map(log => (
                                         <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                                            <td style={{ padding: '1rem', color: '#1f2937', fontWeight: '600' }}>Week {log.week}</td>
+                                            <td style={{ padding: '1rem', color: '#1f2937', fontWeight: '600' }}>
+                                                {log.week && log.week > 0 ? `Week ${log.week}` : 'Reference Table'}
+                                            </td>
                                             <td style={{ padding: '1rem', color: '#1f2937', fontWeight: '600' }}>{log.file_date}</td>
                                             <td style={{ padding: '1rem', color: '#1f2937', fontWeight: '600' }}>{log.file_name}</td>
                                             <td style={{ padding: '1rem' }}>
                                                 <button
-                                                    onClick={() => handleDelete(log.id, log.week)}
+                                                    onClick={() => handleDelete(log.id, log.week, log.file_name)}
                                                     style={{
                                                         background: 'none',
                                                         border: 'none',
