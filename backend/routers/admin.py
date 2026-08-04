@@ -2628,6 +2628,12 @@ async def delete_bulk_symb_updated_tracker(payload: SymbTrackerDeletePayload):
             res = await coll.delete_many({"_id": {"$in": obj_ids}})
             deleted_count = res.deleted_count
             
+        try:
+            from SYMB_plan_transformation import run_symb_plan_pipeline
+            await run_symb_plan_pipeline(db)
+        except Exception as pe:
+            print(f"Error running SYMB plan pipeline after delete: {pe}")
+            
         return {"status": "success", "deleted_count": deleted_count}
     except HTTPException as he:
         raise he
@@ -2684,6 +2690,12 @@ async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate):
                 
             current_date += timedelta(days=1)
             
+        try:
+            from SYMB_plan_transformation import run_symb_plan_pipeline
+            await run_symb_plan_pipeline(db)
+        except Exception as pe:
+            print(f"Error running SYMB plan pipeline after bulk create: {pe}")
+            
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -2735,6 +2747,12 @@ async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow):
         if updates:
             updates["edit_history"] = edit_history
             await coll.update_one({"_id": ObjectId(id)}, {"$set": updates})
+
+        try:
+            from SYMB_plan_transformation import run_symb_plan_pipeline
+            await run_symb_plan_pipeline(db)
+        except Exception as pe:
+            print(f"Error running SYMB plan pipeline after update: {pe}")
             
         return {"status": "success"}
     except Exception as e:
