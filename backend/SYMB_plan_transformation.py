@@ -174,7 +174,10 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_mech_agg_varient, df_tr
         "Active alignment", 
         "Production/Assembly", 
         "FQC", 
-        "Finished goods"
+        "Finished goods",
+        "Invoice Date",
+        "Shipment Date",
+        "customer place"
     }
     
     EVENT_MAP = {
@@ -183,7 +186,10 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_mech_agg_varient, df_tr
         "Active alignment": "Active alignment",
         "Production/Assembly": "Production/Assembly",
         "FQC": "FQC",
-        "Finished goods": "Finished goods"
+        "Finished goods": "Finished goods",
+        "Invoice Date": "Invoice Date",
+        "Shipment Date": "Shipment Date",
+        "customer place": "customer place"
     }
     
     completed_pool = {}
