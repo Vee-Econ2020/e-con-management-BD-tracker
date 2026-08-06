@@ -343,12 +343,48 @@ const SymbPipelineView: React.FC = () => {
         const isComplete = pct === 100;
         const { maxNativeCompletedIdxMap, maxNativeCompletedStageNameMap } = getWeekBackfillInfo(rows);
 
+        const v1MaxIdx = maxNativeCompletedIdxMap['varient 1'] ?? -1;
+        const v2MaxIdx = maxNativeCompletedIdxMap['varient 2'] ?? -1;
+
+        let quickSummaryText = '';
+        if (v1MaxIdx >= 0 && v2MaxIdx >= 0) {
+            if (v1MaxIdx === v2MaxIdx) {
+                quickSummaryText = `${EVENT_ORDER[v1MaxIdx]} both done`;
+            } else {
+                quickSummaryText = `${EVENT_ORDER[v1MaxIdx]} V1 & ${EVENT_ORDER[v2MaxIdx]} V2 done`;
+            }
+        } else if (v1MaxIdx >= 0) {
+            quickSummaryText = `${EVENT_ORDER[v1MaxIdx]} V1 done only`;
+        } else if (v2MaxIdx >= 0) {
+            quickSummaryText = `${EVENT_ORDER[v2MaxIdx]} V2 done only`;
+        } else {
+            quickSummaryText = 'No stages completed';
+        }
+
         return (
             <div key={weekStr} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-                <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1.5rem', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Calendar size={18} style={{ color: '#f5ad42' }} />
-                        <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Shipment Week: {weekStr}</h4>
+                <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1.5rem', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <Calendar size={18} style={{ color: '#f5ad42' }} />
+                            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Shipment Week: {weekStr}</h4>
+                        </div>
+
+                        <span style={{
+                            backgroundColor: isComplete ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 173, 66, 0.15)',
+                            color: isComplete ? '#34d399' : '#fbbf24',
+                            border: `1px solid ${isComplete ? '#059669' : '#d97706'}`,
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '16px',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem'
+                        }}>
+                            <CheckCircle2 size={13} />
+                            {quickSummaryText}
+                        </span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', backgroundColor: '#0f172a', padding: '0.35rem 0.75rem', borderRadius: '20px', border: '1px solid #334155' }}>
