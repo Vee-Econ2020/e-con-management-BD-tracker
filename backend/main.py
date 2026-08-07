@@ -10,12 +10,14 @@ load_dotenv()
 
 from routers import admin
 from routers import auth as auth_router
+from routers import access_management
 from context import target_week_var
 
 app = FastAPI(title="e-con Business Development Tracker API")
 
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(auth_router.router, prefix="/api/admin/auth", tags=["auth"])
+app.include_router(access_management.router, prefix="/api/access", tags=["access"])
 
 # CORS Configuration
 app.add_middleware(
@@ -56,14 +58,14 @@ async def startup_db_client():
         db = client[DB_NAME]
         # Test the connection
         await client.admin.command('ping')
-        print(f"✅ Connected to MongoDB Atlas - Database: {DB_NAME}")
+        print(f"Connected to MongoDB Atlas - Database: {DB_NAME}")
         # Seed default admin credentials (idempotent).
         try:
             await auth_router.seed_default_admin()
         except Exception as seed_err:
-            print(f"⚠️  Admin seed failed: {seed_err}")
+            print(f"Admin seed failed: {seed_err}")
     except Exception as e:
-        print(f"❌ Failed to connect to MongoDB: {e}")
+        print(f"Failed to connect to MongoDB: {e}")
 
 
 @app.on_event("shutdown")

@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Plot from 'react-plotly.js';
 import { Save, History, Edit2, FileText, RefreshCw, Layers, BarChart2, TrendingUp, Trash2, X, ShieldAlert } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface EditHistoryEntry {
     value: any;
+    old_value?: any;
+    new_value?: any;
+    edited_by?: string;
     timestamp: string;
     edit: number;
 }
@@ -22,6 +26,8 @@ interface TrackerRecord {
     planned_qty: number;
     completed: number;
     acc_comp_date: string | null;
+    created_by?: string;
+    created_at?: string;
     edit_history?: EditHistory;
 }
 
@@ -63,8 +69,16 @@ function parseDayDate(dayStr: any): Date | null {
 }
 
 export default function SymbTrackerUpdate() {
+    const { user } = useAuth();
     const [records, setRecords] = useState<TrackerRecord[]>([]);
     const [loading, setLoading] = useState(false);
+
+    const hasPermission = (evt: string) => {
+        if (!user) return false;
+        if (user.role === 'Admin') return true;
+        if (user.symb_permissions?.includes('ALL')) return true;
+        return user.symb_permissions?.includes(evt);
+    };
     
     // Bulk Form State
     const [variant, setVariant] = useState('1');
@@ -84,7 +98,8 @@ export default function SymbTrackerUpdate() {
         plan_date_to: '',
         planned_qty: '',
         completed: '',
-        acc_comp_date: ''
+        acc_comp_date: '',
+        created_by: ''
     });
 
     // Sorting State
@@ -192,6 +207,12 @@ export default function SymbTrackerUpdate() {
             if (columnFilters.acc_comp_date) {
                 const dateStr = rec.acc_comp_date ? new Date(rec.acc_comp_date).toLocaleString().toLowerCase() : '-';
                 if (!dateStr.includes(columnFilters.acc_comp_date.toLowerCase())) {
+                    return false;
+                }
+            }
+            if (columnFilters.created_by) {
+                const cbStr = rec.created_by ? rec.created_by.toLowerCase() : 'system';
+                if (!cbStr.includes(columnFilters.created_by.toLowerCase())) {
                     return false;
                 }
             }
@@ -841,13 +862,27 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
 
     const handleBulkSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!hasPermission(eventType)) {
+            setBulkMsg("Error: you dont have access to it");
+            return;
+        }
+
         setBulkLoading(true);
         setBulkMsg('');
         
         try {
+            const authVal = localStorage.getItem('econ_auth');
+            let token = '';
+            if (authVal) {
+                try { token = JSON.parse(authVal).token || ''; } catch(e){}
+            }
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
             const res = await fetch('/api/admin/symb-updated-tracker/bulk', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     variant,
                     event_type: eventType,
@@ -897,9 +932,17 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
         if (!window.confirm(confirmMsg)) return;
 
         try {
+            const authVal = localStorage.getItem('econ_auth');
+            let token = '';
+            if (authVal) {
+                try { token = JSON.parse(authVal).token || ''; } catch(e){}
+            }
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
             const res = await fetch(`/api/admin/symb-updated-tracker/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(editForm)
             });
             if (res.ok) {
@@ -925,15 +968,20 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
             >
                 <History size={14} />
                 {isHovered && (
-                    <div style={{ position: 'absolute', zIndex: 10, backgroundColor: '#1f2937', color: 'white', fontSize: '0.75rem', padding: '0.5rem', borderRadius: '4px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', width: '14rem', marginTop: '0.25rem', right: 0, border: '1px solid #374151' }}>
-                        <div style={{ fontWeight: 'bold', borderBottom: '1px solid #4b5563', marginBottom: '0.25rem', paddingBottom: '0.25rem' }}>Edit History</div>
+                    <div style={{ position: 'absolute', zIndex: 10, backgroundColor: '#1f2937', color: 'white', fontSize: '0.75rem', padding: '0.6rem', borderRadius: '6px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.2)', width: '16rem', marginTop: '0.25rem', right: 0, border: '1px solid #374151' }}>
+                        <div style={{ fontWeight: 'bold', borderBottom: '1px solid #4b5563', marginBottom: '0.35rem', paddingBottom: '0.25rem' }}>Edit History</div>
                         {history.map((h, i) => (
                             <div key={i} style={{ display: 'flex', flexDirection: 'column', padding: '0.35rem 0', borderBottom: i === history.length - 1 ? 'none' : '1px solid #374151' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span style={{ fontWeight: 'bold' }}>Edit {h.edit}</span>
-                                    <span style={{ fontWeight: '600', color: '#60a5fa' }}>{h.value}</span>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontWeight: 'bold' }}>Edit #{h.edit}</span>
+                                    <span style={{ fontWeight: '600', color: '#60a5fa' }}>
+                                        {h.old_value !== undefined ? `${h.old_value} → ${h.new_value ?? h.value}` : `${h.value}`}
+                                    </span>
                                 </div>
-                                <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginTop: '0.2rem' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#cbd5e1', marginTop: '0.2rem' }}>
+                                    By: <strong>{h.edited_by ? h.edited_by.split('@')[0] : 'System'}</strong> ({h.edited_by || ''})
+                                </div>
+                                <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginTop: '0.1rem' }}>
                                     {new Date(h.timestamp).toLocaleString()}
                                 </div>
                             </div>
@@ -963,14 +1011,11 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Event Type</label>
                         <select value={eventType} onChange={e => setEventType(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }}>
-                            <option value="PCBA Ready">PCBA Ready</option>
-                            <option value="Active alignment">Active alignment</option>
-                            <option value="Production/Assembly">Production/Assembly</option>
-                            <option value="FQC">FQC</option>
-                            <option value="Finished goods">Finished goods</option>
-                            <option value="Invoice Date">Invoice Date</option>
-                            <option value="Shipment Date">Shipment Date</option>
-                            <option value="customer place">customer place</option>
+                            {['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'].map(evt => (
+                                <option key={evt} value={evt} disabled={!hasPermission(evt)}>
+                                    {evt} {!hasPermission(evt) && '(No Access)'}
+                                </option>
+                            ))}
                         </select>
                     </div>
 
@@ -1024,27 +1069,29 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
                             <option value="asc">📅 Sort: Oldest to Newest</option>
                             <option value="desc">📅 Sort: Newest to Oldest</option>
                         </select>
-                        <button 
-                            onClick={() => handleOpenDeleteModal(filteredRecords.map((r: TrackerRecord) => r._id))}
-                            disabled={filteredRecords.length === 0}
-                            style={{ 
-                                backgroundColor: '#ef4444', 
-                                color: 'white', 
-                                border: 'none', 
-                                padding: '0.4rem 0.85rem', 
-                                borderRadius: '6px', 
-                                fontSize: '0.8rem', 
-                                fontWeight: '600', 
-                                cursor: filteredRecords.length === 0 ? 'not-allowed' : 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.4rem',
-                                opacity: filteredRecords.length === 0 ? 0.5 : 1,
-                                transition: 'all 0.15s ease'
-                            }}
-                        >
-                            <Trash2 size={15} /> Delete Filtered Rows ({filteredRecords.length})
-                        </button>
+                        {user?.role === 'Admin' && (
+                            <button 
+                                onClick={() => handleOpenDeleteModal(filteredRecords.map((r: TrackerRecord) => r._id))}
+                                disabled={filteredRecords.length === 0}
+                                style={{ 
+                                    backgroundColor: '#ef4444', 
+                                    color: 'white', 
+                                    border: 'none', 
+                                    padding: '0.4rem 0.85rem', 
+                                    borderRadius: '6px', 
+                                    fontSize: '0.8rem', 
+                                    fontWeight: '600', 
+                                    cursor: filteredRecords.length === 0 ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem',
+                                    opacity: filteredRecords.length === 0 ? 0.5 : 1,
+                                    transition: 'all 0.15s ease'
+                                }}
+                            >
+                                <Trash2 size={15} /> Delete Filtered Rows ({filteredRecords.length})
+                            </button>
+                        )}
                         <button onClick={fetchRecords} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
                         </button>
@@ -1095,6 +1142,7 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Remaining</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Excess</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Actual Comp. Date</th>
+                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Created By</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', textAlign: 'right' }}>Actions</th>
                         </tr>
                         {/* Column Filter Inputs */}
@@ -1168,10 +1216,19 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
                                     style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
                                 />
                             </th>
+                            <th style={{ padding: '0.4rem 0.75rem' }}>
+                                <input 
+                                    type="text" 
+                                    placeholder="Filter creator..." 
+                                    value={columnFilters.created_by} 
+                                    onChange={e => setColumnFilters({...columnFilters, created_by: e.target.value})} 
+                                    style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
+                                />
+                            </th>
                             <th style={{ padding: '0.4rem 0.75rem', textAlign: 'right' }}>
-                                {(columnFilters.variant || columnFilters.event_type || columnFilters.plan_date_from || columnFilters.plan_date_to || columnFilters.planned_qty || columnFilters.completed || columnFilters.acc_comp_date) && (
+                                {(columnFilters.variant || columnFilters.event_type || columnFilters.plan_date_from || columnFilters.plan_date_to || columnFilters.planned_qty || columnFilters.completed || columnFilters.acc_comp_date || columnFilters.created_by) && (
                                     <button 
-                                        onClick={() => setColumnFilters({ variant: '', event_type: '', plan_date_from: '', plan_date_to: '', planned_qty: '', completed: '', acc_comp_date: '' })}
+                                        onClick={() => setColumnFilters({ variant: '', event_type: '', plan_date_from: '', plan_date_to: '', planned_qty: '', completed: '', acc_comp_date: '', created_by: '' })}
                                         style={{ fontSize: '0.72rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}
                                     >
                                         Clear
@@ -1256,6 +1313,11 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
                                         {rec.acc_comp_date ? new Date(rec.acc_comp_date).toLocaleString() : '-'}
                                     </td>
 
+                                    {/* Created By & Date Column */}
+                                    <td style={{ padding: '0.75rem', color: '#4b5563', fontSize: '0.8rem' }}>
+                                        {rec.created_by ? `${rec.created_by.split('@')[0]} (${rec.created_at ? new Date(rec.created_at).toLocaleDateString() : '-'})` : 'System'}
+                                    </td>
+
                                     <td style={{ padding: '0.75rem', textAlign: 'right' }}>
                                         {isEditing ? (
                                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
@@ -1268,12 +1330,20 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
                                             </div>
                                         ) : (
                                             <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                                <button onClick={() => startEditing(rec)} style={{ backgroundColor: 'transparent', border: '1px solid #d1d5db', color: '#4b5563', padding: '0.3rem 0.6rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                                                    <Edit2 size={14} /> Edit
-                                                </button>
-                                                <button onClick={() => handleOpenDeleteModal([rec._id])} title="Delete record" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '0.3rem 0.5rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                {hasPermission(rec.event_type) ? (
+                                                    <button onClick={() => startEditing(rec)} style={{ backgroundColor: 'transparent', border: '1px solid #d1d5db', color: '#4b5563', padding: '0.3rem 0.6rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                                        <Edit2 size={14} /> Edit
+                                                    </button>
+                                                ) : (
+                                                    <span style={{ fontSize: '0.75rem', color: '#ef4444', fontStyle: 'italic', marginRight: '0.5rem' }}>
+                                                        you dont have access to it
+                                                    </span>
+                                                )}
+                                                {user?.role === 'Admin' && (
+                                                    <button onClick={() => handleOpenDeleteModal([rec._id])} title="Delete record (Admin)" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '0.3rem 0.5rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </td>
@@ -1282,7 +1352,7 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
                         })}
                         {filteredRecords.length === 0 && !loading && (
                             <tr>
-                                <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                <td colSpan={10} style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                                     No records match the selected sub-tab or column filters.
                                 </td>
                             </tr>

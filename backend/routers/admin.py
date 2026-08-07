@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Body, File, Form, UploadFile, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Body, File, Form, UploadFile, BackgroundTasks, Header
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 from typing import List, Optional
@@ -2627,6 +2627,201 @@ async def delete_bulk_symb_updated_tracker(payload: SymbTrackerDeletePayload):
         if obj_ids:
             res = await coll.delete_many({"_id": {"$in": obj_ids}})
             deleted_count = res.deleted_count
+            return {"status": "no_change"}
+
+        await coll.update_one(
+            {"_id": ObjectId(slide_id)}, 
+            {"$set": update_data}
+        )
+        return {"status": "success"}
+    except Exception as e:
+        print(f"Error updating custom slide: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- WHALE ACCOUNTS API ---
+from datetime import datetime
+from pydantic import BaseModel
+from typing import Optional
+
+class WhaleAccountEntry(BaseModel):
+    account_name: str
+    date_updated: str
+    week_updated: int
+    text_data: str
+    region: Optional[str] = None
+    is_old_data: Optional[bool] = False
+
+@router.get("/whale-accounts/names")
+async def get_whale_account_names(region: Optional[str] = None):
+    try:
+        coll = get_collection("whale_accounts")
+        query = {}
+        if region:
+            query["region"] = region
+        names = await coll.distinct("account_name", query)
+        return [n for n in names if n]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/whale-accounts/{account_name}")
+async def get_whale_account_entries(account_name: str):
+    try:
+        coll = get_collection("whale_accounts")
+        cursor = coll.find({"account_name": account_name}).sort("date_updated", -1)
+        entries = []
+        async for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            if "variants" not in doc:
+                log_dt = doc.get("updated_at") or doc.get("created_at") or datetime.utcnow()
+                log_str = log_dt.isoformat() + "Z" if isinstance(log_dt, datetime) else str(log_dt)
+                doc["variants"] = [{
+                    "version": "V1",
+                    "text_data": doc.get("text_data", ""),
+                    "log_date": log_str
+                }]
+            entries.append(doc)
+        return entries
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/whale-accounts/{account_name}")
+async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry):
+    try:
+        coll = get_collection("whale_accounts")
+        doc = await coll.find_one({
+            "account_name": account_name,
+            "date_updated": payload.date_updated
+        })
+        
+        now = datetime.utcnow()
+        new_variant = {
+            "text_data": payload.text_data,
+            "log_date": now.isoformat() + "Z"
+        }
+        
+        if doc:
+            variants = doc.get("variants", [])
+            if not variants:
+                log_dt = doc.get("updated_at") or doc.get("created_at") or now
+                log_str = log_dt.isoformat() + "Z" if isinstance(log_dt, datetime) else str(log_dt)
+                variants = [{
+                    "version": "V1",
+                    "text_data": doc.get("text_data", ""),
+                    "log_date": log_str
+                }]
+                
+            if len(variants) >= 3:
+                raise HTTPException(status_code=400, detail="Maximum of 3 variants reached for this date.")
+            
+            new_version = f"V{len(variants) + 1}"
+            new_variant["version"] = new_version
+            
+            await coll.update_one(
+                {"_id": doc["_id"]},
+                {
+                    "$set": {
+                        "week_updated": payload.week_updated,
+                        "updated_at": now,
+                        "region": payload.region,
+                        "is_old_data": payload.is_old_data
+                    },
+                    "$push": {
+                        "variants": new_variant
+                    }
+                }
+            )
+        else:
+            new_variant["version"] = "V1"
+            await coll.insert_one({
+                "account_name": account_name,
+                "date_updated": payload.date_updated,
+                "week_updated": payload.week_updated,
+                "created_at": now,
+                "updated_at": now,
+                "region": payload.region,
+                "is_old_data": payload.is_old_data,
+                "variants": [new_variant]
+            })
+        
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/whale-accounts/stats/{region}/{week}")
+async def get_whale_account_stats(region: str, week: int):
+    try:
+        coll = get_collection("whale_accounts")
+        pipeline = [
+            {"$match": {"region": region, "week_updated": week}},
+            {"$group": {"_id": "$account_name"}}
+        ]
+        cursor = coll.aggregate(pipeline)
+        names = []
+        async for doc in cursor:
+            names.append(doc["_id"])
+        return {"count": len(names), "names": names}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class SymbTrackerBulkCreate(BaseModel):
+    variant: str
+    event_type: str
+    start_date: str
+    end_date: str
+    upd: int
+
+class SymbTrackerUpdateRow(BaseModel):
+    plan_date: Optional[str] = None
+    planned_qty: Optional[int] = None
+    completed: Optional[int] = None
+
+class SymbTrackerDeletePayload(BaseModel):
+    admin_id: str
+    admin_password: str
+    record_ids: List[str]
+
+@router.get("/symb-updated-tracker")
+async def get_symb_updated_tracker():
+    try:
+        coll = get_collection("SYMB_Updated_progress_tracker")
+        # Clean up any legacy soft-deleted documents
+        await coll.delete_many({"status": "deleted"})
+        cursor = coll.find().sort([("variant", 1), ("event_type", 1), ("plan_date", 1)])
+        records = []
+        async for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            records.append(doc)
+        return records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/symb-updated-tracker/delete-bulk")
+async def delete_bulk_symb_updated_tracker(payload: SymbTrackerDeletePayload):
+    from bson.objectid import ObjectId
+    from routers.auth import _verify_password
+    
+    try:
+        auth_coll = get_collection("admin_users")
+        user = await auth_coll.find_one({"username": payload.admin_id})
+        if not user:
+            user = await auth_coll.find_one({"username": {"$regex": f"^{payload.admin_id}$", "$options": "i"}})
+            
+        if not user or not _verify_password(payload.admin_password, user.get("salt", ""), user.get("password_hash", "")):
+            raise HTTPException(status_code=401, detail="Invalid Admin ID or Password")
+            
+        coll = get_collection("SYMB_Updated_progress_tracker")
+        obj_ids = []
+        for r_id in payload.record_ids:
+            try:
+                obj_ids.append(ObjectId(r_id))
+            except Exception:
+                pass
+                
+        deleted_count = 0
+        if obj_ids:
+            res = await coll.delete_many({"_id": {"$in": obj_ids}})
+            deleted_count = res.deleted_count
             
         try:
             from SYMB_plan_transformation import run_symb_plan_pipeline
@@ -2641,9 +2836,12 @@ async def delete_bulk_symb_updated_tracker(payload: SymbTrackerDeletePayload):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/symb-updated-tracker/bulk")
-async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate):
+async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate, authorization: Optional[str] = Header(None)):
     from datetime import datetime, timedelta
+    from routers.auth import get_optional_current_user
     try:
+        user_sess = await get_optional_current_user(authorization)
+        user_email = user_sess.get("email") if user_sess else "System"
         coll = get_collection("SYMB_Updated_progress_tracker")
         start = datetime.strptime(payload.start_date, "%Y-%m-%d")
         end = datetime.strptime(payload.end_date, "%Y-%m-%d")
@@ -2663,7 +2861,10 @@ async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate):
                     edit_history = doc.get("edit_history", {"planned_qty": [], "completed": [], "plan_date": []})
                     pq_hist = edit_history.get("planned_qty", [])
                     pq_hist.append({
+                        "old_value": doc.get("planned_qty"),
+                        "new_value": payload.upd,
                         "value": doc.get("planned_qty"),
+                        "edited_by": user_email,
                         "timestamp": datetime.now().isoformat(),
                         "edit": len(pq_hist) + 1
                     })
@@ -2681,6 +2882,8 @@ async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate):
                     "planned_qty": payload.upd,
                     "completed": 0,
                     "acc_comp_date": None,
+                    "created_by": user_email,
+                    "created_at": datetime.now().isoformat(),
                     "edit_history": {
                         "planned_qty": [],
                         "completed": [],
@@ -2701,10 +2904,13 @@ async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/symb-updated-tracker/{id}")
-async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow):
+async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow, authorization: Optional[str] = Header(None)):
     from bson.objectid import ObjectId
     from datetime import datetime
+    from routers.auth import get_optional_current_user
     try:
+        user_sess = await get_optional_current_user(authorization)
+        user_email = user_sess.get("email") if user_sess else "System"
         coll = get_collection("SYMB_Updated_progress_tracker")
         doc = await coll.find_one({"_id": ObjectId(id)})
         if not doc:
@@ -2716,7 +2922,10 @@ async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow):
         if payload.plan_date is not None and payload.plan_date != doc.get("plan_date"):
             hist = edit_history.get("plan_date", [])
             hist.append({
+                "old_value": doc.get("plan_date"),
+                "new_value": payload.plan_date,
                 "value": doc.get("plan_date"),
+                "edited_by": user_email,
                 "timestamp": datetime.now().isoformat(),
                 "edit": len(hist) + 1
             })
@@ -2726,7 +2935,10 @@ async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow):
         if payload.planned_qty is not None and payload.planned_qty != doc.get("planned_qty"):
             hist = edit_history.get("planned_qty", [])
             hist.append({
+                "old_value": doc.get("planned_qty"),
+                "new_value": payload.planned_qty,
                 "value": doc.get("planned_qty"),
+                "edited_by": user_email,
                 "timestamp": datetime.now().isoformat(),
                 "edit": len(hist) + 1
             })
@@ -2736,7 +2948,10 @@ async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow):
         if payload.completed is not None and payload.completed != doc.get("completed"):
             hist = edit_history.get("completed", [])
             hist.append({
+                "old_value": doc.get("completed"),
+                "new_value": payload.completed,
                 "value": doc.get("completed"),
+                "edited_by": user_email,
                 "timestamp": datetime.now().isoformat(),
                 "edit": len(hist) + 1
             })

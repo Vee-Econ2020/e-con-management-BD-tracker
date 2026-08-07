@@ -19,9 +19,9 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Depends
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
 
@@ -52,32 +52,36 @@ def _verify_password(password: str, salt_hex: str, expected_hash_hex: str) -> bo
 
 async def seed_default_admin() -> None:
     """
-    Ensure the default Admin user exists in `admin_users`.
-
-    Reads the plaintext seed password from the ADMIN_SEED_PASSWORD env var.
-    If the user already exists, this is a no-op (so rotating the env var
-    does not silently overwrite the stored hash). Use `reset-admin` CLI or
-    a DB update to change an existing password.
+    Ensure the default Admin user exists in `users`.
     """
+    seed_email = os.getenv("ADMIN_SEED_EMAIL")
     seed_password = os.getenv("ADMIN_SEED_PASSWORD")
-    if not seed_password:
-        print("⚠️  ADMIN_SEED_PASSWORD not set — skipping default admin seed.")
+    if not seed_email or not seed_password:
+        print("Admin seed failed: ADMIN_SEED_EMAIL or ADMIN_SEED_PASSWORD not set.")
         return
 
     db = _get_db()
-    coll = db["admin_users"]
-    existing = await coll.find_one({"username": "Admin"})
+    coll = db["users"]
+    existing = await coll.find_one({"email": seed_email})
     if existing:
         return
 
     salt = secrets.token_bytes(16)
     await coll.insert_one({
-        "username": "Admin",
+        "email": seed_email,
         "salt": salt.hex(),
         "password_hash": _hash_password(seed_password, salt),
+        "initial_password": seed_password,
+        "current_password": seed_password,
+        "default_password": seed_password,
+        "role": "Admin",
+        "status": "Active",
+        "department": "Management",
+        "tracker_access": ["Weekly", "Revenue", "SYMB", "Admin"],
+        "symb_permissions": ["ALL"],
         "created_at": datetime.utcnow(),
     })
-    print("✅ Seeded default Admin user in admin_users collection.")
+    print("Seeded default Admin user in users collection.")
 
 
 class LoginRequest(BaseModel):
@@ -96,7 +100,6 @@ async def login(payload: LoginRequest):
     db = _get_db()
     user = await db["admin_users"].find_one({"username": payload.username})
     if not user or not _verify_password(payload.password, user.get("salt", ""), user.get("password_hash", "")):
-        # Uniform error to avoid username enumeration.
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
     token = secrets.token_urlsafe(32)
@@ -104,10 +107,62 @@ async def login(payload: LoginRequest):
     await db["admin_sessions"].insert_one({
         "token": token,
         "username": user["username"],
+        "role": "Admin",
         "created_at": datetime.utcnow(),
         "expires_at": expires_at,
     })
     return LoginResponse(token=token, username=user["username"], expires_at=expires_at)
+
+class UserLoginRequest(BaseModel):
+    email: str
+    password: str
+
+class UserLoginResponse(BaseModel):
+    token: str
+    email: str
+    role: str
+    sub_role: Optional[str] = "None"
+    tracker_access: list
+    symb_permissions: list
+    expires_at: datetime
+
+@router.post("/user-login", response_model=UserLoginResponse)
+async def user_login(payload: UserLoginRequest):
+    if not payload.email.endswith("@e-consystems.com"):
+        raise HTTPException(status_code=400, detail="username is invalid please enter valid one or request new acess")
+        
+    db = _get_db()
+    user = await db["users"].find_one({"email": payload.email})
+    if not user:
+        raise HTTPException(status_code=400, detail="username is invalid please enter valid one or request new acess")
+    
+    if user.get("status") != "Active":
+        raise HTTPException(status_code=403, detail="Your account is not active. Status: " + user.get("status", "Unknown"))
+        
+    if not _verify_password(payload.password, user.get("salt", ""), user.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=_SESSION_TTL_HOURS)
+    await db["admin_sessions"].insert_one({
+        "token": token,
+        "email": user["email"],
+        "role": user.get("role", "User"),
+        "sub_role": user.get("sub_role", "None"),
+        "tracker_access": user.get("tracker_access", []),
+        "symb_permissions": user.get("symb_permissions", []),
+        "created_at": datetime.utcnow(),
+        "expires_at": expires_at,
+    })
+    return UserLoginResponse(
+        token=token, 
+        email=user["email"], 
+        role=user.get("role", "User"),
+        sub_role=user.get("sub_role", "None"),
+        tracker_access=user.get("tracker_access", []),
+        symb_permissions=user.get("symb_permissions", []),
+        expires_at=expires_at
+    )
 
 
 @router.post("/logout")
@@ -128,7 +183,73 @@ async def verify(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid token")
     if session.get("expires_at") and session["expires_at"] < datetime.utcnow():
         raise HTTPException(status_code=401, detail="Token expired")
-    return {"status": "ok", "username": session["username"]}
+    
+    return {
+        "status": "ok", 
+        "username": session.get("username"), 
+        "email": session.get("email"),
+        "role": session.get("role"),
+        "sub_role": session.get("sub_role", "None"),
+        "tracker_access": session.get("tracker_access", []),
+        "symb_permissions": session.get("symb_permissions", [])
+    }
+
+async def get_current_user(authorization: Optional[str] = Header(None)):
+    token = _extract_bearer(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing token")
+    session = await _get_db()["admin_sessions"].find_one({"token": token})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    if session.get("expires_at") and session["expires_at"] < datetime.utcnow():
+        raise HTTPException(status_code=401, detail="Token expired")
+    return session
+
+async def get_optional_current_user(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        return None
+    token = _extract_bearer(authorization)
+    if not token:
+        return None
+    session = await _get_db()["admin_sessions"].find_one({"token": token})
+    if not session:
+        return None
+    if session.get("expires_at") and session["expires_at"] < datetime.utcnow():
+        return None
+    return session
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@router.post("/change-password")
+async def change_password(payload: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+    email = current_user.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Only standard users can change passwords this way")
+        
+    db = _get_db()
+    user = await db["users"].find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not _verify_password(payload.current_password, user.get("salt", ""), user.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Invalid current password")
+        
+    new_salt = secrets.token_bytes(16)
+    new_hash = _hash_password(payload.new_password, new_salt)
+    
+    await db["users"].update_one(
+        {"email": email},
+        {"$set": {
+            "salt": new_salt.hex(), 
+            "password_hash": new_hash,
+            "current_password": payload.new_password,
+            "password_changed": True,
+            "password_changed_at": datetime.utcnow()
+        }}
+    )
+    return {"status": "ok", "message": "Password updated successfully"}
 
 
 def _extract_bearer(authorization: Optional[str]) -> Optional[str]:
