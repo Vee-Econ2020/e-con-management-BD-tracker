@@ -19,7 +19,7 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException, Depends
+from fastapi import APIRouter, Header, HTTPException, Depends, Query
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr
 
@@ -173,7 +173,29 @@ async def logout(authorization: Optional[str] = Header(None)):
     return {"status": "ok"}
 
 
-async def _validate_and_sync_session(session: dict) -> Optional[dict]:
+def _map_page_name(path: Optional[str]) -> str:
+    if not path:
+        return "Active Session"
+    path = path.lower().strip()
+    if path == "/" or "home" in path:
+        return "Home"
+    elif "symb" in path:
+        return "SYMB Tracker"
+    elif "weekly" in path:
+        return "Weekly Tracker"
+    elif "revenue" in path:
+        return "Revenue Tracker"
+    elif "access-management" in path:
+        return "Access Management"
+    elif "admin" in path:
+        return "Admin Upload"
+    elif "profile" in path:
+        return "Profile Settings"
+    elif "login" in path:
+        return "Login"
+    return path.replace("/", "").title() or "Home"
+
+async def _validate_and_sync_session(session: dict, page: Optional[str] = None) -> Optional[dict]:
     if not session:
         return None
     db = _get_db()
@@ -193,10 +215,17 @@ async def _validate_and_sync_session(session: dict) -> Optional[dict]:
         session["tracker_access"] = user.get("tracker_access", [])
         session["symb_permissions"] = user.get("symb_permissions", [])
 
+        # Record activity timestamp and current page
+        update_dict = {"last_active_at": datetime.utcnow(), "is_online": True}
+        if page:
+            update_dict["last_active_page"] = _map_page_name(page)
+        
+        await db["users"].update_one({"email": email}, {"$set": update_dict})
+
     return session
 
 @router.get("/verify")
-async def verify(authorization: Optional[str] = Header(None)):
+async def verify(authorization: Optional[str] = Header(None), page: Optional[str] = Query(None)):
     token = _extract_bearer(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="Missing token")
@@ -205,7 +234,7 @@ async def verify(authorization: Optional[str] = Header(None)):
     if not session:
         raise HTTPException(status_code=401, detail="Invalid token")
     
-    session = await _validate_and_sync_session(session)
+    session = await _validate_and_sync_session(session, page=page)
     if not session:
         raise HTTPException(status_code=401, detail="Token expired")
     
@@ -219,7 +248,21 @@ async def verify(authorization: Optional[str] = Header(None)):
         "symb_permissions": session.get("symb_permissions", [])
     }
 
-async def get_current_user(authorization: Optional[str] = Header(None)):
+@router.post("/offline")
+async def mark_offline(authorization: Optional[str] = Header(None), token_param: Optional[str] = Query(None)):
+    token = _extract_bearer(authorization) or token_param
+    if not token:
+        return {"status": "ignored"}
+    db = _get_db()
+    session = await db["admin_sessions"].find_one({"token": token})
+    if session and session.get("email"):
+        await db["users"].update_one(
+            {"email": session["email"]},
+            {"$set": {"is_online": False, "last_active_at": datetime.utcnow()}}
+        )
+    return {"status": "ok"}
+
+async def get_current_user(authorization: Optional[str] = Header(None), x_page_path: Optional[str] = Header(None, alias="X-Page-Path")):
     token = _extract_bearer(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="Missing token")
@@ -227,7 +270,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     session = await db["admin_sessions"].find_one({"token": token})
     if not session:
         raise HTTPException(status_code=401, detail="Invalid token")
-    session = await _validate_and_sync_session(session)
+    session = await _validate_and_sync_session(session, page=x_page_path)
     if not session:
         raise HTTPException(status_code=401, detail="Token expired")
     return session

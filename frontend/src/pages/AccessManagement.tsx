@@ -1,6 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
+function formatRelativeTime(isoStr?: string): string {
+    if (!isoStr) return 'Never';
+    try {
+        const utcStr = (isoStr.endsWith('Z') || isoStr.includes('+')) ? isoStr : (isoStr + 'Z');
+        const date = new Date(utcStr);
+        const diffMs = Date.now() - date.getTime();
+        if (isNaN(diffMs) || diffMs < 0) return 'Just now';
+        const diffMins = Math.floor(diffMs / 60000);
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? 's' : ''} ago`;
+        return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+        return isoStr;
+    }
+}
+
 export default function AccessManagement() {
     const { token } = useAuth();
     const [activeTab, setActiveTab] = useState('pending');
@@ -33,6 +51,12 @@ export default function AccessManagement() {
     useEffect(() => {
         setSelectedEmails([]);
         fetchData();
+
+        const interval = setInterval(() => {
+            fetchData();
+        }, 20000);
+
+        return () => clearInterval(interval);
     }, [activeTab]);
 
     const toggleSelectUser = (email: string) => {
@@ -325,6 +349,7 @@ export default function AccessManagement() {
                             {activeTab === 'active' && <th style={{ padding: '1rem', borderBottom: '2px solid #e5e7eb' }}>Role</th>}
                             {activeTab === 'active' && <th style={{ padding: '1rem', borderBottom: '2px solid #e5e7eb' }}>Password Status</th>}
                             <th style={{ padding: '1rem', borderBottom: '2px solid #e5e7eb' }}>Actions</th>
+                            {activeTab === 'active' && <th style={{ padding: '1rem', borderBottom: '2px solid #e5e7eb' }}>Activity</th>}
                         </tr>
                     </thead>
                     <tbody>
@@ -365,7 +390,7 @@ export default function AccessManagement() {
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                                                 <span style={{ color: '#059669', fontWeight: '700', fontSize: '0.8rem' }}>Changed by User</span>
                                                 <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: '700', color: '#065f46', backgroundColor: '#d1fae5', padding: '0.15rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', border: '1px solid #a7f3d0' }}>
-                                                    🔑 {user.current_password || user.default_password || 'Not Set'}
+                                                    {user.current_password || user.default_password || 'Not Set'}
                                                 </span>
                                                 {user.initial_password && user.initial_password !== user.current_password && (
                                                     <span style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '0.15rem' }}>
@@ -377,7 +402,7 @@ export default function AccessManagement() {
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                                                 <span style={{ color: '#d97706', fontWeight: '700', fontSize: '0.8rem' }}>Default Password</span>
                                                 <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: '700', color: '#92400e', backgroundColor: '#fef3c7', padding: '0.15rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', border: '1px solid #fde68a' }}>
-                                                    🔑 {user.current_password || user.default_password || '@Ec255kif5f'}
+                                                    {user.current_password || user.default_password || '@Ec255kif5f'}
                                                 </span>
                                             </div>
                                         )}
@@ -413,6 +438,66 @@ export default function AccessManagement() {
                                         </div>
                                     )}
                                 </td>
+                                {activeTab === 'active' && (
+                                    <td style={{ padding: '1rem' }}>
+                                        {user.is_live ? (
+                                            <div>
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.4rem',
+                                                    padding: '0.2rem 0.65rem',
+                                                    backgroundColor: '#dcfce7',
+                                                    color: '#15803d',
+                                                    borderRadius: '9999px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '700',
+                                                    border: '1px solid #86efac'
+                                                }}>
+                                                    <span style={{
+                                                        width: '8px',
+                                                        height: '8px',
+                                                        backgroundColor: '#22c55e',
+                                                        borderRadius: '50%',
+                                                        display: 'inline-block'
+                                                    }} />
+                                                    Active Now
+                                                </span>
+                                                <div style={{ fontSize: '0.8rem', color: '#334155', fontWeight: '600', marginTop: '0.25rem' }}>
+                                                    {user.last_active_page || 'Home'}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    padding: '0.2rem 0.65rem',
+                                                    backgroundColor: '#f1f5f9',
+                                                    color: '#64748b',
+                                                    borderRadius: '9999px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '600',
+                                                    border: '1px solid #cbd5e1'
+                                                }}>
+                                                    Offline
+                                                </span>
+                                                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem' }}>
+                                                    {user.last_active_at ? (
+                                                        <>
+                                                            <span>{formatRelativeTime(user.last_active_at)}</span>
+                                                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                                                                Page: {user.last_active_page || 'Unknown'}
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        'No recent activity'
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </td>
+                                )}
                             </tr>
                         ))}
                         {(activeTab === 'pending' ? pendingRequests : activeUsers).length === 0 && (

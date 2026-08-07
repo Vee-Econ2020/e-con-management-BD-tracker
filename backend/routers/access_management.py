@@ -84,10 +84,13 @@ async def request_page_access(payload: PageAccessRequest, current_user: dict = D
 
 @router.get("/active-users")
 async def get_active_users(current_user: dict = Depends(get_current_user)):
+    from datetime import datetime, timedelta
     db = _get_db()
     cursor = db["users"].find({"status": "Active"})
     users = await cursor.to_list(length=100)
     admin_seed_pwd = os.getenv("ADMIN_SEED_PASSWORD", "@Ec255kif5f")
+    now = datetime.utcnow()
+
     for u in users:
         u["_id"] = str(u["_id"])
         u["password_changed"] = u.get("password_changed", False)
@@ -110,6 +113,30 @@ async def get_active_users(current_user: dict = Depends(get_current_user)):
         u["initial_password"] = init_pwd
         u["default_password"] = curr_pwd
         
+        # Activity computation (live within 45 seconds AND is_online)
+        last_active = u.get("last_active_at")
+        is_online_flag = u.get("is_online", True)
+        is_live = False
+        last_active_iso = None
+        if last_active:
+            if isinstance(last_active, str):
+                try:
+                    clean_str = last_active.rstrip("Z")
+                    last_active_dt = datetime.fromisoformat(clean_str)
+                except Exception:
+                    last_active_dt = None
+            else:
+                last_active_dt = last_active
+
+            if last_active_dt:
+                last_active_iso = last_active_dt.isoformat() + "Z"
+                if is_online_flag and (now - last_active_dt) < timedelta(seconds=45):
+                    is_live = True
+
+        u["is_live"] = is_live
+        u["last_active_at"] = last_active_iso
+        u["last_active_page"] = u.get("last_active_page", "Home")
+
         # Don't return password hashes or salts
         u.pop("password_hash", None)
         u.pop("salt", None)

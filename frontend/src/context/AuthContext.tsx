@@ -89,13 +89,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadStoredAuth();
     }, []);
 
-    // Periodic live session polling every 5 seconds to catch access changes immediately
+    // Periodic live session polling every 20 seconds to catch access changes and track active page
     useEffect(() => {
         if (!token) return;
 
-        const interval = setInterval(async () => {
+        const checkSessionAndTrackActivity = async () => {
             try {
-                const res = await fetch('/api/admin/auth/verify', {
+                const currentPath = window.location.pathname;
+                const res = await fetch(`/api/admin/auth/verify?page=${encodeURIComponent(currentPath)}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
@@ -155,9 +156,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch (err) {
                 // Ignore transient network errors during background check
             }
-        }, 5000);
+        };
+
+        const interval = setInterval(checkSessionAndTrackActivity, 20000);
 
         return () => clearInterval(interval);
+    }, [token]);
+
+    // Send instant offline beacon when tab/browser closes or hides
+    useEffect(() => {
+        if (!token) return;
+
+        const sendOfflineBeacon = () => {
+            if (!token) return;
+            const url = `/api/admin/auth/offline?token_param=${encodeURIComponent(token)}`;
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(url);
+            } else {
+                fetch(url, { method: 'POST', keepalive: true }).catch(() => {});
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                sendOfflineBeacon();
+            }
+        };
+
+        window.addEventListener('beforeunload', sendOfflineBeacon);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener('beforeunload', sendOfflineBeacon);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [token]);
 
     const login = (newToken: string, userData: User, expires_at: string) => {
