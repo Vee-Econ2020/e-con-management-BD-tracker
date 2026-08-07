@@ -214,8 +214,18 @@ export default function SymbTrackerUpdate() {
         });
     }, [records, selectedEventTab, columnFilters, sortOrder]);
 
-    const v1Records = useMemo(() => filteredRecords.filter((r: TrackerRecord) => String(r.variant) === '1'), [filteredRecords]);
-    const v2Records = useMemo(() => filteredRecords.filter((r: TrackerRecord) => String(r.variant) === '2'), [filteredRecords]);
+    const isVariant1 = (v: any) => {
+        const s = String(v ?? '').trim().toLowerCase();
+        return s === '1' || s === '1.0' || s === 'v1' || s.includes('variant 1') || s.includes('varient 1');
+    };
+
+    const isVariant2 = (v: any) => {
+        const s = String(v ?? '').trim().toLowerCase();
+        return s === '2' || s === '2.0' || s === 'v2' || s.includes('variant 2') || s.includes('varient 2');
+    };
+
+    const v1Records = useMemo(() => filteredRecords.filter((r: TrackerRecord) => isVariant1(r.variant)), [filteredRecords]);
+    const v2Records = useMemo(() => filteredRecords.filter((r: TrackerRecord) => isVariant2(r.variant)), [filteredRecords]);
 
     const v1Metrics = useMemo(() => calcMetrics(v1Records), [v1Records]);
     const v2Metrics = useMemo(() => calcMetrics(v2Records), [v2Records]);
