@@ -173,15 +173,40 @@ async def logout(authorization: Optional[str] = Header(None)):
     return {"status": "ok"}
 
 
+async def _validate_and_sync_session(session: dict) -> Optional[dict]:
+    if not session:
+        return None
+    db = _get_db()
+    if session.get("expires_at") and session["expires_at"] < datetime.utcnow():
+        await db["admin_sessions"].delete_one({"token": session["token"]})
+        return None
+
+    email = session.get("email")
+    if email:
+        user = await db["users"].find_one({"email": email})
+        if not user or user.get("status") != "Active":
+            await db["admin_sessions"].delete_many({"email": email})
+            raise HTTPException(status_code=403, detail="Access has been revoked")
+
+        session["role"] = user.get("role", "User")
+        session["sub_role"] = user.get("sub_role", "None")
+        session["tracker_access"] = user.get("tracker_access", [])
+        session["symb_permissions"] = user.get("symb_permissions", [])
+
+    return session
+
 @router.get("/verify")
 async def verify(authorization: Optional[str] = Header(None)):
     token = _extract_bearer(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="Missing token")
-    session = await _get_db()["admin_sessions"].find_one({"token": token})
+    db = _get_db()
+    session = await db["admin_sessions"].find_one({"token": token})
     if not session:
         raise HTTPException(status_code=401, detail="Invalid token")
-    if session.get("expires_at") and session["expires_at"] < datetime.utcnow():
+    
+    session = await _validate_and_sync_session(session)
+    if not session:
         raise HTTPException(status_code=401, detail="Token expired")
     
     return {
@@ -198,10 +223,12 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     token = _extract_bearer(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="Missing token")
-    session = await _get_db()["admin_sessions"].find_one({"token": token})
+    db = _get_db()
+    session = await db["admin_sessions"].find_one({"token": token})
     if not session:
         raise HTTPException(status_code=401, detail="Invalid token")
-    if session.get("expires_at") and session["expires_at"] < datetime.utcnow():
+    session = await _validate_and_sync_session(session)
+    if not session:
         raise HTTPException(status_code=401, detail="Token expired")
     return session
 
@@ -211,12 +238,14 @@ async def get_optional_current_user(authorization: Optional[str] = Header(None))
     token = _extract_bearer(authorization)
     if not token:
         return None
-    session = await _get_db()["admin_sessions"].find_one({"token": token})
+    db = _get_db()
+    session = await db["admin_sessions"].find_one({"token": token})
     if not session:
         return None
-    if session.get("expires_at") and session["expires_at"] < datetime.utcnow():
+    try:
+        return await _validate_and_sync_session(session)
+    except HTTPException:
         return None
-    return session
 
 class ChangePasswordRequest(BaseModel):
     current_password: str

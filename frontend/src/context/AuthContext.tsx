@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -32,6 +32,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [revokedMsg, setRevokedMsg] = useState<string | null>(null);
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
+    
+    const userRef = useRef<User | null>(user);
+    userRef.current = user;
+
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -62,14 +68,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     localStorage.removeItem(STORAGE_KEY);
                 } else {
                     const data = await res.json();
-                    setToken(parsed.token);
-                    setUser({
-                        email: data.email || data.username, // Fallback for Admin
+                    const newUser: User = {
+                        email: data.email || data.username,
                         role: data.role || 'Admin',
                         sub_role: data.sub_role || 'None',
                         tracker_access: data.tracker_access || ['Admin'],
                         symb_permissions: data.symb_permissions || ['ALL']
-                    });
+                    };
+                    setToken(parsed.token);
+                    setUser(newUser);
                 }
             } catch (error) {
                 localStorage.removeItem(STORAGE_KEY);
@@ -81,9 +88,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadStoredAuth();
     }, []);
 
+    // Periodic live session polling every 5 seconds to catch access changes immediately
+    useEffect(() => {
+        if (!token) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/admin/auth/verify', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (res.status === 401 || res.status === 403) {
+                    const data = await res.json().catch(() => ({}));
+                    const detailMsg = data.detail || 'Access has been revoked by an administrator.';
+                    setRevokedMsg(detailMsg);
+                    logout();
+                    return;
+                }
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const currentUser = userRef.current;
+                    if (!currentUser) return;
+
+                    const updatedRole = data.role || 'User';
+                    const updatedSubRole = data.sub_role || 'None';
+                    const updatedTrackerAccess: string[] = data.tracker_access || [];
+                    const updatedSymbPermissions: string[] = data.symb_permissions || [];
+
+                    const trackerAccessChanged = JSON.stringify(currentUser.tracker_access?.sort()) !== JSON.stringify(updatedTrackerAccess.sort());
+                    const symbPermsChanged = JSON.stringify(currentUser.symb_permissions?.sort()) !== JSON.stringify(updatedSymbPermissions.sort());
+                    const roleChanged = currentUser.role !== updatedRole || currentUser.sub_role !== updatedSubRole;
+
+                    if (roleChanged || trackerAccessChanged || symbPermsChanged) {
+                        const updatedUser: User = {
+                            ...currentUser,
+                            role: updatedRole,
+                            sub_role: updatedSubRole,
+                            tracker_access: updatedTrackerAccess,
+                            symb_permissions: updatedSymbPermissions
+                        };
+
+                        setUser(updatedUser);
+                        
+                        // Update storage
+                        const raw = localStorage.getItem(STORAGE_KEY);
+                        if (raw) {
+                            try {
+                                const parsed = JSON.parse(raw);
+                                parsed.user = updatedUser;
+                                localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+                            } catch (e) {
+                                // ignore
+                            }
+                        }
+
+                        let msg = `Your role access was updated to: ${updatedRole}`;
+                        if (updatedSubRole && updatedSubRole !== 'None') {
+                            msg += ` (${updatedSubRole})`;
+                        }
+                        setToastMsg(msg);
+                        setTimeout(() => setToastMsg(null), 6000);
+                    }
+                }
+            } catch (err) {
+                // Ignore transient network errors during background check
+            }
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [token]);
+
     const login = (newToken: string, userData: User, expires_at: string) => {
         setToken(newToken);
         setUser(userData);
+        setRevokedMsg(null);
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
             token: newToken,
             user: userData,
@@ -95,13 +174,126 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(null);
         setUser(null);
         localStorage.removeItem(STORAGE_KEY);
-        // localStorage.removeItem('econ_admin_auth'); // clear legacy admin auth too
-        navigate('/');
+        navigate('/login');
     };
 
     return (
         <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
             {children}
+
+            {/* Notification Toast for live permission updates */}
+            {toastMsg && (
+                <div style={{
+                    position: 'fixed',
+                    top: '20px',
+                    right: '20px',
+                    backgroundColor: '#1e293b',
+                    color: '#38bdf8',
+                    border: '2px solid #0284c7',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    borderRadius: '12px',
+                    padding: '1rem 1.5rem',
+                    zIndex: 999999,
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    animation: 'slideIn 0.3s ease-out'
+                }}>
+                    <span style={{ fontSize: '1.3rem' }}>🔔</span>
+                    <div>
+                        <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '1rem' }}>Permissions Updated</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>{toastMsg}</div>
+                    </div>
+                    <button
+                        onClick={() => setToastMsg(null)}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#94a3b8',
+                            fontSize: '1.2rem',
+                            cursor: 'pointer',
+                            marginLeft: '1rem'
+                        }}
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            {/* Modal Popup for Access Revocation */}
+            {revokedMsg && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 999999,
+                    padding: '1.5rem'
+                }}>
+                    <div style={{
+                        backgroundColor: '#1e293b',
+                        borderRadius: '16px',
+                        border: '1px solid #ef4444',
+                        boxShadow: '0 25px 50px -12px rgba(239, 68, 68, 0.25)',
+                        maxWidth: '450px',
+                        width: '100%',
+                        padding: '2rem',
+                        textAlign: 'center',
+                        color: '#f8fafc'
+                    }}>
+                        <div style={{
+                            width: '56px',
+                            height: '56px',
+                            backgroundColor: '#451a1a',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 1.25rem auto',
+                            fontSize: '1.8rem',
+                            color: '#ef4444',
+                            border: '2px solid #991b1b'
+                        }}>
+                            🚫
+                        </div>
+                        <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f8fafc', margin: '0 0 0.5rem 0' }}>
+                            Access Revoked
+                        </h2>
+                        <p style={{ color: '#cbd5e1', fontSize: '0.95rem', lineHeight: '1.5', margin: '0 0 1.5rem 0' }}>
+                            {revokedMsg}
+                        </p>
+                        <button
+                            onClick={() => {
+                                setRevokedMsg(null);
+                                navigate('/login');
+                            }}
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem 1.5rem',
+                                backgroundColor: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontWeight: 700,
+                                fontSize: '1rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                            }}
+                        >
+                            Back to Login
+                        </button>
+                    </div>
+                </div>
+            )}
         </AuthContext.Provider>
     );
 }

@@ -141,6 +141,15 @@ async def update_user_access(email: str, payload: UpdateUserRequest, current_use
             "updated_by": current_user.get("email") or current_user.get("username")
         }}
     )
+    await db["admin_sessions"].update_many(
+        {"email": email},
+        {"$set": {
+            "role": payload.role,
+            "sub_role": payload.sub_role,
+            "tracker_access": payload.tracker_access,
+            "symb_permissions": payload.symb_permissions
+        }}
+    )
     return {"status": "ok", "message": "User access updated successfully"}
 
 @router.put("/approve-request/{email}")
@@ -163,6 +172,15 @@ async def approve_request(email: str, payload: ApproveRequest, current_user: dic
                 "requested_pages": [],
                 "updated_at": datetime.utcnow(),
                 "updated_by": current_user.get("username") or current_user.get("email")
+            }}
+        )
+        await db["admin_sessions"].update_many(
+            {"email": email},
+            {"$set": {
+                "role": payload.role,
+                "sub_role": payload.sub_role,
+                "tracker_access": payload.tracker_access,
+                "symb_permissions": payload.symb_permissions
             }}
         )
         return {"status": "ok", "message": "User page request approved successfully"}
@@ -213,6 +231,7 @@ async def decline_request(email: str, current_user: dict = Depends(get_current_u
             {"email": email},
             {"$set": {"status": "Declined", "declined_at": datetime.utcnow()}}
         )
+        await db["admin_sessions"].delete_many({"email": email})
     else:
         await db["users"].update_one(
             {"email": email},

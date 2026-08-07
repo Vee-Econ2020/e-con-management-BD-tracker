@@ -37,36 +37,34 @@ function Home() {
     };
 
     return (
-        <div className="app-container" style={{ position: 'relative' }}>
-            {!user && (
-                <button
-                    onClick={() => navigate('/login')}
-                    style={{
-                        position: 'absolute',
-                        top: '1rem',
-                        right: '1rem',
-                        padding: '0.6rem 2.5rem',
-                        backgroundColor: '#111827',
-                        color: 'white',
-                        border: '3px solid #374151',
-                        borderRadius: '9999px',
-                        fontWeight: '900',
-                        fontSize: '1.2rem',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        zIndex: 10
-                    }}
-                >
-                    Login
-                </button>
-            )}
-
+        <div className="app-container">
             <header className="header-container">
                 <div className="title-section">
                     <h1>e-con<br />Business<br />Development<br />tracker</h1>
                 </div>
 
-                <div className="date-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+                <div className="date-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
+                    {!user && (
+                        <button
+                            onClick={() => navigate('/login')}
+                            style={{
+                                padding: '0.45rem 1.75rem',
+                                backgroundColor: '#111827',
+                                color: 'white',
+                                border: '2px solid #374151',
+                                borderRadius: '9999px',
+                                fontWeight: '700',
+                                fontSize: '1rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                marginBottom: '0.4rem',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.12)'
+                            }}
+                        >
+                            Login
+                        </button>
+                    )}
+
                     <div className="current-date">{currentDate}</div>
                     <div className="week-display">
                         Week : {weekData?.week || '...'}
