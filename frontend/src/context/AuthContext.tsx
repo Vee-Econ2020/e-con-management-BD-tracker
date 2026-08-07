@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Bell, ShieldAlert, X } from 'lucide-react';
 
 export interface User {
     email: string;
@@ -201,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     gap: '0.75rem',
                     animation: 'slideIn 0.3s ease-out'
                 }}>
-                    <span style={{ fontSize: '1.3rem' }}>🔔</span>
+                    <Bell size={20} color="#38bdf8" style={{ flexShrink: 0 }} />
                     <div>
                         <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '1rem' }}>Permissions Updated</div>
                         <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>{toastMsg}</div>
@@ -212,12 +213,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             background: 'none',
                             border: 'none',
                             color: '#94a3b8',
-                            fontSize: '1.2rem',
+                            fontSize: '1rem',
                             cursor: 'pointer',
-                            marginLeft: '1rem'
+                            marginLeft: '1rem',
+                            display: 'flex',
+                            alignItems: 'center'
                         }}
                     >
-                        ✕
+                        <X size={16} />
                     </button>
                 </div>
             )}
@@ -258,11 +261,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             alignItems: 'center',
                             justifyContent: 'center',
                             margin: '0 auto 1.25rem auto',
-                            fontSize: '1.8rem',
                             color: '#ef4444',
                             border: '2px solid #991b1b'
                         }}>
-                            🚫
+                            <ShieldAlert size={28} />
                         </div>
                         <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f8fafc', margin: '0 0 0.5rem 0' }}>
                             Access Revoked

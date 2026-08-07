@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { Info } from 'lucide-react'
 import '../index.css'
 
 interface WeekData {
@@ -41,6 +42,49 @@ function Home() {
             <header className="header-container">
                 <div className="title-section">
                     <h1>e-con<br />Business<br />Development<br />tracker</h1>
+                    {!user && (
+                        <div style={{
+                            marginTop: '1.25rem',
+                            padding: '0.85rem 1.25rem',
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            borderLeft: '5px solid #3b82f6',
+                            borderRadius: '10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                            maxWidth: '520px'
+                        }}>
+                            <Info size={22} color="#0284c7" style={{ flexShrink: 0 }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                                <span style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1e293b' }}>
+                                    looks like you haven't logged in please login
+                                </span>
+                                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                    Log in to view your custom tracker permissions and features.
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => navigate('/login')}
+                                style={{
+                                    padding: '0.45rem 1.1rem',
+                                    backgroundColor: '#3b82f6',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontWeight: '700',
+                                    fontSize: '0.85rem',
+                                    cursor: 'pointer',
+                                    whiteSpace: 'nowrap',
+                                    marginLeft: 'auto',
+                                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                                }}
+                            >
+                                Login
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="date-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>

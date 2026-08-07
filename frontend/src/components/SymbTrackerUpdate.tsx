@@ -89,6 +89,14 @@ export default function SymbTrackerUpdate() {
     const [bulkLoading, setBulkLoading] = useState(false);
     const [bulkMsg, setBulkMsg] = useState('');
 
+    // Data Update Form State
+    const [duVariant, setDuVariant] = useState('1');
+    const [duEventType, setDuEventType] = useState('PCBA Ready');
+    const [duUpdateDate, setDuUpdateDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [duCompletedQty, setDuCompletedQty] = useState('');
+    const [duLoading, setDuLoading] = useState(false);
+    const [duMsg, setDuMsg] = useState('');
+
     // Filtering State
     const [selectedEventTab, setSelectedEventTab] = useState<string>('ALL');
     const [columnFilters, setColumnFilters] = useState({
@@ -904,6 +912,50 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
         setBulkLoading(false);
     };
 
+    const handleDataUpdateSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!hasPermission(duEventType)) {
+            setDuMsg("Error: you dont have access to it");
+            return;
+        }
+
+        setDuLoading(true);
+        setDuMsg('');
+
+        try {
+            const authVal = localStorage.getItem('econ_auth');
+            let token = '';
+            if (authVal) {
+                try { token = JSON.parse(authVal).token || ''; } catch (e) { }
+            }
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const res = await fetch('/api/admin/symb-updated-tracker/data-update', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    variant: duVariant,
+                    event_type: duEventType,
+                    update_date: duUpdateDate,
+                    completed_qty: parseInt(duCompletedQty) || 0
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setDuMsg('Data updated successfully!');
+                setDuCompletedQty('');
+                fetchRecords();
+            } else {
+                setDuMsg(`Error: ${data.detail || 'Failed to update data'}`);
+            }
+        } catch (err: any) {
+            setDuMsg(`Error: ${err.message}`);
+        }
+        setDuLoading(false);
+    };
+
     const startEditing = (rec: TrackerRecord) => {
         setEditingId(rec._id);
         setEditForm({
@@ -994,7 +1046,7 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', padding: '1rem 0' }}>
-            {/* Bulk Creation Section */}
+            {/* Action Tools: Bulk Plan Generator & Data Update */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <Layers size={20} color="#3b82f6" /> Bulk Plan Generator
@@ -1042,6 +1094,52 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
                         {bulkLoading ? 'Generating...' : 'Generate Plan'}
                     </button>
                     {bulkMsg && <span style={{ color: bulkMsg.includes('Error') ? '#ef4444' : '#10b981', fontSize: '0.9rem', fontWeight: '500' }}>{bulkMsg}</span>}
+                </form>
+            </div>
+
+            {/* Data Update Section */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <RefreshCw size={20} color="#10b981" /> Data Update
+                </h3>
+                <form onSubmit={handleDataUpdateSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Variant</label>
+                        <select value={duVariant} onChange={e => setDuVariant(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }}>
+                            <option value="1">Variant 1</option>
+                            <option value="2">Variant 2</option>
+                        </select>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Event Type</label>
+                        <select value={duEventType} onChange={e => setDuEventType(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }}>
+                            {['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'].map(evt => (
+                                <option key={evt} value={evt} disabled={!hasPermission(evt)}>
+                                    {evt} {!hasPermission(evt) && '(No Access)'}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Update Date</label>
+                        <input type="date" required value={duUpdateDate} onChange={e => setDuUpdateDate(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }} />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Completed Qty</label>
+                        <input type="number" required min="0" value={duCompletedQty} onChange={e => setDuCompletedQty(e.target.value)} placeholder="Completed numbers" style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db', width: '160px' }} />
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        disabled={duLoading}
+                        style={{ padding: '0.6rem 1.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: duLoading ? 'not-allowed' : 'pointer' }}
+                    >
+                        {duLoading ? 'Updating...' : 'Update Data'}
+                    </button>
+                    {duMsg && <span style={{ color: duMsg.includes('Error') ? '#ef4444' : '#10b981', fontSize: '0.9rem', fontWeight: '500' }}>{duMsg}</span>}
                 </form>
             </div>
 

@@ -2771,6 +2771,12 @@ class SymbTrackerBulkCreate(BaseModel):
     end_date: str
     upd: int
 
+class SymbDataUpdatePayload(BaseModel):
+    variant: str
+    event_type: str
+    update_date: str
+    completed_qty: int
+
 class SymbTrackerUpdateRow(BaseModel):
     plan_date: Optional[str] = None
     planned_qty: Optional[int] = None
@@ -2900,6 +2906,91 @@ async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate, autho
             print(f"Error running SYMB plan pipeline after bulk create: {pe}")
             
         return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/symb-updated-tracker/data-update")
+async def data_update_symb_updated_tracker(payload: SymbDataUpdatePayload, authorization: Optional[str] = Header(None)):
+    from datetime import datetime
+    from routers.auth import get_optional_current_user
+    try:
+        user_sess = await get_optional_current_user(authorization)
+        user_email = user_sess.get("email") if user_sess else "System"
+        user_role = user_sess.get("role", "User") if user_sess else "Admin"
+        user_perms = user_sess.get("symb_permissions", []) if user_sess else ["ALL"]
+
+        if user_role != "Admin" and "ALL" not in user_perms and payload.event_type not in user_perms:
+            raise HTTPException(status_code=403, detail="you dont have access to it")
+
+        coll = get_collection("SYMB_Updated_progress_tracker")
+        date_obj = datetime.strptime(payload.update_date, "%Y-%m-%d")
+        current_date_str = date_obj.strftime("%d-%b-%Y").upper()
+
+        doc = await coll.find_one({
+            "variant": payload.variant,
+            "event_type": payload.event_type,
+            "plan_date": current_date_str
+        })
+
+        if doc:
+            edit_history = doc.get("edit_history", {"planned_qty": [], "completed": [], "plan_date": []})
+            comp_hist = edit_history.get("completed", [])
+            comp_hist.append({
+                "old_value": doc.get("completed", 0),
+                "new_value": payload.completed_qty,
+                "value": doc.get("completed", 0),
+                "edited_by": user_email,
+                "timestamp": datetime.now().isoformat(),
+                "edit": len(comp_hist) + 1
+            })
+            pq_hist = edit_history.get("planned_qty", [])
+            if doc.get("planned_qty") != 0:
+                pq_hist.append({
+                    "old_value": doc.get("planned_qty", 0),
+                    "new_value": 0,
+                    "value": doc.get("planned_qty", 0),
+                    "edited_by": user_email,
+                    "timestamp": datetime.now().isoformat(),
+                    "edit": len(pq_hist) + 1
+                })
+            edit_history["completed"] = comp_hist
+            edit_history["planned_qty"] = pq_hist
+
+            await coll.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {
+                    "planned_qty": 0,
+                    "completed": payload.completed_qty,
+                    "acc_comp_date": current_date_str,
+                    "edit_history": edit_history
+                }}
+            )
+        else:
+            await coll.insert_one({
+                "variant": payload.variant,
+                "event_type": payload.event_type,
+                "plan_date": current_date_str,
+                "planned_qty": 0,
+                "completed": payload.completed_qty,
+                "acc_comp_date": current_date_str,
+                "created_by": user_email,
+                "created_at": datetime.now().isoformat(),
+                "edit_history": {
+                    "planned_qty": [],
+                    "completed": [],
+                    "plan_date": []
+                }
+            })
+
+        try:
+            from SYMB_plan_transformation import run_symb_plan_pipeline
+            await run_symb_plan_pipeline(db)
+        except Exception as pe:
+            print(f"Error running SYMB plan pipeline after data update: {pe}")
+
+        return {"status": "success", "message": "Data updated successfully"}
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

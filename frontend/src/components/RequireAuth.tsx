@@ -140,7 +140,7 @@ function AccessDeniedView({ pageName }: { pageName: string }) {
                             boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
                         }}
                     >
-                        {requesting ? 'Requesting...' : requestSent ? '✓ Access Requested' : '🔐 Request Access'}
+                        {requesting ? 'Requesting...' : requestSent ? 'Access Requested' : 'Request Access'}
                     </button>
 
                     <button
@@ -157,7 +157,7 @@ function AccessDeniedView({ pageName }: { pageName: string }) {
                             transition: 'all 0.2s ease'
                         }}
                     >
-                        ← Go to Home
+                        Go to Home
                     </button>
                 </div>
             </div>
