@@ -259,15 +259,22 @@ body {
 /* Auth Styles */
 .login-container { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); }
 .login-card { background: white; padding: 3rem; border-radius: 1rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); width: 100%; max-width: 450px; }
-.login-title { font-size: 2.5rem; font-weight: 800; color: #111827; margin-bottom: 0.5rem; text-align: center; }
+.login-header { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 0.5rem; }
+.login-logo { max-height: 54px; width: auto; object-fit: contain; margin-bottom: 0.75rem; }
+.login-title { font-size: 2.25rem; font-weight: 800; color: #111827; margin-bottom: 0.5rem; text-align: center; }
 .login-subtitle { font-size: 1.125rem; color: #6b7280; margin-bottom: 2rem; text-align: center; }
 .login-form { display: flex; flex-direction: column; gap: 1.5rem; }
 .input-group { display: flex; flex-direction: column; gap: 0.5rem; }
 .input-group label { font-size: 0.875rem; font-weight: 600; color: #374151; }
 .input-group input, .input-group select { padding: 0.75rem 1rem; border: 1px solid #d1d5db; border-radius: 0.5rem; outline: none; transition: border-color 0.15s ease-in-out; }
 .input-group input:focus, .input-group select:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-.primary-btn { background-color: #111827; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.15s; }
+.primary-btn { background-color: #111827; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.15s, transform 0.1s; text-align: center; }
 .primary-btn:hover { background-color: #374151; }
+.secondary-btn { background-color: #2563eb; color: #ffffff; border: 1px solid #1d4ed8; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out; text-align: center; width: 100%; }
+.secondary-btn:hover { background-color: #1d4ed8; border-color: #1e40af; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.25); }
+.auth-divider { display: flex; align-items: center; text-align: center; margin: 0.5rem 0; color: #6b7280; font-size: 0.8125rem; font-weight: 500; }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; border-bottom: 1px solid #e5e7eb; }
+.auth-divider span { padding: 0 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; color: #9ca3af; }
 .toggle-mode { display: flex; justify-content: center; gap: 0.5rem; font-size: 0.875rem; color: #6b7280; }
 .text-btn { background: none; border: none; color: #3b82f6; font-weight: 600; cursor: pointer; padding: 0; }
 .text-btn:hover { text-decoration: underline; }

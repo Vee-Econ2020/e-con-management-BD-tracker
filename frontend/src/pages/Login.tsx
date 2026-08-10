@@ -85,7 +85,10 @@ export default function Login() {
     return (
         <div className="login-container">
             <div className="login-card">
-                <h1 className="login-title">e-con BD Tracker</h1>
+                <div className="login-header">
+                    <img src="/econ-logo.png" alt="e-con Systems" className="login-logo" />
+                    <h1 className="login-title">BD Tracker</h1>
+                </div>
                 <p className="login-subtitle">
                     {isRequesting ? 'Request Access' : 'Sign In'}
                 </p>
@@ -115,12 +118,12 @@ export default function Login() {
                             />
                         </div>
                         <button type="submit" className="primary-btn">Login</button>
-                        <div className="toggle-mode">
-                            <span>Don't have an account? </span>
-                            <button type="button" className="text-btn" onClick={() => setIsRequesting(true)}>
-                                Request Access
-                            </button>
+                        <div className="auth-divider">
+                            <span>Don't have an account?</span>
                         </div>
+                        <button type="button" className="secondary-btn" onClick={() => setIsRequesting(true)}>
+                            Request Access
+                        </button>
                     </form>
                 ) : (
                     <form onSubmit={handleRequestAccess} className="login-form">
@@ -145,12 +148,12 @@ export default function Login() {
                             />
                         </div>
                         <button type="submit" className="primary-btn">Submit Request</button>
-                        <div className="toggle-mode">
-                            <span>Already requested? </span>
-                            <button type="button" className="text-btn" onClick={() => setIsRequesting(false)}>
-                                Back to Login
-                            </button>
+                        <div className="auth-divider">
+                            <span>Already registered?</span>
                         </div>
+                        <button type="button" className="secondary-btn" onClick={() => setIsRequesting(false)}>
+                            Back to Login
+                        </button>
                     </form>
                 )}
             </div>

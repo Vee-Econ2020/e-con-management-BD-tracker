@@ -62,7 +62,7 @@ function AccessDeniedView({ pageName }: { pageName: string }) {
             height: '100vh',
             display: 'flex',
             alignItems: 'center',
-            justify: 'center',
+            justifyContent: 'center',
             backgroundColor: '#0f172a',
             padding: '1.5rem',
             fontFamily: 'sans-serif',
