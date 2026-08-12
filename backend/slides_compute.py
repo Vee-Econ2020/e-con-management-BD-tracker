@@ -1909,7 +1909,63 @@ async def compute_order_backlog_data(
         # Check if this week has any FY data (non-zero in any FY series)
         has_fy = any(fy_series.get(fy, [])[i] > 0 if i < len(fy_series.get(fy, [])) else False for fy in sorted_fiscal_years)
         weeks_with_fy_data.append(has_fy)
-    
+
+    # Fetch Q4 Base Target for this region to compute Order Backlog Target (Q4 Base Target + 30%)
+    if opp_type_filter:
+        target_category_map = {
+            "Overall": "Overall - Serivces",
+            "US West": "US West -  Services",
+            "Europe": "Europe - Services",
+            "US East": "US East - Services"
+        }
+        target_category = target_category_map.get(region_name, region_name)
+    else:
+        target_category_map = {
+            "Overall": "Overall - region"
+        }
+        target_category = target_category_map.get(region_name, region_name)
+
+    collection_targets = db["target_settings"]
+    q4_base_target = 0.0
+
+    async for doc in collection_targets.find({
+        "ppt_type": "Weekly Tracker",
+        "financial_year": "FY2027",
+        "financial_qtr": "Q4",
+        "category_type": target_category
+    }):
+        cat_val = str(doc.get("category_value", "")).lower()
+        val = float(doc.get("target_value", 0.0))
+        if "base" in cat_val:
+            q4_base_target = val
+            break
+        elif q4_base_target == 0.0:
+            q4_base_target = val
+
+    # Fallbacks if target doc is missing in target_settings
+    if q4_base_target == 0.0:
+        if opp_type_filter:
+            fallback_map = {
+                "Overall": 7500000.0,
+                "US West": 2750000.0,
+                "Europe": 1500000.0,
+                "US East": 2000000.0
+            }
+        else:
+            fallback_map = {
+                "Overall": 63800000.0,
+                "US West": 15500000.0,
+                "Europe": 14500000.0,
+                "US East": 20000000.0,
+                "Asean": 3500000.0,
+                "Japan": 2800000.0,
+                "KANZ": 2000000.0,
+                "Legacy": 5000000.0
+            }
+        q4_base_target = fallback_map.get(region_name, 0.0)
+
+    backlog_target = q4_base_target * 1.30
+
     return {
         "weeks": final_weeks,
         "backlog_data": final_backlogs,  # Total for reference
@@ -1921,6 +1977,8 @@ async def compute_order_backlog_data(
         "region": region_name,
         "enable_animation": ENABLE_CHART_ANIMATION,
         "is_services": bool(opp_type_filter),
+        "q4_target": q4_base_target,
+        "backlog_target": backlog_target,
     }
 
 

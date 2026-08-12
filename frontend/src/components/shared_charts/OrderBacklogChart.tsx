@@ -7,6 +7,33 @@ interface BacklogChartProps {
     title: string;
 }
 
+function getBacklogTarget(data: any, title: string): number {
+    if (data?.backlog_target && data.backlog_target > 0) {
+        return data.backlog_target;
+    }
+
+    const titleUpper = (title || '').toUpperCase();
+    const regionUpper = (data?.region || '').toUpperCase();
+    const isServices = data?.is_services || titleUpper.includes('SERVICE');
+
+    if (isServices) {
+        if (titleUpper.includes('WEST') || regionUpper.includes('WEST')) return 2750000 * 1.30;
+        if (titleUpper.includes('EUROPE') || regionUpper.includes('EUROPE')) return 1500000 * 1.30;
+        if (titleUpper.includes('EAST') || regionUpper.includes('EAST')) return 2000000 * 1.30;
+        return 7500000 * 1.30; // Overall services default ($9.75M)
+    }
+
+    if (titleUpper.includes('WEST') || regionUpper.includes('WEST')) return 15500000 * 1.30; // $20.15M
+    if (titleUpper.includes('EUROPE') || regionUpper.includes('EUROPE')) return 14500000 * 1.30; // $18.85M
+    if (titleUpper.includes('EAST') || regionUpper.includes('EAST')) return 20000000 * 1.30; // $26.00M
+    if (titleUpper.includes('ASEAN') || regionUpper.includes('ASEAN')) return 3500000 * 1.30; // $4.55M
+    if (titleUpper.includes('JAPAN') || regionUpper.includes('JAPAN')) return 2800000 * 1.30; // $3.64M
+    if (titleUpper.includes('KANZ') || regionUpper.includes('KANZ')) return 2000000 * 1.30; // $2.60M
+    if (titleUpper.includes('LEGACY') || titleUpper.includes('MANAGEMENT') || regionUpper.includes('LEGACY')) return 5000000 * 1.30; // $6.50M
+
+    return 63800000 * 1.30; // Overall default ($82.94M)
+}
+
 export function OrderBacklogChart({ data, title }: BacklogChartProps) {
     const plotRef = useRef<any>(null);
     const [figData, setFigData] = useState<any[]>([]);
@@ -17,6 +44,7 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
         if (!data) return;
 
         const { weeks, backlog_data, fy_series, fiscal_years, fy_colors, default_colors, weeks_with_fy_data, enable_animation } = data;
+        const backlog_target = getBacklogTarget(data, title);
         
         if (!fy_series || !fiscal_years || fiscal_years.length === 0) {
             // Fallback to simple bar if no FY data
@@ -25,6 +53,17 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
         }
 
         const xNumeric = weeks.map((_: any, i: number) => i);
+
+        // Create target line trace if backlog_target is available
+        const targetLineTrace = backlog_target > 0 ? {
+            x: xNumeric,
+            y: Array(weeks.length).fill(backlog_target),
+            mode: 'lines',
+            name: `Order Backlog Target ($${(backlog_target / 1e6).toFixed(2)}M)`,
+            line: { color: '#E74C3C', width: 3, dash: 'dash' },
+            type: 'scatter',
+            hoverinfo: 'name+y',
+        } : null;
 
         // Create a trace for each fiscal year (stacked bars)
         const initialData = fiscal_years.map((fy: string, fyIdx: number) => {
@@ -67,6 +106,11 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
             });
         }
 
+        // Add static target line trace to initialData
+        if (targetLineTrace) {
+            initialData.push(targetLineTrace);
+        }
+
         // Frame Generation for stacked bar chart animation
         const frames: any[] = [];
         if (enable_animation !== false) {
@@ -97,6 +141,18 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
                     });
                 }
 
+                // Add static target line frame trace so it stays visible
+                if (targetLineTrace) {
+                    frameData.push({
+                        x: xNumeric,
+                        y: Array(weeks.length).fill(backlog_target),
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: `Order Backlog Target ($${(backlog_target / 1e6).toFixed(2)}M)`,
+                        line: { color: '#E74C3C', width: 3, dash: 'dash' }
+                    });
+                }
+
                 frames.push({
                     data: frameData,
                     name: `frame_${i}`
@@ -107,8 +163,8 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
         setFigData(initialData);
         setFigFrames(frames);
 
-        // Use backlog_data for total annotations (works for both placeholder and FY weeks)
-        const maxValue = Math.max(...backlog_data);
+        // Use backlog_data and backlog_target for total annotations and Y-axis scaling
+        const maxValue = Math.max(...backlog_data, backlog_target || 0);
 
         // Create annotations for total on top of each bar
         const annotations = backlog_data.map((total: number, idx: number) => ({
@@ -121,6 +177,42 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
             yanchor: 'bottom',
             yshift: 5
         }));
+
+        // Add callout annotation for static target line
+        if (backlog_target > 0) {
+            annotations.push({
+                x: weeks.length - 1,
+                y: backlog_target,
+                text: `<b>Target: $${(backlog_target / 1e6).toFixed(2)}M</b>`,
+                showarrow: false,
+                font: { size: 14, color: '#E74C3C', weight: 'bold', family: 'Arial' },
+                bgcolor: 'rgba(255,255,255,0.9)',
+                bordercolor: '#E74C3C',
+                borderwidth: 1.5,
+                borderpad: 4,
+                xanchor: 'left',
+                xshift: 10,
+                yanchor: 'middle'
+            });
+        }
+
+        // Layout horizontal target line shape
+        const shapes = backlog_target > 0 ? [
+            {
+                type: 'line',
+                xref: 'paper',
+                x0: 0,
+                x1: 1,
+                yref: 'y',
+                y0: backlog_target,
+                y1: backlog_target,
+                line: {
+                    color: '#E74C3C',
+                    width: 3,
+                    dash: 'dash'
+                }
+            }
+        ] : [];
 
         setFigLayout({
             autosize: true,
@@ -137,7 +229,7 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
                 showgrid: true, 
                 gridcolor: 'rgba(200,200,200,0.3)', 
                 zeroline: false,
-                range: [-0.6, weeks.length - 0.4],
+                range: [-0.6, weeks.length - 0.1],
                 showline: true, 
                 linewidth: 2, 
                 linecolor: '#d1d5db', 
@@ -147,14 +239,14 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
                 showgrid: true, 
                 gridcolor: 'rgba(200,200,200,0.3)', 
                 zeroline: true,
-                range: [0, maxValue * 1.15],
+                range: [0, maxValue * 1.20],
                 showline: true, 
                 linewidth: 2, 
                 linecolor: '#d1d5db', 
                 mirror: true,
                 tickformat: '$.3s'
             },
-            margin: { l: 80, r: 40, t: 80, b: 80 },
+            margin: { l: 80, r: 80, t: 80, b: 80 },
             font: { family: 'Helvetica, Arial, sans-serif' },
             template: 'plotly_white',
             showlegend: true,
@@ -166,6 +258,7 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
                 x: 0.5,
                 font: { size: 14, weight: 'bold' }
             },
+            shapes,
             annotations
         });
 

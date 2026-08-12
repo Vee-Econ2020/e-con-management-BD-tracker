@@ -51,7 +51,7 @@ async def get_pending_requests(current_user: dict = Depends(get_current_user)):
             {"has_pending_page_request": True}
         ]
     })
-    requests = await cursor.to_list(length=100)
+    requests = await cursor.to_list(length=5000)
     for req in requests:
         req["_id"] = str(req["_id"])
     return requests
@@ -87,7 +87,7 @@ async def get_active_users(current_user: dict = Depends(get_current_user)):
     from datetime import datetime, timedelta
     db = _get_db()
     cursor = db["users"].find({"status": "Active"})
-    users = await cursor.to_list(length=100)
+    users = await cursor.to_list(length=5000)
     admin_seed_pwd = os.getenv("ADMIN_SEED_PASSWORD", "@Ec255kif5f")
     now = datetime.utcnow()
 

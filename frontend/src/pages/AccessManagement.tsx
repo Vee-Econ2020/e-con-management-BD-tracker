@@ -48,8 +48,40 @@ export default function AccessManagement() {
     // Multi-select state for active users
     const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
 
+    // Column Filters State
+    const [columnFilters, setColumnFilters] = useState({
+        email: '',
+        department: '',
+        role: '',
+        passwordStatus: 'all',
+        activity: 'all'
+    });
+
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(50);
+
+    const resetFilters = () => {
+        setColumnFilters({
+            email: '',
+            department: '',
+            role: '',
+            passwordStatus: 'all',
+            activity: 'all'
+        });
+        setCurrentPage(1);
+    };
+
+    const isFilterActive = 
+        Boolean(columnFilters.email.trim()) ||
+        Boolean(columnFilters.department.trim()) ||
+        Boolean(columnFilters.role.trim()) ||
+        columnFilters.passwordStatus !== 'all' ||
+        columnFilters.activity !== 'all';
+
     useEffect(() => {
         setSelectedEmails([]);
+        resetFilters();
         fetchData();
 
         const interval = setInterval(() => {
@@ -59,6 +91,42 @@ export default function AccessManagement() {
         return () => clearInterval(interval);
     }, [activeTab]);
 
+    const rawList = activeTab === 'pending' ? pendingRequests : activeUsers;
+
+    const filteredUsers = rawList.filter(user => {
+        if (columnFilters.email.trim() && !user.email?.toLowerCase().includes(columnFilters.email.toLowerCase().trim())) {
+            return false;
+        }
+        if (columnFilters.department.trim()) {
+            const deptText = `${user.department || ''} ${user.requested_pages?.join(' ') || ''}`;
+            if (!deptText.toLowerCase().includes(columnFilters.department.toLowerCase().trim())) {
+                return false;
+            }
+        }
+        if (activeTab === 'active' && columnFilters.role.trim()) {
+            const roleText = `${user.role || ''} ${user.sub_role || ''}`;
+            if (!roleText.toLowerCase().includes(columnFilters.role.toLowerCase().trim())) {
+                return false;
+            }
+        }
+        if (activeTab === 'active' && columnFilters.passwordStatus !== 'all') {
+            if (columnFilters.passwordStatus === 'changed' && !user.password_changed) return false;
+            if (columnFilters.passwordStatus === 'default' && user.password_changed) return false;
+        }
+        if (activeTab === 'active' && columnFilters.activity !== 'all') {
+            if (columnFilters.activity === 'live' && !user.is_live) return false;
+            if (columnFilters.activity === 'offline' && user.is_live) return false;
+        }
+        return true;
+    });
+
+    const totalFiltered = filteredUsers.length;
+    const totalPages = pageSize > 0 ? Math.ceil(totalFiltered / pageSize) || 1 : 1;
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const paginatedUsers = pageSize > 0 
+        ? filteredUsers.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize)
+        : filteredUsers;
+
     const toggleSelectUser = (email: string) => {
         setSelectedEmails(prev => 
             prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]
@@ -66,10 +134,12 @@ export default function AccessManagement() {
     };
 
     const toggleSelectAll = () => {
-        if (selectedEmails.length === activeUsers.length && activeUsers.length > 0) {
-            setSelectedEmails([]);
+        const filteredEmails = filteredUsers.map(u => u.email);
+        const allSelected = filteredEmails.length > 0 && filteredEmails.every(e => selectedEmails.includes(e));
+        if (allSelected) {
+            setSelectedEmails(prev => prev.filter(e => !filteredEmails.includes(e)));
         } else {
-            setSelectedEmails(activeUsers.map(u => u.email));
+            setSelectedEmails(prev => Array.from(new Set([...prev, ...filteredEmails])));
         }
     };
 
@@ -330,183 +400,457 @@ export default function AccessManagement() {
             {loading ? (
                 <p>Loading...</p>
             ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
-                    <thead>
-                        <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
-                            {activeTab === 'active' && (
-                                <th style={{ padding: '1rem', borderBottom: '2px solid #e5e7eb', width: '40px' }}>
-                                    <input 
-                                        type="checkbox"
-                                        checked={activeUsers.length > 0 && selectedEmails.length === activeUsers.length}
-                                        onChange={toggleSelectAll}
-                                        title="Select all active users"
-                                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                                    />
-                                </th>
+                <>
+                    {/* Controls & Filter Summary Bar */}
+                    <div style={{
+                        display: 'flex',
+                        justify: 'space-between',
+                        alignItems: 'center',
+                        marginTop: '1rem',
+                        marginBottom: '0.75rem',
+                        backgroundColor: '#f8fafc',
+                        padding: '0.75rem 1rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e2e8f0',
+                        flexWrap: 'wrap',
+                        gap: '0.75rem'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <span style={{ fontWeight: '600', fontSize: '0.875rem', color: '#334155' }}>
+                                Showing {paginatedUsers.length} of {totalFiltered} {activeTab === 'pending' ? 'requests' : 'users'}
+                                {rawList.length !== totalFiltered && ` (Filtered from ${rawList.length} total)`}
+                            </span>
+                            {isFilterActive && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span style={{
+                                        backgroundColor: '#e0f2fe',
+                                        color: '#0369a1',
+                                        fontSize: '0.75rem',
+                                        fontWeight: '700',
+                                        padding: '0.2rem 0.5rem',
+                                        borderRadius: '9999px',
+                                        border: '1px solid #bae6fd'
+                                    }}>
+                                        Filters Active
+                                    </span>
+                                    <button
+                                        onClick={resetFilters}
+                                        style={{
+                                            backgroundColor: '#fee2e2',
+                                            color: '#dc2626',
+                                            border: '1px solid #fca5a5',
+                                            padding: '0.25rem 0.6rem',
+                                            borderRadius: '0.25rem',
+                                            fontSize: '0.75rem',
+                                            fontWeight: '600',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Clear Filters
+                                    </button>
+                                </div>
                             )}
-                            <th style={{ padding: '1rem', borderBottom: '2px solid #e5e7eb' }}>Email</th>
-                            <th style={{ padding: '1rem', borderBottom: '2px solid #e5e7eb' }}>{activeTab === 'pending' ? 'Department / Request Details' : 'Department'}</th>
-                            {activeTab === 'active' && <th style={{ padding: '1rem', borderBottom: '2px solid #e5e7eb' }}>Role</th>}
-                            {activeTab === 'active' && <th style={{ padding: '1rem', borderBottom: '2px solid #e5e7eb' }}>Password Status</th>}
-                            <th style={{ padding: '1rem', borderBottom: '2px solid #e5e7eb' }}>Actions</th>
-                            {activeTab === 'active' && <th style={{ padding: '1rem', borderBottom: '2px solid #e5e7eb' }}>Activity</th>}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {(activeTab === 'pending' ? pendingRequests : activeUsers).map((user, idx) => (
-                            <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: selectedEmails.includes(user.email) ? '#fef2f2' : 'transparent' }}>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#475569' }}>
+                                <label>Per Page:</label>
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => {
+                                        setPageSize(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    style={{
+                                        padding: '0.25rem 0.5rem',
+                                        borderRadius: '0.25rem',
+                                        border: '1px solid #cbd5e1',
+                                        fontSize: '0.85rem',
+                                        backgroundColor: 'white'
+                                    }}
+                                >
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                    <option value={250}>250</option>
+                                    <option value={0}>All</option>
+                                </select>
+                            </div>
+
+                            {pageSize > 0 && totalPages > 1 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <button
+                                        disabled={safeCurrentPage <= 1}
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        style={{
+                                            padding: '0.25rem 0.6rem',
+                                            borderRadius: '0.25rem',
+                                            border: '1px solid #cbd5e1',
+                                            backgroundColor: safeCurrentPage <= 1 ? '#f1f5f9' : 'white',
+                                            color: safeCurrentPage <= 1 ? '#94a3b8' : '#334155',
+                                            cursor: safeCurrentPage <= 1 ? 'not-allowed' : 'pointer',
+                                            fontWeight: '600',
+                                            fontSize: '0.85rem'
+                                        }}
+                                    >
+                                        Prev
+                                    </button>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#475569', padding: '0 0.25rem' }}>
+                                        {safeCurrentPage} / {totalPages}
+                                    </span>
+                                    <button
+                                        disabled={safeCurrentPage >= totalPages}
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                        style={{
+                                            padding: '0.25rem 0.6rem',
+                                            borderRadius: '0.25rem',
+                                            border: '1px solid #cbd5e1',
+                                            backgroundColor: safeCurrentPage >= totalPages ? '#f1f5f9' : 'white',
+                                            color: safeCurrentPage >= totalPages ? '#94a3b8' : '#334155',
+                                            cursor: safeCurrentPage >= totalPages ? 'not-allowed' : 'pointer',
+                                            fontWeight: '600',
+                                            fontSize: '0.85rem'
+                                        }}
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ background: '#f1f5f9', textAlign: 'left' }}>
                                 {activeTab === 'active' && (
-                                    <td style={{ padding: '1rem' }}>
+                                    <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #cbd5e1', width: '40px' }}>
                                         <input 
                                             type="checkbox"
-                                            checked={selectedEmails.includes(user.email)}
-                                            onChange={() => toggleSelectUser(user.email)}
+                                            checked={filteredUsers.length > 0 && filteredUsers.every(u => selectedEmails.includes(u.email))}
+                                            onChange={toggleSelectAll}
+                                            title="Select all filtered active users"
                                             style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                                        />
+                                    </th>
+                                )}
+                                <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #cbd5e1', fontWeight: '700', color: '#1e293b' }}>Email</th>
+                                <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #cbd5e1', fontWeight: '700', color: '#1e293b' }}>{activeTab === 'pending' ? 'Department / Request Details' : 'Department'}</th>
+                                {activeTab === 'active' && <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #cbd5e1', fontWeight: '700', color: '#1e293b' }}>Role</th>}
+                                {activeTab === 'active' && <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #cbd5e1', fontWeight: '700', color: '#1e293b' }}>Password Status</th>}
+                                <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #cbd5e1', fontWeight: '700', color: '#1e293b' }}>Actions</th>
+                                {activeTab === 'active' && <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #cbd5e1', fontWeight: '700', color: '#1e293b' }}>Activity</th>}
+                            </tr>
+                            {/* Column Filters Row */}
+                            <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                                {activeTab === 'active' && <td style={{ padding: '0.4rem', textAlign: 'center' }}></td>}
+                                <td style={{ padding: '0.4rem 0.75rem' }}>
+                                    <input 
+                                        type="text"
+                                        placeholder="Filter email..."
+                                        value={columnFilters.email}
+                                        onChange={e => { setColumnFilters(prev => ({ ...prev, email: e.target.value })); setCurrentPage(1); }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.35rem 0.5rem',
+                                            fontSize: '0.8rem',
+                                            border: '1px solid #cbd5e1',
+                                            borderRadius: '0.375rem',
+                                            outline: 'none',
+                                            backgroundColor: 'white'
+                                        }}
+                                    />
+                                </td>
+                                <td style={{ padding: '0.4rem 0.75rem' }}>
+                                    <input 
+                                        type="text"
+                                        placeholder="Filter dept..."
+                                        value={columnFilters.department}
+                                        onChange={e => { setColumnFilters(prev => ({ ...prev, department: e.target.value })); setCurrentPage(1); }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.35rem 0.5rem',
+                                            fontSize: '0.8rem',
+                                            border: '1px solid #cbd5e1',
+                                            borderRadius: '0.375rem',
+                                            outline: 'none',
+                                            backgroundColor: 'white'
+                                        }}
+                                    />
+                                </td>
+                                {activeTab === 'active' && (
+                                    <td style={{ padding: '0.4rem 0.75rem' }}>
+                                        <input 
+                                            type="text"
+                                            placeholder="Filter role..."
+                                            value={columnFilters.role}
+                                            onChange={e => { setColumnFilters(prev => ({ ...prev, role: e.target.value })); setCurrentPage(1); }}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.35rem 0.5rem',
+                                                fontSize: '0.8rem',
+                                                border: '1px solid #cbd5e1',
+                                                borderRadius: '0.375rem',
+                                                outline: 'none',
+                                                backgroundColor: 'white'
+                                            }}
                                         />
                                     </td>
                                 )}
-                                <td style={{ padding: '1rem' }}>{user.email}</td>
-                                <td style={{ padding: '1rem' }}>
-                                    {activeTab === 'pending' && user.has_pending_page_request ? (
-                                        <div>
-                                            <span style={{ color: '#0284c7', fontWeight: '700', fontSize: '0.85rem', display: 'block' }}>
-                                                Page Request: <span style={{ backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #bae6fd' }}>{user.requested_pages?.join(', ')}</span>
-                                            </span>
-                                            <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Dept: {user.department || 'N/A'}</span>
-                                        </div>
-                                    ) : (
-                                        <span>{user.department || 'N/A'}</span>
-                                    )}
-                                </td>
                                 {activeTab === 'active' && (
-                                    <td style={{ padding: '1rem' }}>
-                                        {user.role}
-                                        {user.sub_role && user.sub_role !== 'None' && user.sub_role !== 'undefined' ? ` (${user.sub_role})` : ''}
+                                    <td style={{ padding: '0.4rem 0.75rem' }}>
+                                        <select
+                                            value={columnFilters.passwordStatus}
+                                            onChange={e => { setColumnFilters(prev => ({ ...prev, passwordStatus: e.target.value })); setCurrentPage(1); }}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.35rem 0.5rem',
+                                                fontSize: '0.8rem',
+                                                border: '1px solid #cbd5e1',
+                                                borderRadius: '0.375rem',
+                                                outline: 'none',
+                                                backgroundColor: 'white'
+                                            }}
+                                        >
+                                            <option value="all">All Passwords</option>
+                                            <option value="changed">Changed by User</option>
+                                            <option value="default">Default Password</option>
+                                        </select>
                                     </td>
                                 )}
+                                <td style={{ padding: '0.4rem 0.75rem' }}></td>
                                 {activeTab === 'active' && (
+                                    <td style={{ padding: '0.4rem 0.75rem' }}>
+                                        <select
+                                            value={columnFilters.activity}
+                                            onChange={e => { setColumnFilters(prev => ({ ...prev, activity: e.target.value })); setCurrentPage(1); }}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.35rem 0.5rem',
+                                                fontSize: '0.8rem',
+                                                border: '1px solid #cbd5e1',
+                                                borderRadius: '0.375rem',
+                                                outline: 'none',
+                                                backgroundColor: 'white'
+                                            }}
+                                        >
+                                            <option value="all">All Activity</option>
+                                            <option value="live">Active Now</option>
+                                            <option value="offline">Offline</option>
+                                        </select>
+                                    </td>
+                                )}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {paginatedUsers.map((user, idx) => (
+                                <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: selectedEmails.includes(user.email) ? '#fef2f2' : 'transparent' }}>
+                                    {activeTab === 'active' && (
+                                        <td style={{ padding: '1rem' }}>
+                                            <input 
+                                                type="checkbox"
+                                                checked={selectedEmails.includes(user.email)}
+                                                onChange={() => toggleSelectUser(user.email)}
+                                                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                                            />
+                                        </td>
+                                    )}
+                                    <td style={{ padding: '1rem' }}>{user.email}</td>
                                     <td style={{ padding: '1rem' }}>
-                                        {user.password_changed ? (
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                                <span style={{ color: '#059669', fontWeight: '700', fontSize: '0.8rem' }}>Changed by User</span>
-                                                <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: '700', color: '#065f46', backgroundColor: '#d1fae5', padding: '0.15rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', border: '1px solid #a7f3d0' }}>
-                                                    {user.current_password || user.default_password || 'Not Set'}
+                                        {activeTab === 'pending' && user.has_pending_page_request ? (
+                                            <div>
+                                                <span style={{ color: '#0284c7', fontWeight: '700', fontSize: '0.85rem', display: 'block' }}>
+                                                    Page Request: <span style={{ backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #bae6fd' }}>{user.requested_pages?.join(', ')}</span>
                                                 </span>
-                                                {user.initial_password && user.initial_password !== user.current_password && (
-                                                    <span style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '0.15rem' }}>
-                                                        Initial: <span style={{ fontFamily: 'monospace' }}>{user.initial_password}</span>
-                                                    </span>
-                                                )}
+                                                <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Dept: {user.department || 'N/A'}</span>
                                             </div>
                                         ) : (
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                                <span style={{ color: '#d97706', fontWeight: '700', fontSize: '0.8rem' }}>Default Password</span>
-                                                <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: '700', color: '#92400e', backgroundColor: '#fef3c7', padding: '0.15rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', border: '1px solid #fde68a' }}>
-                                                    {user.current_password || user.default_password || '@Ec255kif5f'}
-                                                </span>
-                                            </div>
+                                            <span>{user.department || 'N/A'}</span>
                                         )}
                                     </td>
-                                )}
-                                <td style={{ padding: '1rem' }}>
-                                    {activeTab === 'pending' ? (
-                                        <>
-                                            <button 
-                                                onClick={() => handleApproveClick(user)}
-                                                style={{ background: '#10b981', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.25rem', border: 'none', marginRight: '0.5rem', cursor: 'pointer' }}
-                                            >Approve</button>
-                                            <button 
-                                                onClick={() => handleDeclineClick(user.email)}
-                                                style={{ background: '#ef4444', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.25rem', border: 'none', cursor: 'pointer' }}
-                                            >Decline</button>
-                                        </>
-                                    ) : (
-                                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                            <button 
-                                                onClick={() => handleEditAccessClick(user)}
-                                                style={{ background: '#3b82f6', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.25rem', border: 'none', cursor: 'pointer' }}
-                                            >
-                                                Edit Access
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDeleteSelectedUsers([user.email])}
-                                                style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '0.5rem 0.75rem', borderRadius: '0.25rem', cursor: 'pointer', fontWeight: '500' }}
-                                                title="Delete this user"
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
+                                    {activeTab === 'active' && (
+                                        <td style={{ padding: '1rem' }}>
+                                            {user.role}
+                                            {user.sub_role && user.sub_role !== 'None' && user.sub_role !== 'undefined' ? ` (${user.sub_role})` : ''}
+                                        </td>
                                     )}
-                                </td>
-                                {activeTab === 'active' && (
-                                    <td style={{ padding: '1rem' }}>
-                                        {user.is_live ? (
-                                            <div>
-                                                <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '0.4rem',
-                                                    padding: '0.2rem 0.65rem',
-                                                    backgroundColor: '#dcfce7',
-                                                    color: '#15803d',
-                                                    borderRadius: '9999px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: '700',
-                                                    border: '1px solid #86efac'
-                                                }}>
-                                                    <span style={{
-                                                        width: '8px',
-                                                        height: '8px',
-                                                        backgroundColor: '#22c55e',
-                                                        borderRadius: '50%',
-                                                        display: 'inline-block'
-                                                    }} />
-                                                    Active Now
-                                                </span>
-                                                <div style={{ fontSize: '0.8rem', color: '#334155', fontWeight: '600', marginTop: '0.25rem' }}>
-                                                    {user.last_active_page || 'Home'}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div>
-                                                <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    padding: '0.2rem 0.65rem',
-                                                    backgroundColor: '#f1f5f9',
-                                                    color: '#64748b',
-                                                    borderRadius: '9999px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: '600',
-                                                    border: '1px solid #cbd5e1'
-                                                }}>
-                                                    Offline
-                                                </span>
-                                                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem' }}>
-                                                    {user.last_active_at ? (
-                                                        <>
-                                                            <span>{formatRelativeTime(user.last_active_at)}</span>
-                                                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                                                                Page: {user.last_active_page || 'Unknown'}
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        'No recent activity'
+                                    {activeTab === 'active' && (
+                                        <td style={{ padding: '1rem' }}>
+                                            {user.password_changed ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                    <span style={{ color: '#059669', fontWeight: '700', fontSize: '0.8rem' }}>Changed by User</span>
+                                                    <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: '700', color: '#065f46', backgroundColor: '#d1fae5', padding: '0.15rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', border: '1px solid #a7f3d0' }}>
+                                                        {user.current_password || user.default_password || 'Not Set'}
+                                                    </span>
+                                                    {user.initial_password && user.initial_password !== user.current_password && (
+                                                        <span style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '0.15rem' }}>
+                                                            Initial: <span style={{ fontFamily: 'monospace' }}>{user.initial_password}</span>
+                                                        </span>
                                                     )}
                                                 </div>
+                                            ) : (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                    <span style={{ color: '#d97706', fontWeight: '700', fontSize: '0.8rem' }}>Default Password</span>
+                                                    <span style={{ fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: '700', color: '#92400e', backgroundColor: '#fef3c7', padding: '0.15rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', border: '1px solid #fde68a' }}>
+                                                        {user.current_password || user.default_password || '@Ec255kif5f'}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </td>
+                                    )}
+                                    <td style={{ padding: '1rem' }}>
+                                        {activeTab === 'pending' ? (
+                                            <>
+                                                <button 
+                                                    onClick={() => handleApproveClick(user)}
+                                                    style={{ background: '#10b981', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.25rem', border: 'none', marginRight: '0.5rem', cursor: 'pointer' }}
+                                                >Approve</button>
+                                                <button 
+                                                    onClick={() => handleDeclineClick(user.email)}
+                                                    style={{ background: '#ef4444', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.25rem', border: 'none', cursor: 'pointer' }}
+                                                >Decline</button>
+                                            </>
+                                        ) : (
+                                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                                <button 
+                                                    onClick={() => handleEditAccessClick(user)}
+                                                    style={{ background: '#3b82f6', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.25rem', border: 'none', cursor: 'pointer' }}
+                                                >
+                                                    Edit Access
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteSelectedUsers([user.email])}
+                                                    style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '0.5rem 0.75rem', borderRadius: '0.25rem', cursor: 'pointer', fontWeight: '500' }}
+                                                    title="Delete this user"
+                                                >
+                                                    Delete
+                                                </button>
                                             </div>
                                         )}
                                     </td>
-                                )}
-                            </tr>
-                        ))}
-                        {(activeTab === 'pending' ? pendingRequests : activeUsers).length === 0 && (
-                            <tr>
-                                <td colSpan={6} style={{ padding: '1rem', textAlign: 'center' }}>No records found.</td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                                    {activeTab === 'active' && (
+                                        <td style={{ padding: '1rem' }}>
+                                            {user.is_live ? (
+                                                <div>
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.4rem',
+                                                        padding: '0.2rem 0.65rem',
+                                                        backgroundColor: '#dcfce7',
+                                                        color: '#15803d',
+                                                        borderRadius: '9999px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '700',
+                                                        border: '1px solid #86efac'
+                                                    }}>
+                                                        <span style={{
+                                                            width: '8px',
+                                                            height: '8px',
+                                                            backgroundColor: '#22c55e',
+                                                            borderRadius: '50%',
+                                                            display: 'inline-block'
+                                                        }} />
+                                                        Active Now
+                                                    </span>
+                                                    <div style={{ fontSize: '0.8rem', color: '#334155', fontWeight: '600', marginTop: '0.25rem' }}>
+                                                        {user.last_active_page || 'Home'}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        padding: '0.2rem 0.65rem',
+                                                        backgroundColor: '#f1f5f9',
+                                                        color: '#64748b',
+                                                        borderRadius: '9999px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '600',
+                                                        border: '1px solid #cbd5e1'
+                                                    }}>
+                                                        Offline
+                                                    </span>
+                                                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem' }}>
+                                                        {user.last_active_at ? (
+                                                            <>
+                                                                <span>{formatRelativeTime(user.last_active_at)}</span>
+                                                                <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                                                                    Page: {user.last_active_page || 'Unknown'}
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            'No recent activity'
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </td>
+                                    )}
+                                </tr>
+                            ))}
+                            {paginatedUsers.length === 0 && (
+                                <tr>
+                                    <td colSpan={7} style={{ padding: '2rem 1rem', textAlign: 'center', color: '#64748b' }}>
+                                        {isFilterActive ? 'No users match the current column filters.' : 'No records found.'}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+
+                    {/* Bottom Pagination Bar */}
+                    {pageSize > 0 && totalPages > 1 && (
+                        <div style={{
+                            display: 'flex',
+                            justify: 'space-between',
+                            alignItems: 'center',
+                            marginTop: '1rem',
+                            padding: '0.75rem 1rem',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '0.5rem',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                Page {safeCurrentPage} of {totalPages} ({totalFiltered} total items)
+                            </span>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                    disabled={safeCurrentPage <= 1}
+                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                    style={{
+                                        padding: '0.35rem 0.75rem',
+                                        borderRadius: '0.25rem',
+                                        border: '1px solid #cbd5e1',
+                                        backgroundColor: safeCurrentPage <= 1 ? '#f1f5f9' : 'white',
+                                        color: safeCurrentPage <= 1 ? '#94a3b8' : '#334155',
+                                        cursor: safeCurrentPage <= 1 ? 'not-allowed' : 'pointer',
+                                        fontWeight: '600',
+                                        fontSize: '0.85rem'
+                                    }}
+                                >
+                                    Previous
+                                </button>
+                                <button
+                                    disabled={safeCurrentPage >= totalPages}
+                                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                    style={{
+                                        padding: '0.35rem 0.75rem',
+                                        borderRadius: '0.25rem',
+                                        border: '1px solid #cbd5e1',
+                                        backgroundColor: safeCurrentPage >= totalPages ? '#f1f5f9' : 'white',
+                                        color: safeCurrentPage >= totalPages ? '#94a3b8' : '#334155',
+                                        cursor: safeCurrentPage >= totalPages ? 'not-allowed' : 'pointer',
+                                        fontWeight: '600',
+                                        fontSize: '0.85rem'
+                                    }}
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
 
             {/* Approval / Edit Modal */}
