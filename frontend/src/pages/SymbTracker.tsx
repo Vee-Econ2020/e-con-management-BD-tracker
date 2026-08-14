@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Plot from 'react-plotly.js';
 import { ArrowLeft, RefreshCw, X, Table, Activity, Calendar } from 'lucide-react';
 import '../index.css';
 import SymbTrackerUpdate from '../components/SymbTrackerUpdate';
@@ -44,11 +43,55 @@ export default function SymbTracker() {
     const [fileDate, setFileDate] = useState<string>('');
     const [availableFileDates, setAvailableFileDates] = useState<string[]>([]);
     const [selectedFileDate, setSelectedFileDate] = useState<string>('');
-    const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+    const [selectedMonth] = useState<string | null>(null);
     const [selectedFlag, setSelectedFlag] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [activeSubTab, setActiveSubTab] = useState<'symb_plan_pipeline' | 'tracker_update' | 'detailed'>('symb_plan_pipeline');
+
+    const activeRecords = useMemo(() => {
+        if (!selectedFileDate || selectedFileDate === fileDate) {
+            return records.filter(r => !r.file_date || r.file_date === fileDate);
+        }
+        return records.filter(r => r.file_date === selectedFileDate);
+    }, [records, selectedFileDate, fileDate]);
+
+    // Filtered records for table view
+    const filteredRecords = useMemo(() => {
+        return activeRecords.filter(rec => {
+            if (selectedMonth) {
+                const cdd = getCDDVal(rec);
+                const recMonth = getMonthYearKey(cdd);
+                if (recMonth !== selectedMonth) return false;
+            }
+
+            if (selectedFlag) {
+                const recFlag = (rec.new_flag_algo || rec.new_flag_color || rec.flag || 'green').toLowerCase().trim();
+                if (recFlag !== selectedFlag.toLowerCase()) return false;
+            }
+
+            if (searchTerm.trim()) {
+                const term = searchTerm.toLowerCase();
+                const soNum = String(rec['SO Number'] || rec['SO NUMBER'] || '').toLowerCase();
+                const stage = String(rec['n-reg_stage'] || rec['Regular-Product Stage'] || '').toLowerCase();
+                const who = String(rec.who || '').toLowerCase();
+
+                if (!soNum.includes(term) && !stage.includes(term) && !who.includes(term)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }, [activeRecords, selectedMonth, selectedFlag, searchTerm]);
+
+    // Total quantity sum
+    const totalQuantity = useMemo(() => {
+        return filteredRecords.reduce((sum, r) => {
+            const qty = Number(r.Quantity) || 0;
+            return sum + qty;
+        }, 0);
+    }, [filteredRecords]);
 
     const fetchSymbData = async () => {
         setLoading(true);
@@ -103,13 +146,6 @@ export default function SymbTracker() {
         return map;
     }, [flagRules]);
 
-    // Filter records by selected file date if available
-    const activeRecords = useMemo(() => {
-        if (!selectedFileDate) return records;
-        const filtered = records.filter(r => r.file_date === selectedFileDate);
-        return filtered.length > 0 ? filtered : records;
-    }, [records, selectedFileDate]);
-
     // Format date string nicely (e.g. "04 January 2027")
     const formatDatePretty = (dateStr?: string) => {
         if (!dateStr) return '-';
@@ -162,190 +198,9 @@ export default function SymbTracker() {
         return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     };
 
-    // Helper to get sortable year-month object
-    const getSortableMonth = (dateStr?: string) => {
-        const d = parseAnyDate(dateStr);
-        if (!d) return { key: 'Unspecified', year: 9999, monthIdx: 99, label: 'Unspecified' };
-        const year = d.getFullYear();
-        const monthIdx = d.getMonth();
-        const label = d.toLocaleDateString('en-US', { month: 'long' });
-        return {
-            key: `${label} ${year}`,
-            year,
-            monthIdx,
-            label: `${label}\n${year}`
-        };
-    };
 
-    // Compute chart data grouped by Month & Flag
-    const { chartMonths, flagData, monthTotals } = useMemo(() => {
-        const monthMap = new Map<string, { year: number; monthIdx: number; key: string; displayLabel: string }>();
 
-        activeRecords.forEach(rec => {
-            const cdd = getCDDVal(rec);
-            const info = getSortableMonth(cdd);
-            if (!monthMap.has(info.key)) {
-                monthMap.set(info.key, {
-                    year: info.year,
-                    monthIdx: info.monthIdx,
-                    key: info.key,
-                    displayLabel: info.key
-                });
-            }
-        });
 
-        const sortedMonths = Array.from(monthMap.values()).sort((a, b) => {
-            if (a.year !== b.year) return a.year - b.year;
-            return a.monthIdx - b.monthIdx;
-        });
-
-        const monthKeys = sortedMonths.map(m => m.key);
-
-        // Group unique SO numbers by month and flag
-        const monthFlagSoSets: Record<string, Record<string, Set<string>>> = {};
-        const monthAllSoSets: Record<string, Set<string>> = {};
-
-        monthKeys.forEach(m => {
-            monthFlagSoSets[m] = {
-                green: new Set(),
-                red: new Set(),
-                yellow: new Set(),
-                blue: new Set()
-            };
-            monthAllSoSets[m] = new Set();
-        });
-
-        activeRecords.forEach((rec, idx) => {
-            const cdd = getCDDVal(rec);
-            const mKey = getMonthYearKey(cdd);
-            const flag = (rec.new_flag_algo || rec.new_flag_color || rec.flag || 'green').toLowerCase().trim();
-            const soNum = String(rec['SO Number'] || rec['SO NUMBER'] || rec['SO_Number'] || rec['Record Id'] || rec['NPI'] || `REC_${idx}`).trim();
-
-            if (!monthFlagSoSets[mKey]) {
-                monthFlagSoSets[mKey] = {
-                    green: new Set(),
-                    red: new Set(),
-                    yellow: new Set(),
-                    blue: new Set()
-                };
-                monthAllSoSets[mKey] = new Set();
-            }
-
-            if (!monthFlagSoSets[mKey][flag]) {
-                monthFlagSoSets[mKey][flag] = new Set();
-            }
-
-            monthFlagSoSets[mKey][flag].add(soNum);
-            monthAllSoSets[mKey].add(soNum);
-        });
-
-        const counts: Record<string, Record<string, number>> = {};
-        const totals: Record<string, number> = {};
-
-        monthKeys.forEach(m => {
-            counts[m] = {
-                green: monthFlagSoSets[m]?.green.size || 0,
-                red: monthFlagSoSets[m]?.red.size || 0,
-                yellow: monthFlagSoSets[m]?.yellow.size || 0,
-                blue: monthFlagSoSets[m]?.blue.size || 0,
-            };
-            totals[m] = monthAllSoSets[m]?.size || 0;
-        });
-
-        return {
-            chartMonths: monthKeys,
-            flagData: counts,
-            monthTotals: totals
-        };
-    }, [activeRecords]);
-
-    // Plotly traces configuration
-    const plotlyTraces = useMemo(() => {
-        const flagsList: Array<{ name: string; key: string; color: string }> = [
-            { name: 'green', key: 'green', color: '#52b788' },
-            { name: 'red', key: 'red', color: '#e63946' },
-            { name: 'yellow', key: 'yellow', color: '#f5ad42' },
-            { name: 'blue', key: 'blue', color: '#3b82f6' }
-        ];
-
-        return flagsList.map(flag => {
-            const yValues = chartMonths.map(m => flagData[m]?.[flag.key] || 0);
-            const textLabels = yValues.map(val => val > 0 ? `${val}` : '');
-
-            return {
-                x: chartMonths,
-                y: yValues,
-                name: flag.name,
-                type: 'bar' as const,
-                marker: { color: flag.color },
-                text: textLabels,
-                textposition: 'inside' as const,
-                insidetextfont: { color: 'white', size: 22 },
-                hoverinfo: 'x+y+name' as const
-            };
-        });
-    }, [chartMonths, flagData]);
-
-    // Total annotations above stacked bars
-    const totalAnnotations = useMemo(() => {
-        return chartMonths.map(m => ({
-            x: m,
-            y: monthTotals[m] || 0,
-            text: `<b>${monthTotals[m] || 0}</b>`,
-            xanchor: 'center' as const,
-            yanchor: 'bottom' as const,
-            showarrow: false,
-            font: { size: 22, color: '#1e293b' }
-        }));
-    }, [chartMonths, monthTotals]);
-
-    // Filtered records for table view
-    const filteredRecords = useMemo(() => {
-        return activeRecords.filter(rec => {
-            if (selectedMonth) {
-                const cdd = getCDDVal(rec);
-                const recMonth = getMonthYearKey(cdd);
-                if (recMonth !== selectedMonth) return false;
-            }
-
-            if (selectedFlag) {
-                const recFlag = (rec.new_flag_algo || rec.new_flag_color || rec.flag || 'green').toLowerCase().trim();
-                if (recFlag !== selectedFlag.toLowerCase()) return false;
-            }
-
-            if (searchTerm.trim()) {
-                const term = searchTerm.toLowerCase();
-                const soNum = String(rec['SO Number'] || rec['SO NUMBER'] || '').toLowerCase();
-                const stage = String(rec['n-reg_stage'] || rec['Regular-Product Stage'] || '').toLowerCase();
-                const who = String(rec.who || '').toLowerCase();
-
-                if (!soNum.includes(term) && !stage.includes(term) && !who.includes(term)) {
-                    return false;
-                }
-            }
-
-            return true;
-        });
-    }, [activeRecords, selectedMonth, selectedFlag, searchTerm]);
-
-    // Total quantity sum
-    const totalQuantity = useMemo(() => {
-        return filteredRecords.reduce((sum, r) => {
-            const qty = Number(r.Quantity) || 0;
-            return sum + qty;
-        }, 0);
-    }, [filteredRecords]);
-
-    const handlePlotClick = (data: any) => {
-        if (data && data.points && data.points.length > 0) {
-            const point = data.points[0];
-            const month = point.x;
-            const flag = point.data.name;
-            setSelectedMonth(month);
-            setSelectedFlag(flag);
-            setIsModalOpen(true);
-        }
-    };
 
     const todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Filter, AlertCircle, CalendarDays, ArrowRight, RefreshCw, Clock, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Calendar, Filter, AlertCircle, CalendarDays, ArrowRight, RefreshCw, Clock, CheckCircle2, ChevronDown, Eye, Check, Layers, X } from 'lucide-react';
 
 interface SymbPlanRow {
     id: string;
@@ -27,6 +27,24 @@ const EVENT_ORDER = [
     "Shipment Date",
     "customer place"
 ];
+
+const STAGE_COLOR_MAP: Record<string, { color: string; bg: string; border: string; text: string }> = {
+    'EBOM covered': { color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe', text: '#3730a3' },
+    'PCBA covered': { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
+    'PCBA Ready': { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
+    'All Material Available': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
+    'Active alignment': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
+    'Production/Assembly': { color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4', text: '#115e59' },
+    'FQC': { color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', text: '#3730a3' },
+    'Finished goods': { color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', text: '#065f46' },
+    'Invoice Date': { color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', text: '#5b21b6' },
+    'Shipment Date': { color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8', text: '#9d174d' },
+    'customer place': { color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd', text: '#0369a1' }
+};
+
+const getStageThemeColor = (stageName: string) => {
+    return STAGE_COLOR_MAP[stageName] || { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' };
+};
 
 const ProgressRing: React.FC<{ percentage: number; size?: number; strokeWidth?: number }> = ({ percentage, size = 26, strokeWidth = 3 }) => {
     const radius = (size - strokeWidth) / 2;
@@ -67,11 +85,22 @@ const SymbPipelineView: React.FC = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isCompletedSectionOpen, setIsCompletedSectionOpen] = useState(false);
     
+    // Coverage Stage Filter State
+    const [selectedCoverageStage, setSelectedCoverageStage] = useState<string | null>(null);
+
     // Filters
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [selectedVariant, setSelectedVariant] = useState<string>('All');
+
+    const MILESTONE_STAGES = useMemo(() => [
+        { key: 'PCBA', title: 'PCBA', eventMatch: ['PCBA covered', 'PCBA Ready'], color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+        { key: 'Active Alignment', title: 'Active Alignment', eventMatch: ['Active alignment'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+        { key: 'Production / Assembly', title: 'Production / Assembly', eventMatch: ['Production/Assembly'], color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' },
+        { key: 'FQC', title: 'FQC', eventMatch: ['FQC'], color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
+        { key: 'Finished Goods', title: 'Finished Goods', eventMatch: ['Finished goods'], color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' }
+    ], []);
 
     useEffect(() => {
         fetchData();
@@ -132,7 +161,7 @@ const SymbPipelineView: React.FC = () => {
         return filtered;
     }, [data, fromDate, toDate, sortOrder, selectedVariant]);
 
-    // Group by Shipment Week
+    // Group by Shipment Week (filtering out weeks where total planned quantity is 0)
     const groupedByWeek = useMemo(() => {
         const groups: Record<string, SymbPlanRow[]> = {};
         filteredAndSortedData.forEach(row => {
@@ -140,7 +169,16 @@ const SymbPipelineView: React.FC = () => {
             if (!groups[weekStr]) groups[weekStr] = [];
             groups[weekStr].push(row);
         });
-        return groups;
+
+        // Omit any shipment week where total planned quantity across all stages is 0
+        const validGroups: Record<string, SymbPlanRow[]> = {};
+        Object.entries(groups).forEach(([weekStr, rows]) => {
+            const totalPlannedInWeek = rows.reduce((sum, r) => sum + (Number(r["planned Value"]) || 0), 0);
+            if (totalPlannedInWeek > 0) {
+                validGroups[weekStr] = rows;
+            }
+        });
+        return validGroups;
     }, [filteredAndSortedData]);
 
     const getWeekBackfillInfo = (rows: SymbPlanRow[]) => {
@@ -169,6 +207,99 @@ const SymbPipelineView: React.FC = () => {
 
         return { maxNativeCompletedIdxMap, maxNativeCompletedStageNameMap };
     };
+
+    const sortedShipmentWeeks = useMemo(() => {
+        return Object.keys(groupedByWeek).sort((a, b) => {
+            const timeA = new Date(a).getTime();
+            const timeB = new Date(b).getTime();
+            return timeA - timeB;
+        });
+    }, [groupedByWeek]);
+
+    const isStageCoveredForWeekVariant = (weekStr: string, variantKey: string, stageTitle: string) => {
+        const rows = groupedByWeek[weekStr] || [];
+        const stageConfig = MILESTONE_STAGES.find(s => s.title === stageTitle);
+        if (!stageConfig) return false;
+
+        const { maxNativeCompletedIdxMap } = getWeekBackfillInfo(rows);
+        const vMaxIdx = maxNativeCompletedIdxMap[variantKey.toLowerCase()] ?? -1;
+
+        for (const evt of stageConfig.eventMatch) {
+            const stageIdx = EVENT_ORDER.findIndex(e => e.toLowerCase() === evt.toLowerCase());
+            const row = rows.find(r => r["Event Type"].toLowerCase() === evt.toLowerCase() && (r["Variant Type"] || "").toLowerCase() === variantKey.toLowerCase());
+            if (row) {
+                const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
+                const isBackfilled = !isNativeCompleted && (stageIdx >= 0 && stageIdx < vMaxIdx);
+                if (isNativeCompleted || isBackfilled) return true;
+            } else if (stageIdx >= 0 && stageIdx < vMaxIdx) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    const getTargetDateForWeekVariantStage = (weekStr: string, variantKey: string, stageTitle: string) => {
+        const rows = groupedByWeek[weekStr] || [];
+        const stageConfig = MILESTONE_STAGES.find(s => s.title === stageTitle);
+        if (!stageConfig) return null;
+
+        const row = rows.find(r => stageConfig.eventMatch.includes(r["Event Type"]) && (r["Variant Type"] || "").toLowerCase() === variantKey.toLowerCase());
+        if (row) {
+            if (row["Last Batch Date"]) {
+                return String(row["Last Batch Date"]).split(' ')[0];
+            }
+            if (row["Estimated Completion Date"] && row["Estimated Completion Date"] !== "None" && row["Estimated Completion Date"] !== "N/A" && row["Estimated Completion Date"].trim() !== "") {
+                return row["Estimated Completion Date"];
+            }
+        }
+        return null;
+    };
+
+    // Calculate Project Coverage Percentage
+    const projectCoverageStats = useMemo(() => {
+        const validRows = filteredAndSortedData.filter(r => {
+            const weekStr = r["Shipment Week"] ? r["Shipment Week"].split(' ')[0] : '';
+            return weekStr && groupedByWeek[weekStr];
+        });
+
+        if (selectedCoverageStage) {
+            const stageConfig = MILESTONE_STAGES.find(s => s.title === selectedCoverageStage);
+            if (!stageConfig) return { stageTitle: selectedCoverageStage, totalPlanned: 0, totalCompleted: 0, percent: 0 };
+
+            const stageRows = validRows.filter(r => stageConfig.eventMatch.includes(r["Event Type"]));
+            const totalPlanned = stageRows.reduce((sum, r) => sum + (Number(r["planned Value"]) || 0), 0);
+            const totalCompleted = stageRows.reduce((sum, r) => sum + (Number(r.completed) || 0), 0);
+
+            let percent = 0;
+            if (totalPlanned > 0) {
+                percent = Math.min(100, Math.round((totalCompleted / totalPlanned) * 100));
+            } else if (stageRows.length > 0 && totalCompleted > 0) {
+                percent = 100;
+            }
+
+            return {
+                stageTitle: selectedCoverageStage,
+                totalPlanned,
+                totalCompleted,
+                percent
+            };
+        } else {
+            const totalPlanned = validRows.reduce((sum, r) => sum + (Number(r["planned Value"]) || 0), 0);
+            const totalCompleted = validRows.reduce((sum, r) => sum + (Number(r.completed) || 0), 0);
+
+            let percent = 0;
+            if (totalPlanned > 0) {
+                percent = Math.min(100, Math.round((totalCompleted / totalPlanned) * 100));
+            }
+
+            return {
+                stageTitle: 'Overall Project',
+                totalPlanned,
+                totalCompleted,
+                percent
+            };
+        }
+    }, [filteredAndSortedData, groupedByWeek, selectedCoverageStage, MILESTONE_STAGES]);
 
     const { completedWeeks, activeWeeks } = useMemo(() => {
         const completed: [string, SymbPlanRow[], number][] = [];
@@ -607,38 +738,353 @@ const SymbPipelineView: React.FC = () => {
 
             {/* Overall Stage Completed Summary Cards */}
             <div style={{ marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                {overallSummaryCards.map(card => (
-                    <div key={card.title} style={{ 
-                        backgroundColor: card.bgColor, 
-                        borderRadius: '10px', 
-                        padding: '0.9rem 1rem', 
-                        border: `1px solid ${card.borderColor}`,
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between'
-                    }}>
-                        <div>
-                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: card.titleColor, textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                                {card.title}
+                {overallSummaryCards.map(card => {
+                    const isSelected = selectedCoverageStage === card.title;
+                    return (
+                        <div key={card.title} style={{ 
+                            backgroundColor: card.bgColor, 
+                            borderRadius: '10px', 
+                            padding: '0.9rem 1rem', 
+                            border: `2px solid ${isSelected ? card.titleColor : card.borderColor}`,
+                            boxShadow: isSelected ? `0 4px 12px ${card.borderColor}` : '0 2px 5px rgba(0,0,0,0.04)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            transition: 'all 0.2s ease'
+                        }}>
+                            <div>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: card.titleColor, textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                                    {card.title}
+                                </div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: card.numColor, display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
+                                    {card.total.toLocaleString()}
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 600, color: card.subTextColor }}>Total Completed</span>
+                                </div>
                             </div>
-                            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: card.numColor, display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
-                                {card.total.toLocaleString()}
-                                <span style={{ fontSize: '0.7rem', fontWeight: 600, color: card.subTextColor }}>Total Completed</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', marginTop: '0.5rem', borderTop: `1px solid ${card.borderColor}`, fontSize: '0.78rem' }}>
+                                <div>
+                                    <span style={{ color: card.titleColor, opacity: 0.85 }}>Variant 1: </span>
+                                    <strong style={{ color: card.numColor }}>{card.v1.toLocaleString()}</strong>
+                                </div>
+                                <div>
+                                    <span style={{ color: card.titleColor, opacity: 0.85 }}>Variant 2: </span>
+                                    <strong style={{ color: card.numColor }}>{card.v2.toLocaleString()}</strong>
+                                </div>
                             </div>
+
+                            <button
+                                onClick={() => setSelectedCoverageStage(isSelected ? null : card.title)}
+                                style={{
+                                    marginTop: '0.65rem',
+                                    padding: '0.4rem 0.75rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    borderRadius: '6px',
+                                    border: `1px solid ${isSelected ? card.titleColor : card.borderColor}`,
+                                    backgroundColor: isSelected ? card.titleColor : '#ffffff',
+                                    color: isSelected ? '#ffffff' : card.titleColor,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.35rem',
+                                    width: '100%',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                    transition: 'all 0.15s ease'
+                                }}
+                            >
+                                <Eye size={13} /> {isSelected ? 'Selected (Click to Clear)' : 'View Coverage'}
+                            </button>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', marginTop: '0.5rem', borderTop: `1px solid ${card.borderColor}`, fontSize: '0.78rem' }}>
-                            <div>
-                                <span style={{ color: card.titleColor, opacity: 0.85 }}>Variant 1: </span>
-                                <strong style={{ color: card.numColor }}>{card.v1.toLocaleString()}</strong>
-                            </div>
-                            <div>
-                                <span style={{ color: card.titleColor, opacity: 0.85 }}>Variant 2: </span>
-                                <strong style={{ color: card.numColor }}>{card.v2.toLocaleString()}</strong>
-                            </div>
+                    );
+                })}
+            </div>
+
+            {/* Milestone Lines Coverage Timeline Section */}
+            <div style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '12px',
+                padding: '1.25rem 1.5rem',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                marginBottom: '1.5rem'
+            }}>
+                {/* Project Coverage Percentage Banner */}
+                <div style={{
+                    backgroundColor: selectedCoverageStage ? '#1e293b' : '#0f172a',
+                    borderRadius: '10px',
+                    padding: '1rem 1.25rem',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    flexWrap: 'wrap',
+                    marginBottom: '1.25rem',
+                    border: '1px solid #334155'
+                }}>
+                    <div>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {selectedCoverageStage ? `Stage Project Coverage (${projectCoverageStats.stageTitle})` : 'Overall Project Coverage & Progress'}
+                        </div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 800, color: selectedCoverageStage ? '#38bdf8' : projectCoverageStats.percent === 100 ? '#34d399' : '#fbbf24', marginTop: '0.25rem' }}>
+                            {selectedCoverageStage 
+                                ? `${projectCoverageStats.percent}% of total project is covered for ${projectCoverageStats.stageTitle}`
+                                : projectCoverageStats.percent === 100 ? '🎉 100% of Total Project Completed' : `Total ${projectCoverageStats.percent}% of Project Completed`
+                            }
                         </div>
                     </div>
-                ))}
+                    <div style={{ textAlign: 'right', fontSize: '0.82rem', color: '#cbd5e1', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.5rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div>Completed: <strong style={{ color: '#34d399' }}>{projectCoverageStats.totalCompleted.toLocaleString()}</strong></div>
+                        <div style={{ marginTop: '0.15rem' }}>Planned: <strong style={{ color: '#f8fafc' }}>{projectCoverageStats.totalPlanned.toLocaleString()}</strong></div>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <Layers size={20} style={{ color: '#2563eb' }} />
+                        <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1e293b' }}>
+                            {selectedCoverageStage ? `${selectedCoverageStage} Coverage Line` : 'Default Shipment Week Milestones'}
+                        </h3>
+                        {selectedCoverageStage ? (
+                            <span style={{
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '12px',
+                                backgroundColor: MILESTONE_STAGES.find(s => s.title === selectedCoverageStage)?.bg || '#eff6ff',
+                                color: MILESTONE_STAGES.find(s => s.title === selectedCoverageStage)?.color || '#2563eb',
+                                border: `1px solid ${MILESTONE_STAGES.find(s => s.title === selectedCoverageStage)?.border || '#bfdbfe'}`
+                            }}>
+                                Showing {selectedCoverageStage} Coverage Line
+                            </span>
+                        ) : (
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#64748b', backgroundColor: '#f1f5f9', padding: '0.25rem 0.75rem', borderRadius: '12px' }}>
+                                Showing All 5 Milestone Stage Lines
+                            </span>
+                        )}
+                    </div>
+
+                    {selectedCoverageStage && (
+                        <button
+                            onClick={() => setSelectedCoverageStage(null)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: '6px',
+                                border: '1px solid #cbd5e1',
+                                backgroundColor: '#f8fafc',
+                                color: '#475569',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <X size={14} /> Clear Filter
+                        </button>
+                    )}
+                </div>
+
+                {/* Render Horizontal Milestone Lines */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    {selectedCoverageStage ? (
+                        // Render single stage milestone line when stage coverage card is clicked
+                        MILESTONE_STAGES.filter(s => s.title === selectedCoverageStage).map(stage => {
+                            const variants = ['Varient 1', 'Varient 2'];
+                            return (
+                                <div key={stage.title} style={{
+                                    backgroundColor: stage.bg,
+                                    borderRadius: '10px',
+                                    padding: '1rem 1.25rem',
+                                    border: `1px solid ${stage.border}`
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: stage.color }} />
+                                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: stage.color }}>
+                                            {stage.title} Coverage Milestone Line
+                                        </h4>
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                                        {variants.map(variantName => (
+                                            <div key={variantName} style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '0.85rem 1rem', border: '1px solid #e2e8f0' }}>
+                                                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155', marginBottom: '0.75rem' }}>
+                                                    {variantName}
+                                                </div>
+
+                                                <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', minWidth: 'max-content' }}>
+                                                        {sortedShipmentWeeks.map((weekStr, idx) => {
+                                                            const isCovered = isStageCoveredForWeekVariant(weekStr, variantName, stage.title);
+                                                            const targetDate = getTargetDateForWeekVariantStage(weekStr, variantName, stage.title);
+                                                            const isLast = idx === sortedShipmentWeeks.length - 1;
+
+                                                            return (
+                                                                <div key={weekStr} style={{ display: 'flex', alignItems: 'center' }}>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem', minWidth: '110px' }}>
+                                                                        <span style={{ fontSize: '0.73rem', fontWeight: 700, color: isCovered ? stage.color : '#64748b' }}>
+                                                                            {weekStr}
+                                                                        </span>
+
+                                                                        <div style={{
+                                                                            width: '28px',
+                                                                            height: '28px',
+                                                                            borderRadius: '50%',
+                                                                            backgroundColor: isCovered ? stage.color : '#f1f5f9',
+                                                                            border: `2px solid ${isCovered ? stage.color : '#cbd5e1'}`,
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            color: isCovered ? '#ffffff' : '#64748b',
+                                                                            boxShadow: isCovered ? `0 2px 6px ${stage.border}` : 'none',
+                                                                            transition: 'all 0.2s ease'
+                                                                        }}>
+                                                                            {isCovered ? (
+                                                                                <Check size={16} strokeWidth={3} />
+                                                                            ) : (
+                                                                                <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>⏳</span>
+                                                                            )}
+                                                                        </div>
+
+                                                                        <span style={{
+                                                                            fontSize: '0.68rem',
+                                                                            fontWeight: 700,
+                                                                            padding: '0.15rem 0.45rem',
+                                                                            borderRadius: '8px',
+                                                                            backgroundColor: isCovered ? '#dcfce7' : '#f1f5f9',
+                                                                            color: isCovered ? '#15803d' : '#64748b',
+                                                                            border: `1px solid ${isCovered ? '#bbf7d0' : '#cbd5e1'}`,
+                                                                            textAlign: 'center'
+                                                                        }}>
+                                                                            {isCovered 
+                                                                                ? '✓ Covered' 
+                                                                                : targetDate 
+                                                                                    ? `Not Covered (Target: ${targetDate})` 
+                                                                                    : 'Not Covered'
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {!isLast && (
+                                                                        <div style={{
+                                                                            width: '45px',
+                                                                            height: isCovered ? '3px' : '2px',
+                                                                            backgroundColor: isCovered ? stage.color : '#cbd5e1',
+                                                                            borderStyle: isCovered ? 'solid' : 'dashed',
+                                                                            margin: '0 0.2rem',
+                                                                            alignSelf: 'center',
+                                                                            marginTop: '-0.7rem'
+                                                                        }} />
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        // Default View when NO card is selected: Default milestone line showing highest stage completed per week
+                        <div style={{
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '10px',
+                            padding: '1rem 1.25rem',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#0284c7' }} />
+                                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0369a1' }}>
+                                    Default Shipment Week Stage Milestone Line
+                                </h4>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                                {['Varient 1', 'Varient 2'].map(variantName => (
+                                    <div key={variantName} style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '0.85rem 1rem', border: '1px solid #e2e8f0' }}>
+                                        <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155', marginBottom: '0.75rem' }}>
+                                            {variantName}
+                                        </div>
+
+                                        <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', minWidth: 'max-content' }}>
+                                                {sortedShipmentWeeks.map((weekStr, idx) => {
+                                                    const rows = groupedByWeek[weekStr] || [];
+                                                    const { maxNativeCompletedIdxMap } = getWeekBackfillInfo(rows);
+                                                    const maxIdx = maxNativeCompletedIdxMap[variantName.toLowerCase()] ?? -1;
+                                                    const isCovered = maxIdx >= 0;
+                                                    const stageName = isCovered ? EVENT_ORDER[maxIdx] : '';
+                                                    const theme = isCovered ? getStageThemeColor(stageName) : null;
+                                                    const isLast = idx === sortedShipmentWeeks.length - 1;
+
+                                                    return (
+                                                        <div key={weekStr} style={{ display: 'flex', alignItems: 'center' }}>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem', minWidth: '120px' }}>
+                                                                <span style={{ fontSize: '0.73rem', fontWeight: 700, color: theme ? theme.color : '#64748b' }}>
+                                                                    {weekStr}
+                                                                </span>
+
+                                                                <div style={{
+                                                                    width: '28px',
+                                                                    height: '28px',
+                                                                    borderRadius: '50%',
+                                                                    backgroundColor: theme ? theme.color : '#f1f5f9',
+                                                                    border: `2px solid ${theme ? theme.color : '#cbd5e1'}`,
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    color: theme ? '#ffffff' : '#64748b',
+                                                                    boxShadow: theme ? `0 2px 6px ${theme.border}` : 'none',
+                                                                    transition: 'all 0.2s ease'
+                                                                }}>
+                                                                    {isCovered ? (
+                                                                        <Check size={16} strokeWidth={3} />
+                                                                    ) : (
+                                                                        <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>⏳</span>
+                                                                    )}
+                                                                </div>
+
+                                                                <span style={{
+                                                                    fontSize: '0.68rem',
+                                                                    fontWeight: 700,
+                                                                    padding: '0.15rem 0.5rem',
+                                                                    borderRadius: '8px',
+                                                                    backgroundColor: theme ? theme.bg : '#f1f5f9',
+                                                                    color: theme ? theme.text : '#64748b',
+                                                                    border: `1px solid ${theme ? theme.border : '#cbd5e1'}`,
+                                                                    textAlign: 'center'
+                                                                }}>
+                                                                    {isCovered ? `✓ ${stageName} done` : 'Not Covered'}
+                                                                </span>
+                                                            </div>
+
+                                                            {!isLast && (
+                                                                <div style={{
+                                                                    width: '45px',
+                                                                    height: theme ? '3px' : '2px',
+                                                                    backgroundColor: theme ? theme.color : '#cbd5e1',
+                                                                    borderStyle: theme ? 'solid' : 'dashed',
+                                                                    margin: '0 0.2rem',
+                                                                    alignSelf: 'center',
+                                                                    marginTop: '-0.7rem'
+                                                                }} />
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Completed in all green Accordion */}

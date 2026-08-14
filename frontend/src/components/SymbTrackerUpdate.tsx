@@ -110,6 +110,666 @@ function getLockStatus(nowDate: Date = new Date()) {
     };
 }
 
+function calcMetrics(recs: TrackerRecord[]) {
+    let totalPlanned = 0;
+    let totalCompleted = 0;
+
+    let plannedAsOfToday = 0;
+    let completedAsOfToday = 0;
+
+    const today = new Date();
+    const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+    recs.forEach(rec => {
+        const p = rec.planned_qty || 0;
+        const c = rec.completed || 0;
+        totalPlanned += p;
+        totalCompleted += c;
+
+        const recDate = parseDayDate(rec.plan_date);
+        if (recDate) {
+            const recTime = new Date(recDate.getFullYear(), recDate.getMonth(), recDate.getDate()).getTime();
+            if (recTime <= todayTime) {
+                plannedAsOfToday += p;
+                completedAsOfToday += c;
+            }
+        }
+    });
+
+    const netDiff = totalCompleted - totalPlanned;
+    const totalRemaining = netDiff < 0 ? Math.abs(netDiff) : 0;
+    const totalExcess = netDiff > 0 ? netDiff : 0;
+
+    const diffAsOfToday = completedAsOfToday - plannedAsOfToday;
+    const percentAsOfToday = plannedAsOfToday > 0 ? ((diffAsOfToday / plannedAsOfToday) * 100).toFixed(1) : '0.0';
+    const isAheadAsOfToday = diffAsOfToday >= 0;
+
+    return {
+        totalPlanned,
+        totalCompleted,
+        totalRemaining,
+        totalExcess,
+        plannedAsOfToday,
+        completedAsOfToday,
+        diffAsOfToday,
+        percentAsOfToday,
+        isAheadAsOfToday
+    };
+}
+
+interface MetricCardsStackProps {
+    title: string;
+    metrics: ReturnType<typeof calcMetrics>;
+    records: TrackerRecord[];
+    selectedEventTab: string;
+}
+
+const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricCardsStackProps) => {
+    const [showDetail, setShowDetail] = useState(false);
+    const [chartMode, setChartMode] = useState<'actuals' | 'cumulative'>('cumulative');
+    const [showHistoryLines, setShowHistoryLines] = useState(false);
+
+    // Compute stage breakdown metrics for ALL tab
+    const stageMetrics = useMemo(() => {
+        if (selectedEventTab !== 'ALL') return [];
+        const STAGES = [
+            { key: 'PCBA Ready', label: 'PCBA Ready', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+            { key: 'Active alignment', label: 'Total AA Done', color: '#d97706', bg: '#fffbe5', border: '#fde68a' },
+            { key: 'Production/Assembly', label: 'Production / Assembly', color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' },
+            { key: 'FQC', label: 'FQC', color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
+            { key: 'Finished goods', label: 'Finished Goods', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+            { key: 'Invoice Date', label: 'Invoiced', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+            { key: 'Shipment Date', label: 'Shipped', color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8' },
+            { key: 'customer place', label: 'Customer Place', color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' }
+        ];
+
+        return STAGES.map(stg => {
+            const stgRecords = records.filter(r => r.event_type === stg.key);
+            let planned = 0;
+            let completed = 0;
+            stgRecords.forEach(r => {
+                planned += r.planned_qty || 0;
+                completed += r.completed || 0;
+            });
+            const remaining = planned > completed ? planned - completed : 0;
+            return {
+                ...stg,
+                planned,
+                completed,
+                remaining
+            };
+        });
+    }, [records, selectedEventTab]);
+
+    // Compute edit statistics for this stack
+    const editStats = useMemo(() => {
+        let planDateEdits = 0;
+        let plannedQtyEdits = 0;
+        let completedEdits = 0;
+
+        records.forEach(r => {
+            planDateEdits += r.edit_history?.plan_date?.length || 0;
+            plannedQtyEdits += r.edit_history?.planned_qty?.length || 0;
+            completedEdits += r.edit_history?.completed?.length || 0;
+        });
+
+        return { planDateEdits, plannedQtyEdits, completedEdits };
+    }, [records]);
+
+    // Prepare chart data & traces for single event tab (Planned vs Completed + Past Edits)
+    const { singleTabTraces, singleTabMaxY } = useMemo(() => {
+        const sorted = [...records].sort((a, b) => {
+            const dA = parseDayDate(a.plan_date);
+            const dB = parseDayDate(b.plan_date);
+            return (dA ? dA.getTime() : 0) - (dB ? dB.getTime() : 0);
+        });
+
+        const xDates = sorted.map(r => r.plan_date);
+        const rawPlanned = sorted.map(r => r.planned_qty || 0);
+        const rawCompleted = sorted.map(r => r.completed || 0);
+
+        let yPlanned: number[] = [];
+        let yCompleted: number[] = [];
+
+        if (chartMode === 'cumulative') {
+            let pSum = 0;
+            yPlanned = rawPlanned.map(v => { pSum += v; return pSum; });
+            let cSum = 0;
+            yCompleted = rawCompleted.map(v => { cSum += v; return cSum; });
+        } else {
+            yPlanned = rawPlanned;
+            yCompleted = rawCompleted;
+        }
+
+        let allY: number[] = [...yPlanned, ...yCompleted];
+
+        const pastTraces: any[] = [];
+
+        let maxPlannedEdits = 0;
+        sorted.forEach(r => {
+            const pLen = r.edit_history?.planned_qty?.length || 0;
+            if (pLen > maxPlannedEdits) maxPlannedEdits = pLen;
+        });
+
+        for (let rev = 0; rev < maxPlannedEdits; rev++) {
+            const revPoints: { dateStr: string; dateObj: Date | null; val: number; timestamp: string }[] = [];
+            let hasAnyEditAtRev = false;
+
+            sorted.forEach(r => {
+                const pHist = r.edit_history?.planned_qty;
+                if (pHist && pHist[rev] !== undefined) {
+                    hasAnyEditAtRev = true;
+                    const pastVal = pHist[rev].value || 0;
+                    const dObj = parseDayDate(r.plan_date);
+                    revPoints.push({ dateStr: r.plan_date, dateObj: dObj, val: pastVal, timestamp: pHist[rev].timestamp });
+                } else {
+                    const dObj = parseDayDate(r.plan_date);
+                    revPoints.push({ dateStr: r.plan_date, dateObj: dObj, val: r.planned_qty || 0, timestamp: '' });
+                }
+            });
+
+            if (hasAnyEditAtRev) {
+                revPoints.sort((a, b) => (a.dateObj ? a.dateObj.getTime() : 0) - (b.dateObj ? b.dateObj.getTime() : 0));
+
+                const xDates = revPoints.map(p => p.dateStr);
+                const rawY = revPoints.map(p => p.val);
+
+                let finalY: number[] = [];
+                if (chartMode === 'cumulative') {
+                    let sum = 0;
+                    finalY = rawY.map(v => { sum += v; return sum; });
+                } else {
+                    finalY = rawY;
+                }
+
+                allY.push(...finalY);
+
+                const hoverTexts = revPoints.map((p, i) => {
+                    const ts = p.timestamp ? ` (Edited ${new Date(p.timestamp).toLocaleString()})` : '';
+                    return `Prev Planned (Rev ${rev + 1}): ${finalY[i]} on ${p.dateStr}${ts}`;
+                });
+
+                pastTraces.push({
+                    x: xDates,
+                    y: finalY,
+                    name: `Past Planned (Rev ${rev + 1})`,
+                    mode: 'lines+markers' as any,
+                    hoverinfo: 'text' as any,
+                    hovertext: hoverTexts,
+                    line: { shape: 'spline', width: 2, color: '#94a3b8', dash: 'dot' },
+                    marker: { size: 6, color: '#64748b', symbol: 'circle' },
+                    showlegend: false
+                });
+            }
+        }
+
+        let maxCompletedEdits = 0;
+        sorted.forEach(r => {
+            const cLen = r.edit_history?.completed?.length || 0;
+            if (cLen > maxCompletedEdits) maxCompletedEdits = cLen;
+        });
+
+        for (let rev = 0; rev < maxCompletedEdits; rev++) {
+            const revPoints: { dateStr: string; dateObj: Date | null; val: number; timestamp: string }[] = [];
+            let hasAnyEditAtRev = false;
+
+            sorted.forEach(r => {
+                const cHist = r.edit_history?.completed;
+                if (cHist && cHist[rev] !== undefined) {
+                    hasAnyEditAtRev = true;
+                    const pastVal = cHist[rev].value || 0;
+                    const dObj = parseDayDate(r.plan_date);
+                    revPoints.push({ dateStr: r.plan_date, dateObj: dObj, val: pastVal, timestamp: cHist[rev].timestamp });
+                } else {
+                    const dObj = parseDayDate(r.plan_date);
+                    revPoints.push({ dateStr: r.plan_date, dateObj: dObj, val: r.completed || 0, timestamp: '' });
+                }
+            });
+
+            if (hasAnyEditAtRev) {
+                revPoints.sort((a, b) => (a.dateObj ? a.dateObj.getTime() : 0) - (b.dateObj ? b.dateObj.getTime() : 0));
+
+                const xDates = revPoints.map(p => p.dateStr);
+                const rawY = revPoints.map(p => p.val);
+
+                let finalY: number[] = [];
+                if (chartMode === 'cumulative') {
+                    let sum = 0;
+                    finalY = rawY.map(v => { sum += v; return sum; });
+                } else {
+                    finalY = rawY;
+                }
+
+                allY.push(...finalY);
+
+                const hoverTexts = revPoints.map((p, i) => {
+                    const ts = p.timestamp ? ` (Edited ${new Date(p.timestamp).toLocaleString()})` : '';
+                    return `Prev Completed (Rev ${rev + 1}): ${finalY[i]} on ${p.dateStr}${ts}`;
+                });
+
+                pastTraces.push({
+                    x: xDates,
+                    y: finalY,
+                    name: `Past Completed (Rev ${rev + 1})`,
+                    mode: 'lines+markers' as any,
+                    hoverinfo: 'text' as any,
+                    hovertext: hoverTexts,
+                    line: { shape: 'spline', width: 2, color: '#cbd5e1', dash: 'dot' },
+                    marker: { size: 6, color: '#94a3b8', symbol: 'circle-open' },
+                    showlegend: false
+                });
+            }
+        }
+
+        const mainTraces = [
+            {
+                x: xDates,
+                y: yPlanned,
+                name: chartMode === 'cumulative' ? 'Cum. Planned Target' : 'Planned Qty',
+                mode: 'lines+markers+text' as any,
+                text: yPlanned.map(v => String(v)),
+                textposition: 'top center',
+                textfont: { size: 14, color: '#1e40af', weight: 'bold' } as any,
+                line: { shape: 'spline', width: 3.5, color: '#3b82f6' },
+                marker: { size: 8, color: '#3b82f6' }
+            },
+            {
+                x: xDates,
+                y: yCompleted,
+                name: chartMode === 'cumulative' ? 'Cum. Completed' : 'Completed Qty',
+                mode: 'lines+markers+text' as any,
+                text: yCompleted.map(v => String(v)),
+                textposition: 'bottom center',
+                textfont: { size: 14, color: '#166534', weight: 'bold' } as any,
+                line: { shape: 'spline', width: 3.5, color: '#10b981' },
+                marker: { size: 8, color: '#10b981' }
+            }
+        ];
+
+        const traces = showHistoryLines ? [...pastTraces, ...mainTraces] : mainTraces;
+
+        const maxVal = Math.max(0, ...allY);
+        const maxY = maxVal + Math.max(1, Math.ceil(maxVal * 0.15));
+
+        return { singleTabTraces: traces, singleTabMaxY: maxY };
+    }, [records, chartMode, showHistoryLines]);
+
+    // Prepare chart data & traces for ALL tab (Completed Qty per Event Type + Past Edits)
+    const { allTabChartTraces, allTabMaxY } = useMemo(() => {
+        if (selectedEventTab !== 'ALL') return { allTabChartTraces: [], allTabMaxY: 10 };
+
+        const dateMap = new Map<string, { dateStr: string; timestamp: number }>();
+        records.forEach(r => {
+            const dObj = parseDayDate(r.plan_date);
+            if (dObj) {
+                if (!dateMap.has(r.plan_date)) {
+                    dateMap.set(r.plan_date, { dateStr: r.plan_date, timestamp: dObj.getTime() });
+                }
+            }
+        });
+
+        const today = new Date();
+        const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).getTime();
+
+        const sortedDates = Array.from(dateMap.values())
+            .filter(d => d.timestamp <= todayTime)
+            .sort((a, b) => a.timestamp - b.timestamp);
+        const xDates = sortedDates.map(d => d.dateStr);
+
+        const eventTypes = ['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
+        const colorMap: Record<string, string> = {
+            'PCBA Ready': '#3b82f6',
+            'Active alignment': '#f59e0b',
+            'Production/Assembly': '#14b8a6',
+            'FQC': '#6366f1',
+            'Finished goods': '#10b981',
+            'Invoice Date': '#8b5cf6',
+            'Shipment Date': '#ec4899',
+            'customer place': '#06b6d4'
+        };
+
+        const traces: any[] = [];
+        let allY: number[] = [];
+
+        eventTypes.forEach(evt => {
+            const evtRows = records.filter(r => r.event_type === evt);
+            if (evtRows.length === 0) return;
+
+            const dateToCompleted = new Map<string, number>();
+            evtRows.forEach(r => {
+                dateToCompleted.set(r.plan_date, r.completed || 0);
+            });
+
+            const rawYVals = xDates.map(d => dateToCompleted.get(d) ?? 0);
+            
+            let finalYVals: number[] = [];
+            if (chartMode === 'cumulative') {
+                let sum = 0;
+                finalYVals = rawYVals.map(v => { sum += v; return sum; });
+            } else {
+                finalYVals = rawYVals;
+            }
+
+            allY.push(...finalYVals);
+
+            let lastShownIdx = -999;
+            let repeatCount = 0;
+
+            const textVals = finalYVals.map((val, idx) => {
+                if (val <= 0) return '';
+                
+                const prevVal = idx > 0 ? finalYVals[idx - 1] : null;
+                if (val === prevVal) {
+                    repeatCount++;
+                } else {
+                    repeatCount = 1;
+                }
+                
+                const isLast = idx === finalYVals.length - 1;
+                if (repeatCount > 3 && !isLast) {
+                    return '';
+                }
+
+                const currTs = sortedDates[idx]?.timestamp || 0;
+                const lastTs = lastShownIdx >= 0 ? sortedDates[lastShownIdx]?.timestamp || 0 : 0;
+                const daysDiff = (currTs - lastTs) / (1000 * 60 * 60 * 24);
+
+                const isValChanged = idx === 0 || val !== prevVal;
+                const isTwoWeeksPassed = daysDiff >= 14;
+
+                if (isLast || isValChanged || isTwoWeeksPassed) {
+                    lastShownIdx = idx;
+                    return String(val);
+                }
+
+                return '';
+            });
+
+            const color = colorMap[evt] || '#64748b';
+
+            traces.push({
+                x: xDates,
+                y: finalYVals,
+                name: evt,
+                mode: 'lines+markers+text' as any,
+                text: textVals,
+                textposition: 'top center',
+                textfont: { size: 14, color: color, weight: 'bold' } as any,
+                line: { shape: 'spline', width: 3, color: color },
+                marker: { size: 7, color: color }
+            });
+        });
+
+        const pastTraces: any[] = [];
+        records.forEach(r => {
+            const cHist = r.edit_history?.completed;
+            if (cHist && cHist.length > 0) {
+                cHist.forEach((entry, idx) => {
+                    const val = entry.value || 0;
+                    allY.push(val);
+                    pastTraces.push({
+                        x: [r.plan_date],
+                        y: [val],
+                        name: `${r.event_type} Past Edit #${idx + 1}`,
+                        mode: 'markers' as any,
+                        hoverinfo: 'text' as any,
+                        hovertext: `${r.event_type} Past Edit #${idx + 1}: ${val} (${new Date(entry.timestamp).toLocaleString()})`,
+                        marker: { size: 7, color: '#cbd5e1', symbol: 'circle-open', line: { width: 2, color: '#94a3b8' } },
+                        showlegend: false
+                    });
+                });
+            }
+        });
+
+        const finalTraces = showHistoryLines ? [...pastTraces, ...traces] : traces;
+
+        const maxVal = Math.max(0, ...allY);
+        const maxY = maxVal + Math.max(1, Math.ceil(maxVal * 0.15));
+
+        return { allTabChartTraces: finalTraces, allTabMaxY: maxY };
+    }, [records, selectedEventTab, chartMode, showHistoryLines]);
+
+    return (
+        <div style={{ marginBottom: '1.25rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#374151', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ backgroundColor: '#3b82f6', color: 'white', padding: '0.2rem 0.7rem', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '700' }}>
+                    {title}
+                </span>
+
+                <button
+                    onClick={() => setShowDetail(!showDetail)}
+                    style={{
+                        padding: '0.35rem 0.8rem',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        color: '#2563eb',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        transition: 'all 0.15s ease'
+                    }}
+                >
+                    <BarChart2 size={15} /> {showDetail ? 'Hide Detail Graph' : 'View Detail Graph'}
+                </button>
+            </div>
+
+            {/* Summary Cards: Stage Breakdown for ALL tab, or 4 standard metric cards for single event tab */}
+            {selectedEventTab === 'ALL' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.85rem' }}>
+                    {stageMetrics.map(stg => (
+                        <div 
+                            key={stg.key}
+                            style={{ 
+                                backgroundColor: stg.bg, 
+                                padding: '0.85rem 1rem', 
+                                borderRadius: '8px', 
+                                border: `1px solid ${stg.border}`,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                            }}
+                        >
+                            <div style={{ fontSize: '0.72rem', color: stg.color, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                {stg.label}
+                            </div>
+                            <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', marginTop: '0.2rem' }}>
+                                {stg.completed.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: '600', color: stg.color }}>done</span>
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Target: <strong>{stg.planned.toLocaleString()}</strong></span>
+                                {stg.remaining > 0 ? (
+                                    <span style={{ color: '#ca8a04', fontWeight: '600' }}>{stg.remaining.toLocaleString()} rem</span>
+                                ) : (
+                                    <span style={{ color: '#166534', fontWeight: '600' }}>Completed</span>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    <div style={{ backgroundColor: '#ffffff', padding: '0.9rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Total Planned</div>
+                        <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#1e293b', marginTop: '0.2rem' }}>
+                            {metrics.totalPlanned.toLocaleString()}
+                        </div>
+                    </div>
+
+                    <div style={{ backgroundColor: '#f0fdf4', padding: '0.9rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Total Completed</div>
+                        <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d', marginTop: '0.2rem' }}>
+                            {metrics.totalCompleted.toLocaleString()}
+                        </div>
+                    </div>
+
+                    <div style={{ backgroundColor: metrics.totalExcess > 0 ? '#eff6ff' : metrics.totalRemaining > 0 ? '#fefce8' : '#f0fdf4', padding: '0.9rem', borderRadius: '8px', border: metrics.totalExcess > 0 ? '1px solid #bfdbfe' : metrics.totalRemaining > 0 ? '1px solid #fef08a' : '1px solid #bbf7d0' }}>
+                        <div style={{ fontSize: '0.75rem', color: metrics.totalExcess > 0 ? '#1e40af' : metrics.totalRemaining > 0 ? '#854d0e' : '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Remaining / Excess</div>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'baseline', marginTop: '0.2rem' }}>
+                            {metrics.totalRemaining > 0 && (
+                                <div>
+                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#a16207' }}>{metrics.totalRemaining.toLocaleString()}</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#ca8a04', marginLeft: '0.2rem' }}>rem (deficit)</span>
+                                </div>
+                            )}
+                            {metrics.totalExcess > 0 && (
+                                <div>
+                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#2563eb' }}>+{metrics.totalExcess.toLocaleString()}</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#3b82f6', marginLeft: '0.2rem' }}>excess</span>
+                                </div>
+                            )}
+                            {metrics.totalRemaining === 0 && metrics.totalExcess === 0 && (
+                                <div>
+                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d' }}>0</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#166534', marginLeft: '0.2rem' }}>on point</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div style={{ 
+                        backgroundColor: metrics.isAheadAsOfToday ? '#f0fdf4' : '#fef2f2', 
+                        padding: '0.9rem', 
+                        borderRadius: '8px', 
+                        border: metrics.isAheadAsOfToday ? '1px solid #bbf7d0' : '1px solid #fecaca' 
+                    }}>
+                        <div style={{ fontSize: '0.75rem', color: metrics.isAheadAsOfToday ? '#166534' : '#991b1b', fontWeight: '600', textTransform: 'uppercase' }}>
+                            Pacing Status (As of Today)
+                        </div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: '800', color: metrics.isAheadAsOfToday ? '#15803d' : '#dc2626', marginTop: '0.2rem' }}>
+                            {metrics.isAheadAsOfToday ? `Ahead by ${metrics.diffAsOfToday.toLocaleString()} (+${metrics.percentAsOfToday}%)` : `Behind by ${Math.abs(metrics.diffAsOfToday).toLocaleString()} (${metrics.percentAsOfToday}%)`}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                            Target: <strong>{metrics.plannedAsOfToday.toLocaleString()}</strong> | Done: <strong>{metrics.completedAsOfToday.toLocaleString()}</strong>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Expandable Detail Graph & Edit Stats Sub-Card */}
+            {showDetail && (
+                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ backgroundColor: '#ffffff', padding: '0.9rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <TrendingUp size={15} color="#3b82f6" /> Change Frequency Statistics ({title})
+                        </div>
+                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                            <div style={{ backgroundColor: '#f1f5f9', padding: '0.5rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem', color: '#475569' }}>
+                                Plan Date Changed: <strong style={{ color: '#0f172a' }}>{editStats.planDateEdits} times</strong>
+                            </div>
+                            <div style={{ backgroundColor: '#f1f5f9', padding: '0.5rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem', color: '#475569' }}>
+                                Planned Qty Changed: <strong style={{ color: '#0f172a' }}>{editStats.plannedQtyEdits} times</strong>
+                            </div>
+                            <div style={{ backgroundColor: '#f1f5f9', padding: '0.5rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem', color: '#475569' }}>
+                                Completed Qty Changed: <strong style={{ color: '#0f172a' }}>{editStats.completedEdits} times</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <BarChart2 size={16} color="#3b82f6" />
+                                {selectedEventTab === 'ALL' 
+                                    ? `Completed Quantity Trend Across Event Types (${title})`
+                                    : `Planned Target vs Actual Completed Trend (${title} - ${selectedEventTab})`
+                                }
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <label style={{ fontSize: '0.78rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: '600' }}>
+                                    <input 
+                                        type="checkbox"
+                                        checked={showHistoryLines}
+                                        onChange={e => setShowHistoryLines(e.target.checked)}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    Show Past Edit Revision Lines
+                                </label>
+
+                                <div style={{ display: 'flex', gap: '0.2rem', backgroundColor: '#f1f5f9', padding: '0.15rem', borderRadius: '6px' }}>
+                                    <button
+                                        onClick={() => setChartMode('actuals')}
+                                        style={{
+                                            padding: '0.25rem 0.65rem',
+                                            fontSize: '0.75rem',
+                                            fontWeight: chartMode === 'actuals' ? '700' : '500',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            backgroundColor: chartMode === 'actuals' ? '#ffffff' : 'transparent',
+                                            color: chartMode === 'actuals' ? '#1e293b' : '#64748b',
+                                            boxShadow: chartMode === 'actuals' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Actuals
+                                    </button>
+                                    <button
+                                        onClick={() => setChartMode('cumulative')}
+                                        style={{
+                                            padding: '0.25rem 0.65rem',
+                                            fontSize: '0.75rem',
+                                            fontWeight: chartMode === 'cumulative' ? '700' : '500',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            backgroundColor: chartMode === 'cumulative' ? '#3b82f6' : 'transparent',
+                                            color: chartMode === 'cumulative' ? '#ffffff' : '#64748b',
+                                            boxShadow: chartMode === 'cumulative' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Cumulative
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {selectedEventTab === 'ALL' ? (
+                            <div style={{ overflowX: 'auto' }}>
+                                <Plot
+                                    data={allTabChartTraces}
+                                    layout={{
+                                        autosize: true,
+                                        title: { text: '', font: { size: 13, color: '#1e293b', weight: 'bold' } },
+                                        margin: { l: 50, r: 40, t: 30, b: 80 },
+                                        xaxis: { title: { text: 'Plan Date' }, showgrid: true, gridcolor: '#f1f5f9' },
+                                        yaxis: { title: { text: chartMode === 'cumulative' ? 'Cumulative Completed Qty' : 'Actual Completed Qty' }, showgrid: true, gridcolor: '#f1f5f9', range: [0, allTabMaxY] },
+                                        legend: { orientation: 'h', y: -0.25, x: 0, xanchor: 'left', yanchor: 'top' },
+                                        hovermode: 'x unified'
+                                    }}
+                                    style={{ width: '100%', height: '360px' }}
+                                    config={{ responsive: true, displayModeBar: false }}
+                                />
+                            </div>
+                        ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                                <Plot
+                                    data={singleTabTraces}
+                                    layout={{
+                                        autosize: true,
+                                        title: { text: '', font: { size: 13, color: '#1e293b', weight: 'bold' } },
+                                        margin: { l: 50, r: 40, t: 30, b: 80 },
+                                        xaxis: { title: { text: 'Plan Date' }, showgrid: true, gridcolor: '#f1f5f9' },
+                                        yaxis: { title: { text: chartMode === 'cumulative' ? 'Cumulative Quantity' : 'Actual Quantity' }, showgrid: true, gridcolor: '#f1f5f9', range: [0, singleTabMaxY] },
+                                        legend: { orientation: 'h', y: -0.25, x: 0, xanchor: 'left', yanchor: 'top' },
+                                        hovermode: 'x unified'
+                                    }}
+                                    style={{ width: '100%', height: '360px' }}
+                                    config={{ responsive: true, displayModeBar: false }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 export default function SymbTrackerUpdate() {
     const { user } = useAuth();
     const [records, setRecords] = useState<TrackerRecord[]>([]);
@@ -302,682 +962,6 @@ export default function SymbTrackerUpdate() {
 
     const v1Metrics = useMemo(() => calcMetrics(v1Records), [v1Records]);
     const v2Metrics = useMemo(() => calcMetrics(v2Records), [v2Records]);
-
-function calcMetrics(recs: TrackerRecord[]) {
-    let totalPlanned = 0;
-    let totalCompleted = 0;
-
-    let plannedAsOfToday = 0;
-    let completedAsOfToday = 0;
-
-    const today = new Date();
-    const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-
-    recs.forEach(rec => {
-        const p = rec.planned_qty || 0;
-        const c = rec.completed || 0;
-        totalPlanned += p;
-        totalCompleted += c;
-
-        const recDate = parseDayDate(rec.plan_date);
-        if (recDate) {
-            const recTime = new Date(recDate.getFullYear(), recDate.getMonth(), recDate.getDate()).getTime();
-            if (recTime <= todayTime) {
-                plannedAsOfToday += p;
-                completedAsOfToday += c;
-            }
-        }
-    });
-
-    const netDiff = totalCompleted - totalPlanned;
-    const totalRemaining = netDiff < 0 ? Math.abs(netDiff) : 0;
-    const totalExcess = netDiff > 0 ? netDiff : 0;
-
-    const diffAsOfToday = completedAsOfToday - plannedAsOfToday;
-    const percentAsOfToday = plannedAsOfToday > 0 ? ((diffAsOfToday / plannedAsOfToday) * 100).toFixed(1) : '0.0';
-    const isAheadAsOfToday = diffAsOfToday >= 0;
-
-    return {
-        totalPlanned,
-        totalCompleted,
-        totalRemaining,
-        totalExcess,
-        plannedAsOfToday,
-        completedAsOfToday,
-        diffAsOfToday,
-        percentAsOfToday,
-        isAheadAsOfToday
-    };
-}
-
-interface MetricCardsStackProps {
-    title: string;
-    metrics: ReturnType<typeof calcMetrics>;
-    records: TrackerRecord[];
-    selectedEventTab: string;
-}
-
-const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricCardsStackProps) => {
-    const [showDetail, setShowDetail] = useState(false);
-    const [chartMode, setChartMode] = useState<'actuals' | 'cumulative'>('cumulative');
-    const [showHistoryLines, setShowHistoryLines] = useState(false);
-
-    // Compute stage breakdown metrics for ALL tab
-    const stageMetrics = useMemo(() => {
-        if (selectedEventTab !== 'ALL') return [];
-        const STAGES = [
-            { key: 'PCBA Ready', label: 'PCBA Ready', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-            { key: 'Active alignment', label: 'Total AA Done', color: '#d97706', bg: '#fffbe5', border: '#fde68a' },
-            { key: 'Production/Assembly', label: 'Production / Assembly', color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' },
-            { key: 'FQC', label: 'FQC', color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
-            { key: 'Finished goods', label: 'Finished Goods', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
-            { key: 'Invoice Date', label: 'Invoiced', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-            { key: 'Shipment Date', label: 'Shipped', color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8' },
-            { key: 'customer place', label: 'Customer Place', color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' }
-        ];
-
-        return STAGES.map(stg => {
-            const stgRecords = records.filter(r => r.event_type === stg.key);
-            let planned = 0;
-            let completed = 0;
-            stgRecords.forEach(r => {
-                planned += r.planned_qty || 0;
-                completed += r.completed || 0;
-            });
-            const remaining = planned > completed ? planned - completed : 0;
-            return {
-                ...stg,
-                planned,
-                completed,
-                remaining
-            };
-        });
-    }, [records, selectedEventTab]);
-
-    // Compute edit statistics for this stack
-    const editStats = useMemo(() => {
-        let planDateEdits = 0;
-        let plannedQtyEdits = 0;
-        let completedEdits = 0;
-
-        records.forEach(r => {
-            planDateEdits += r.edit_history?.plan_date?.length || 0;
-            plannedQtyEdits += r.edit_history?.planned_qty?.length || 0;
-            completedEdits += r.edit_history?.completed?.length || 0;
-        });
-
-        return { planDateEdits, plannedQtyEdits, completedEdits };
-    }, [records]);
-
-    // Prepare chart data & traces for single event tab (Planned vs Completed + Past Edits)
-    const { singleTabTraces, singleTabMaxY } = useMemo(() => {
-        const sorted = [...records].sort((a, b) => {
-            const dA = parseDayDate(a.plan_date);
-            const dB = parseDayDate(b.plan_date);
-            return (dA ? dA.getTime() : 0) - (dB ? dB.getTime() : 0);
-        });
-
-        const xDates = sorted.map(r => r.plan_date);
-        const rawPlanned = sorted.map(r => r.planned_qty || 0);
-        const rawCompleted = sorted.map(r => r.completed || 0);
-
-        let yPlanned: number[] = [];
-        let yCompleted: number[] = [];
-
-        if (chartMode === 'cumulative') {
-            let pSum = 0;
-            yPlanned = rawPlanned.map(v => { pSum += v; return pSum; });
-            let cSum = 0;
-            yCompleted = rawCompleted.map(v => { cSum += v; return cSum; });
-        } else {
-            yPlanned = rawPlanned;
-            yCompleted = rawCompleted;
-        }
-
-        let allY: number[] = [...yPlanned, ...yCompleted];
-
-        const pastTraces: any[] = [];
-
-        // Light Grey Connected Revision Lines for Past Edits (Planned Qty and Completed)
-        // 1. Past Planned Qty Revision Lines
-        let maxPlannedEdits = 0;
-        sorted.forEach(r => {
-            const pLen = r.edit_history?.planned_qty?.length || 0;
-            if (pLen > maxPlannedEdits) maxPlannedEdits = pLen;
-        });
-
-        for (let rev = 0; rev < maxPlannedEdits; rev++) {
-            const revPoints: { dateStr: string; dateObj: Date | null; val: number; timestamp: string }[] = [];
-            let hasAnyEditAtRev = false;
-
-            sorted.forEach(r => {
-                const pHist = r.edit_history?.planned_qty;
-                if (pHist && pHist[rev] !== undefined) {
-                    hasAnyEditAtRev = true;
-                    const pastVal = pHist[rev].value || 0;
-                    const dObj = parseDayDate(r.plan_date);
-                    revPoints.push({ dateStr: r.plan_date, dateObj: dObj, val: pastVal, timestamp: pHist[rev].timestamp });
-                } else {
-                    const dObj = parseDayDate(r.plan_date);
-                    revPoints.push({ dateStr: r.plan_date, dateObj: dObj, val: r.planned_qty || 0, timestamp: '' });
-                }
-            });
-
-            if (hasAnyEditAtRev) {
-                revPoints.sort((a, b) => (a.dateObj ? a.dateObj.getTime() : 0) - (b.dateObj ? b.dateObj.getTime() : 0));
-
-                const xDates = revPoints.map(p => p.dateStr);
-                const rawY = revPoints.map(p => p.val);
-
-                let finalY: number[] = [];
-                if (chartMode === 'cumulative') {
-                    let sum = 0;
-                    finalY = rawY.map(v => { sum += v; return sum; });
-                } else {
-                    finalY = rawY;
-                }
-
-                allY.push(...finalY);
-
-                const hoverTexts = revPoints.map((p, i) => {
-                    const ts = p.timestamp ? ` (Edited ${new Date(p.timestamp).toLocaleString()})` : '';
-                    return `Prev Planned (Rev ${rev + 1}): ${finalY[i]} on ${p.dateStr}${ts}`;
-                });
-
-                pastTraces.push({
-                    x: xDates,
-                    y: finalY,
-                    name: `Past Planned (Rev ${rev + 1})`,
-                    mode: 'lines+markers' as any,
-                    hoverinfo: 'text' as any,
-                    hovertext: hoverTexts,
-                    line: { shape: 'spline', width: 2, color: '#94a3b8', dash: 'dot' },
-                    marker: { size: 6, color: '#64748b', symbol: 'circle' },
-                    showlegend: false
-                });
-            }
-        }
-
-        // 2. Past Completed Revision Lines
-        let maxCompletedEdits = 0;
-        sorted.forEach(r => {
-            const cLen = r.edit_history?.completed?.length || 0;
-            if (cLen > maxCompletedEdits) maxCompletedEdits = cLen;
-        });
-
-        for (let rev = 0; rev < maxCompletedEdits; rev++) {
-            const revPoints: { dateStr: string; dateObj: Date | null; val: number; timestamp: string }[] = [];
-            let hasAnyEditAtRev = false;
-
-            sorted.forEach(r => {
-                const cHist = r.edit_history?.completed;
-                if (cHist && cHist[rev] !== undefined) {
-                    hasAnyEditAtRev = true;
-                    const pastVal = cHist[rev].value || 0;
-                    const dObj = parseDayDate(r.plan_date);
-                    revPoints.push({ dateStr: r.plan_date, dateObj: dObj, val: pastVal, timestamp: cHist[rev].timestamp });
-                } else {
-                    const dObj = parseDayDate(r.plan_date);
-                    revPoints.push({ dateStr: r.plan_date, dateObj: dObj, val: r.completed || 0, timestamp: '' });
-                }
-            });
-
-            if (hasAnyEditAtRev) {
-                revPoints.sort((a, b) => (a.dateObj ? a.dateObj.getTime() : 0) - (b.dateObj ? b.dateObj.getTime() : 0));
-
-                const xDates = revPoints.map(p => p.dateStr);
-                const rawY = revPoints.map(p => p.val);
-
-                let finalY: number[] = [];
-                if (chartMode === 'cumulative') {
-                    let sum = 0;
-                    finalY = rawY.map(v => { sum += v; return sum; });
-                } else {
-                    finalY = rawY;
-                }
-
-                allY.push(...finalY);
-
-                const hoverTexts = revPoints.map((p, i) => {
-                    const ts = p.timestamp ? ` (Edited ${new Date(p.timestamp).toLocaleString()})` : '';
-                    return `Prev Completed (Rev ${rev + 1}): ${finalY[i]} on ${p.dateStr}${ts}`;
-                });
-
-                pastTraces.push({
-                    x: xDates,
-                    y: finalY,
-                    name: `Past Completed (Rev ${rev + 1})`,
-                    mode: 'lines+markers' as any,
-                    hoverinfo: 'text' as any,
-                    hovertext: hoverTexts,
-                    line: { shape: 'spline', width: 2, color: '#cbd5e1', dash: 'dashdot' },
-                    marker: { size: 6, color: '#94a3b8', symbol: 'diamond-open' },
-                    showlegend: false
-                });
-            }
-        }
-
-        // Main Actuals Traces rendered LAST so they always appear in FRONT
-        const mainTraces: any[] = [
-            {
-                x: xDates,
-                y: yPlanned,
-                name: chartMode === 'cumulative' ? 'Cum. Planned' : 'Planned Qty',
-                mode: 'lines+markers+text' as any,
-                text: yPlanned.map(v => String(v)),
-                textposition: 'top center',
-                textfont: { size: 14, color: '#1e40af', weight: 'bold' } as any,
-                line: { shape: 'spline', width: 3.5, color: '#3b82f6' },
-                marker: { size: 8, color: '#3b82f6' }
-            },
-            {
-                x: xDates,
-                y: yCompleted,
-                name: chartMode === 'cumulative' ? 'Cum. Completed' : 'Completed Qty',
-                mode: 'lines+markers+text' as any,
-                text: yCompleted.map(v => String(v)),
-                textposition: 'bottom center',
-                textfont: { size: 14, color: '#166534', weight: 'bold' } as any,
-                line: { shape: 'spline', width: 3.5, color: '#10b981' },
-                marker: { size: 8, color: '#10b981' }
-            }
-        ];
-
-        const traces = showHistoryLines ? [...pastTraces, ...mainTraces] : mainTraces;
-
-        const maxVal = Math.max(0, ...allY);
-        const maxY = maxVal + Math.max(1, Math.ceil(maxVal * 0.15));
-
-        return { singleTabTraces: traces, singleTabMaxY: maxY };
-    }, [records, chartMode, showHistoryLines]);
-
-    // Prepare chart data & traces for ALL tab (Completed Qty per Event Type + Past Edits)
-    const { allTabChartTraces, allTabMaxY } = useMemo(() => {
-        if (selectedEventTab !== 'ALL') return { allTabChartTraces: [], allTabMaxY: 10 };
-
-        const dateMap = new Map<string, { dateStr: string; timestamp: number }>();
-        records.forEach(r => {
-            const dObj = parseDayDate(r.plan_date);
-            if (dObj) {
-                if (!dateMap.has(r.plan_date)) {
-                    dateMap.set(r.plan_date, { dateStr: r.plan_date, timestamp: dObj.getTime() });
-                }
-            }
-        });
-
-        const today = new Date();
-        const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).getTime();
-
-        const sortedDates = Array.from(dateMap.values())
-            .filter(d => d.timestamp <= todayTime)
-            .sort((a, b) => a.timestamp - b.timestamp);
-        const xDates = sortedDates.map(d => d.dateStr);
-
-        const eventTypes = ['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
-        const colorMap: Record<string, string> = {
-            'PCBA Ready': '#3b82f6',
-            'Active alignment': '#f59e0b',
-            'Production/Assembly': '#14b8a6',
-            'FQC': '#6366f1',
-            'Finished goods': '#10b981',
-            'Invoice Date': '#8b5cf6',
-            'Shipment Date': '#ec4899',
-            'customer place': '#06b6d4'
-        };
-
-        const traces: any[] = [];
-        let allY: number[] = [];
-
-        eventTypes.forEach(evt => {
-            const evtRows = records.filter(r => r.event_type === evt);
-            if (evtRows.length === 0) return;
-
-            const dateToCompleted = new Map<string, number>();
-            evtRows.forEach(r => {
-                dateToCompleted.set(r.plan_date, r.completed || 0);
-            });
-
-            const rawYVals = xDates.map(d => dateToCompleted.get(d) ?? 0);
-            
-            let finalYVals: number[] = [];
-            if (chartMode === 'cumulative') {
-                let sum = 0;
-                finalYVals = rawYVals.map(v => { sum += v; return sum; });
-            } else {
-                finalYVals = rawYVals;
-            }
-
-            allY.push(...finalYVals);
-
-            let lastShownIdx = -999;
-            let repeatCount = 0;
-
-            const textVals = finalYVals.map((val, idx) => {
-                if (val <= 0) return '';
-                
-                const prevVal = idx > 0 ? finalYVals[idx - 1] : null;
-                if (val === prevVal) {
-                    repeatCount++;
-                } else {
-                    repeatCount = 1;
-                }
-                
-                const isLast = idx === finalYVals.length - 1;
-                if (repeatCount > 3 && !isLast) {
-                    return '';
-                }
-
-                const currTs = sortedDates[idx]?.timestamp || 0;
-                const lastTs = lastShownIdx >= 0 ? sortedDates[lastShownIdx]?.timestamp || 0 : 0;
-                const daysDiff = (currTs - lastTs) / (1000 * 60 * 60 * 24);
-
-                const isValChanged = idx === 0 || val !== prevVal;
-                const isTwoWeeksPassed = daysDiff >= 14;
-
-                if (isLast || isValChanged || isTwoWeeksPassed) {
-                    lastShownIdx = idx;
-                    return String(val);
-                }
-
-                return '';
-            });
-
-            const color = colorMap[evt] || '#64748b';
-
-            traces.push({
-                x: xDates,
-                y: finalYVals,
-                name: evt,
-                mode: 'lines+markers+text' as any,
-                text: textVals,
-                textposition: 'top center',
-                textfont: { size: 14, color: color, weight: 'bold' } as any,
-                line: { shape: 'spline', width: 3, color: color },
-                marker: { size: 7, color: color }
-            });
-        });
-
-        const pastTraces: any[] = [];
-        // Light Grey Past Edits for ALL tab (Hover only)
-        records.forEach(r => {
-            const cHist = r.edit_history?.completed;
-            if (cHist && cHist.length > 0) {
-                cHist.forEach((entry, idx) => {
-                    const val = entry.value || 0;
-                    allY.push(val);
-                    pastTraces.push({
-                        x: [r.plan_date],
-                        y: [val],
-                        name: `${r.event_type} Past Edit #${idx + 1}`,
-                        mode: 'markers' as any,
-                        hoverinfo: 'text' as any,
-                        hovertext: `${r.event_type} Past Edit #${idx + 1}: ${val} (${new Date(entry.timestamp).toLocaleString()})`,
-                        marker: { size: 7, color: '#cbd5e1', symbol: 'circle-open', line: { width: 2, color: '#94a3b8' } },
-                        showlegend: false
-                    });
-                });
-            }
-        });
-
-        const finalTraces = showHistoryLines ? [...pastTraces, ...traces] : traces;
-
-        const maxVal = Math.max(0, ...allY);
-        const maxY = maxVal + Math.max(1, Math.ceil(maxVal * 0.15));
-
-        return { allTabChartTraces: finalTraces, allTabMaxY: maxY };
-    }, [records, selectedEventTab, chartMode, showHistoryLines]);
-
-    return (
-        <div style={{ marginBottom: '1.25rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#374151', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ backgroundColor: '#3b82f6', color: 'white', padding: '0.2rem 0.7rem', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '700' }}>
-                    {title}
-                </span>
-
-                <button
-                    onClick={() => setShowDetail(!showDetail)}
-                    style={{
-                        padding: '0.35rem 0.8rem',
-                        fontSize: '0.8rem',
-                        fontWeight: '600',
-                        color: '#2563eb',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #bfdbfe',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        transition: 'all 0.15s ease'
-                    }}
-                >
-                    <BarChart2 size={15} /> {showDetail ? 'Hide Detail Graph' : 'View Detail Graph'}
-                </button>
-            </div>
-
-            {/* Summary Cards: Stage Breakdown for ALL tab, or 4 standard metric cards for single event tab */}
-            {selectedEventTab === 'ALL' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.85rem' }}>
-                    {stageMetrics.map(stg => (
-                        <div 
-                            key={stg.key}
-                            style={{ 
-                                backgroundColor: stg.bg, 
-                                padding: '0.85rem 1rem', 
-                                borderRadius: '8px', 
-                                border: `1px solid ${stg.border}`,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                justifyContent: 'space-between',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-                            }}
-                        >
-                            <div style={{ fontSize: '0.72rem', color: stg.color, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                {stg.label}
-                            </div>
-                            <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', marginTop: '0.2rem' }}>
-                                {stg.completed.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: '600', color: stg.color }}>done</span>
-                            </div>
-                            <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>Target: <strong>{stg.planned.toLocaleString()}</strong></span>
-                                {stg.remaining > 0 ? (
-                                    <span style={{ color: '#ca8a04', fontWeight: '600' }}>{stg.remaining.toLocaleString()} rem</span>
-                                ) : (
-                                    <span style={{ color: '#166534', fontWeight: '600' }}>Completed</span>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                    <div style={{ backgroundColor: '#ffffff', padding: '0.9rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Total Planned</div>
-                        <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#1e293b', marginTop: '0.2rem' }}>
-                            {metrics.totalPlanned.toLocaleString()}
-                        </div>
-                    </div>
-
-                    <div style={{ backgroundColor: '#f0fdf4', padding: '0.9rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Total Completed</div>
-                        <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d', marginTop: '0.2rem' }}>
-                            {metrics.totalCompleted.toLocaleString()}
-                        </div>
-                    </div>
-
-                    <div style={{ backgroundColor: metrics.totalExcess > 0 ? '#eff6ff' : metrics.totalRemaining > 0 ? '#fefce8' : '#f0fdf4', padding: '0.9rem', borderRadius: '8px', border: metrics.totalExcess > 0 ? '1px solid #bfdbfe' : metrics.totalRemaining > 0 ? '1px solid #fef08a' : '1px solid #bbf7d0' }}>
-                        <div style={{ fontSize: '0.75rem', color: metrics.totalExcess > 0 ? '#1e40af' : metrics.totalRemaining > 0 ? '#854d0e' : '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Remaining / Excess</div>
-                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'baseline', marginTop: '0.2rem' }}>
-                            {metrics.totalRemaining > 0 && (
-                                <div>
-                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#a16207' }}>{metrics.totalRemaining.toLocaleString()}</span>
-                                    <span style={{ fontSize: '0.7rem', color: '#ca8a04', marginLeft: '0.2rem' }}>rem (deficit)</span>
-                                </div>
-                            )}
-                            {metrics.totalExcess > 0 && (
-                                <div>
-                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#2563eb' }}>+{metrics.totalExcess.toLocaleString()}</span>
-                                    <span style={{ fontSize: '0.7rem', color: '#3b82f6', marginLeft: '0.2rem' }}>excess</span>
-                                </div>
-                            )}
-                            {metrics.totalRemaining === 0 && metrics.totalExcess === 0 && (
-                                <div>
-                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d' }}>0</span>
-                                    <span style={{ fontSize: '0.7rem', color: '#166534', marginLeft: '0.2rem' }}>on point</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div style={{ 
-                        backgroundColor: metrics.isAheadAsOfToday ? '#f0fdf4' : '#fef2f2', 
-                        padding: '0.9rem', 
-                        borderRadius: '8px', 
-                        border: metrics.isAheadAsOfToday ? '1px solid #bbf7d0' : '1px solid #fecaca' 
-                    }}>
-                        <div style={{ fontSize: '0.75rem', color: metrics.isAheadAsOfToday ? '#166534' : '#991b1b', fontWeight: '600', textTransform: 'uppercase' }}>
-                            Pacing Status (As of Today)
-                        </div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: '800', color: metrics.isAheadAsOfToday ? '#15803d' : '#dc2626', marginTop: '0.2rem' }}>
-                            {metrics.isAheadAsOfToday ? `Ahead by ${metrics.diffAsOfToday.toLocaleString()} (+${metrics.percentAsOfToday}%)` : `Behind by ${Math.abs(metrics.diffAsOfToday).toLocaleString()} (${metrics.percentAsOfToday}%)`}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                            Target: <strong>{metrics.plannedAsOfToday.toLocaleString()}</strong> | Done: <strong>{metrics.completedAsOfToday.toLocaleString()}</strong>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Expandable Detail Graph & Edit Stats Sub-Card */}
-            {showDetail && (
-                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {/* Sub-card 1: Edit History Statistics */}
-                    <div style={{ backgroundColor: '#ffffff', padding: '0.9rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                            <TrendingUp size={15} color="#3b82f6" /> Change Frequency Statistics ({title})
-                        </div>
-                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                            <div style={{ backgroundColor: '#f1f5f9', padding: '0.5rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem', color: '#475569' }}>
-                                Plan Date Changed: <strong style={{ color: '#0f172a' }}>{editStats.planDateEdits} times</strong>
-                            </div>
-                            <div style={{ backgroundColor: '#f1f5f9', padding: '0.5rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem', color: '#475569' }}>
-                                Planned Qty Changed: <strong style={{ color: '#0f172a' }}>{editStats.plannedQtyEdits} times</strong>
-                            </div>
-                            <div style={{ backgroundColor: '#f1f5f9', padding: '0.5rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem', color: '#475569' }}>
-                                Completed Changed: <strong style={{ color: '#0f172a' }}>{editStats.completedEdits} times</strong>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Sub-card 2: Line Graph with Mode Toggle */}
-                    <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1e293b' }}>
-                                {selectedEventTab === 'ALL' 
-                                    ? `${title} - Event Completed Trend (${chartMode === 'cumulative' ? 'Cumulative' : 'Actuals'})` 
-                                    : `${title} - Planned vs Completed (${selectedEventTab} - ${chartMode === 'cumulative' ? 'Cumulative' : 'Actuals'})`}
-                            </span>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                                <button
-                                    onClick={() => setShowHistoryLines(!showHistoryLines)}
-                                    style={{
-                                        padding: '0.25rem 0.65rem',
-                                        fontSize: '0.75rem',
-                                        fontWeight: showHistoryLines ? '700' : '500',
-                                        border: '1px solid #cbd5e1',
-                                        borderRadius: '4px',
-                                        backgroundColor: showHistoryLines ? '#64748b' : '#ffffff',
-                                        color: showHistoryLines ? '#ffffff' : '#475569',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.3rem',
-                                        boxShadow: showHistoryLines ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                        transition: 'all 0.15s ease'
-                                    }}
-                                >
-                                    <History size={13} /> {showHistoryLines ? 'Hide History' : 'Show History'}
-                                </button>
-
-                                <div style={{ display: 'flex', gap: '0.2rem', backgroundColor: '#f1f5f9', padding: '0.2rem', borderRadius: '6px' }}>
-                                    <button
-                                        onClick={() => setChartMode('actuals')}
-                                        style={{
-                                            padding: '0.25rem 0.65rem',
-                                            fontSize: '0.75rem',
-                                            fontWeight: chartMode === 'actuals' ? '700' : '500',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            backgroundColor: chartMode === 'actuals' ? '#ffffff' : 'transparent',
-                                            color: chartMode === 'actuals' ? '#1e293b' : '#64748b',
-                                            boxShadow: chartMode === 'actuals' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        Actuals
-                                    </button>
-                                    <button
-                                        onClick={() => setChartMode('cumulative')}
-                                        style={{
-                                            padding: '0.25rem 0.65rem',
-                                            fontSize: '0.75rem',
-                                            fontWeight: chartMode === 'cumulative' ? '700' : '500',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            backgroundColor: chartMode === 'cumulative' ? '#3b82f6' : 'transparent',
-                                            color: chartMode === 'cumulative' ? '#ffffff' : '#64748b',
-                                            boxShadow: chartMode === 'cumulative' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        Cumulative
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {selectedEventTab === 'ALL' ? (
-                            <div style={{ overflowX: 'auto' }}>
-                                <Plot
-                                    data={allTabChartTraces}
-                                    layout={{
-                                        autosize: true,
-                                        title: { text: '', font: { size: 13, color: '#1e293b', weight: 'bold' } },
-                                        margin: { l: 50, r: 40, t: 30, b: 80 },
-                                        xaxis: { title: { text: 'Plan Date' }, showgrid: true, gridcolor: '#f1f5f9' },
-                                        yaxis: { title: { text: chartMode === 'cumulative' ? 'Cumulative Completed Qty' : 'Actual Completed Qty' }, showgrid: true, gridcolor: '#f1f5f9', range: [0, allTabMaxY] },
-                                        legend: { orientation: 'h', y: -0.25, x: 0, xanchor: 'left', yanchor: 'top' },
-                                        hovermode: 'x unified'
-                                    }}
-                                    style={{ width: '100%', height: '360px' }}
-                                    config={{ responsive: true, displayModeBar: false }}
-                                />
-                            </div>
-                        ) : (
-                            <div style={{ overflowX: 'auto' }}>
-                                <Plot
-                                    data={singleTabTraces}
-                                    layout={{
-                                        autosize: true,
-                                        title: { text: '', font: { size: 13, color: '#1e293b', weight: 'bold' } },
-                                        margin: { l: 50, r: 40, t: 30, b: 80 },
-                                        xaxis: { title: { text: 'Plan Date' }, showgrid: true, gridcolor: '#f1f5f9' },
-                                        yaxis: { title: { text: chartMode === 'cumulative' ? 'Cumulative Quantity' : 'Actual Quantity' }, showgrid: true, gridcolor: '#f1f5f9', range: [0, singleTabMaxY] },
-                                        legend: { orientation: 'h', y: -0.25, x: 0, xanchor: 'left', yanchor: 'top' },
-                                        hovermode: 'x unified'
-                                    }}
-                                    style={{ width: '100%', height: '360px' }}
-                                    config={{ responsive: true, displayModeBar: false }}
-                                />
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
 
     const handleBulkSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
