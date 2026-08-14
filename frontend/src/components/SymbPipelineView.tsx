@@ -84,6 +84,7 @@ const SymbPipelineView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isCompletedSectionOpen, setIsCompletedSectionOpen] = useState(false);
+    const [highlightedWeek, setHighlightedWeek] = useState<string | null>(null);
     
     // Coverage Stage Filter State
     const [selectedCoverageStage, setSelectedCoverageStage] = useState<string | null>(null);
@@ -404,6 +405,27 @@ const SymbPipelineView: React.FC = () => {
         });
     }, [data]);
 
+    const handleWeekClick = (weekStr: string) => {
+        // If the target week is in completedWeeks, ensure accordion is open so card exists in DOM
+        const isCompleted = completedWeeks.some(([w]) => w === weekStr);
+        if (isCompleted && !isCompletedSectionOpen) {
+            setIsCompletedSectionOpen(true);
+        }
+
+        setHighlightedWeek(weekStr);
+
+        setTimeout(() => {
+            const el = document.getElementById(`week-card-${weekStr}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 120);
+
+        setTimeout(() => {
+            setHighlightedWeek(prev => (prev === weekStr ? null : prev));
+        }, 2500);
+    };
+
     const renderVariantSection = (row: SymbPlanRow, isBackfilled: boolean, backfillSourceStage?: string) => {
         const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
         const isCompleted = isNativeCompleted || isBackfilled;
@@ -483,8 +505,20 @@ const SymbPipelineView: React.FC = () => {
             quickSummaryText = 'No stages completed';
         }
 
+        const isHighlighted = highlightedWeek === weekStr;
+
         return (
-            <div key={weekStr} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+            <div 
+                key={weekStr} 
+                id={`week-card-${weekStr}`}
+                style={{ 
+                    border: isHighlighted ? '3px solid #3b82f6' : '1px solid #e2e8f0', 
+                    borderRadius: '12px', 
+                    overflow: 'hidden',
+                    boxShadow: isHighlighted ? '0 0 24px rgba(59, 130, 246, 0.45)' : 'none',
+                    transition: 'all 0.3s ease'
+                }}
+            >
                 <div style={{ backgroundColor: '#1e293b', padding: '0.75rem 1.5rem', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -914,7 +948,22 @@ const SymbPipelineView: React.FC = () => {
 
                                                             return (
                                                                 <div key={weekStr} style={{ display: 'flex', alignItems: 'center' }}>
-                                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem', minWidth: '110px' }}>
+                                                                    <div 
+                                                                        onClick={() => handleWeekClick(weekStr)}
+                                                                        title={`Click to scroll to Shipment Week ${weekStr} in pipeline`}
+                                                                        style={{ 
+                                                                            display: 'flex', 
+                                                                            flexDirection: 'column', 
+                                                                            alignItems: 'center', 
+                                                                            gap: '0.35rem', 
+                                                                            minWidth: '110px',
+                                                                            cursor: 'pointer',
+                                                                            userSelect: 'none',
+                                                                            transition: 'transform 0.15s ease'
+                                                                        }}
+                                                                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'}
+                                                                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                                                    >
                                                                         <span style={{ fontSize: '0.73rem', fontWeight: 700, color: isCovered ? stage.color : '#64748b' }}>
                                                                             {weekStr}
                                                                         </span>
@@ -1015,7 +1064,22 @@ const SymbPipelineView: React.FC = () => {
 
                                                     return (
                                                         <div key={weekStr} style={{ display: 'flex', alignItems: 'center' }}>
-                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem', minWidth: '120px' }}>
+                                                            <div 
+                                                                onClick={() => handleWeekClick(weekStr)}
+                                                                title={`Click to scroll to Shipment Week ${weekStr} in pipeline`}
+                                                                style={{ 
+                                                                    display: 'flex', 
+                                                                    flexDirection: 'column', 
+                                                                    alignItems: 'center', 
+                                                                    gap: '0.35rem', 
+                                                                    minWidth: '120px',
+                                                                    cursor: 'pointer',
+                                                                    userSelect: 'none',
+                                                                    transition: 'transform 0.15s ease'
+                                                                }}
+                                                                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'}
+                                                                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                                            >
                                                                 <span style={{ fontSize: '0.73rem', fontWeight: 700, color: theme ? theme.color : '#64748b' }}>
                                                                     {weekStr}
                                                                 </span>
