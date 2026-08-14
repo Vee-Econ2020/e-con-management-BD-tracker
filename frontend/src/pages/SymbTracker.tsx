@@ -390,7 +390,7 @@ export default function SymbTracker() {
                     </button>
                     <div>
                         <h1 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: '#1e293b' }}>
-                            Current Flag Status for Symbotic orders
+                            SYMB Sales Orders Tracker
                         </h1>
                         <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
                             SYMB Sales Orders Tracking & Production Progress Dashboard
@@ -492,122 +492,6 @@ export default function SymbTracker() {
                 </div>
             ) : (
                 <>
-                    {/* Main Stacked Bar Chart Card */}
-                    <div style={{
-                        backgroundColor: '#ffffff',
-                        borderRadius: '12px',
-                        padding: '1.5rem',
-                        boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
-                        marginBottom: '2rem',
-                        border: '1px solid #e2e8f0'
-                    }}>
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '1rem',
-                            paddingBottom: '0.75rem',
-                            borderBottom: '1px solid #f1f5f9'
-                        }}>
-                            <div>
-                                <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 700, color: '#1e293b' }}>
-                                    Current Flag Status for Symbotic orders
-                                </h3>
-                                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                                    Click any bar segment to filter detailed records
-                                </span>
-                            </div>
-
-                            {/* Active Selection Indicator & Clear Button */}
-                            {(selectedMonth || selectedFlag) && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                                    <span style={{
-                                        backgroundColor: '#eff6ff',
-                                        color: '#1d4ed8',
-                                        padding: '0.4rem 0.8rem',
-                                        borderRadius: '6px',
-                                        fontSize: '0.85rem',
-                                        fontWeight: 600,
-                                        border: '1px solid #bfdbfe'
-                                    }}>
-                                        Selected: {selectedMonth || 'All Months'} {selectedFlag ? `(${selectedFlag.toUpperCase()})` : ''}
-                                    </span>
-                                    <button
-                                        onClick={() => { setSelectedMonth(null); setSelectedFlag(null); }}
-                                        style={{
-                                            backgroundColor: '#fef2f2',
-                                            color: '#ef4444',
-                                            border: '1px solid #fca5a5',
-                                            padding: '0.35rem 0.75rem',
-                                            borderRadius: '6px',
-                                            cursor: 'pointer',
-                                            fontWeight: 600,
-                                            fontSize: '0.85rem',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.3rem'
-                                        }}
-                                    >
-                                        <X size={14} /> Clear Selection
-                                    </button>
-
-                                    <button
-                                        onClick={() => setIsModalOpen(true)}
-                                        style={{
-                                            backgroundColor: '#f5ad42',
-                                            color: '#000000',
-                                            border: 'none',
-                                            padding: '0.4rem 1rem',
-                                            borderRadius: '6px',
-                                            cursor: 'pointer',
-                                            fontWeight: 700,
-                                            fontSize: '0.85rem',
-                                            boxShadow: '0 2px 5px rgba(245,173,66,0.3)'
-                                        }}
-                                    >
-                                        🔍 View Detailed Data ({filteredRecords.length})
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Plotly Stacked Bar Chart */}
-                        <div style={{ width: '100%', height: '540px' }}>
-                            <Plot
-                                data={plotlyTraces}
-                                layout={{
-                                    barmode: 'stack',
-                                    autosize: true,
-                                    margin: { t: 50, b: 80, l: 80, r: 40 },
-                                    xaxis: {
-                                        title: { text: 'Month', font: { size: 18, color: '#1e293b' } },
-                                        type: 'category',
-                                        tickfont: { size: 16, color: '#0f172a' }
-                                    },
-                                    yaxis: {
-                                        title: { text: 'Count of SO Number', font: { size: 18, color: '#1e293b' } },
-                                        tickfont: { size: 16, color: '#0f172a' },
-                                        gridcolor: '#e2e8f0'
-                                    },
-                                    legend: {
-                                        orientation: 'h',
-                                        x: 0,
-                                        y: 1.15,
-                                        font: { size: 18, color: '#0f172a' }
-                                    },
-                                    annotations: totalAnnotations,
-                                    hovermode: 'closest',
-                                    plot_bgcolor: '#ffffff',
-                                    paper_bgcolor: '#ffffff'
-                                }}
-                                useResizeHandler={true}
-                                style={{ width: '100%', height: '100%' }}
-                                config={{ displayModeBar: false }}
-                                onClick={handlePlotClick}
-                            />
-                        </div>
-                    </div>
-
                     {/* Sub-Tab Navigation Bar */}
                     <div style={{
                         display: 'flex',

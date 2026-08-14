@@ -404,7 +404,7 @@ export default function AccessManagement() {
                     {/* Controls & Filter Summary Bar */}
                     <div style={{
                         display: 'flex',
-                        justify: 'space-between',
+                        justifyContent: 'space-between',
                         alignItems: 'center',
                         marginTop: '1rem',
                         marginBottom: '0.75rem',
@@ -803,7 +803,7 @@ export default function AccessManagement() {
                     {pageSize > 0 && totalPages > 1 && (
                         <div style={{
                             display: 'flex',
-                            justify: 'space-between',
+                            justifyContent: 'space-between',
                             alignItems: 'center',
                             marginTop: '1rem',
                             padding: '0.75rem 1rem',

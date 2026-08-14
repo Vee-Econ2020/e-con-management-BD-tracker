@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Plot from 'react-plotly.js';
-import { Save, History, Edit2, FileText, RefreshCw, Layers, BarChart2, TrendingUp, Trash2, X, ShieldAlert } from 'lucide-react';
+import { Save, History, Edit2, FileText, RefreshCw, Layers, BarChart2, TrendingUp, Trash2, X, ShieldAlert, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface EditHistoryEntry {
@@ -68,10 +68,62 @@ function parseDayDate(dayStr: any): Date | null {
     return isNaN(d.getTime()) ? null : d;
 }
 
+function getLockStatus(nowDate: Date = new Date()) {
+    const hours = nowDate.getHours();
+    const minutes = nowDate.getMinutes();
+    const seconds = nowDate.getSeconds();
+
+    const currentTotalSec = hours * 3600 + minutes * 60 + seconds;
+    
+    // 00:01 AM (60 seconds) to 14:00 (14 * 3600 = 50400 seconds)
+    const startSec = 60;
+    const endSec = 14 * 3600;
+
+    const isEditAllowed = currentTotalSec >= startSec && currentTotalSec <= endSec;
+
+    let targetDate = new Date(nowDate);
+
+    if (isEditAllowed) {
+        targetDate.setHours(14, 0, 0, 0);
+    } else {
+        if (currentTotalSec > endSec) {
+            targetDate.setDate(targetDate.getDate() + 1);
+            targetDate.setHours(0, 1, 0, 0);
+        } else {
+            targetDate.setHours(0, 1, 0, 0);
+        }
+    }
+
+    const diffMs = Math.max(0, targetDate.getTime() - nowDate.getTime());
+    const totalSecondsRem = Math.floor(diffMs / 1000);
+    const hrs = Math.floor(totalSecondsRem / 3600);
+    const mins = Math.floor((totalSecondsRem % 3600) / 60);
+    const secs = totalSecondsRem % 60;
+
+    return {
+        isEditAllowed,
+        hrs,
+        mins,
+        secs,
+        lockTimeStr: '14:00 (2:00 PM)',
+        unlockTimeStr: '00:01 AM'
+    };
+}
+
 export default function SymbTrackerUpdate() {
     const { user } = useAuth();
     const [records, setRecords] = useState<TrackerRecord[]>([]);
     const [loading, setLoading] = useState(false);
+
+    // Data Update Time Lock State & Live Timer
+    const [lockInfo, setLockInfo] = useState(() => getLockStatus());
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setLockInfo(getLockStatus());
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
 
     const hasPermission = (evt: string) => {
         if (!user) return false;
@@ -88,14 +140,6 @@ export default function SymbTrackerUpdate() {
     const [upd, setUpd] = useState('');
     const [bulkLoading, setBulkLoading] = useState(false);
     const [bulkMsg, setBulkMsg] = useState('');
-
-    // Data Update Form State
-    const [duVariant, setDuVariant] = useState('1');
-    const [duEventType, setDuEventType] = useState('PCBA Ready');
-    const [duUpdateDate, setDuUpdateDate] = useState(() => new Date().toISOString().split('T')[0]);
-    const [duCompletedQty, setDuCompletedQty] = useState('');
-    const [duLoading, setDuLoading] = useState(false);
-    const [duMsg, setDuMsg] = useState('');
 
     // Filtering State
     const [selectedEventTab, setSelectedEventTab] = useState<string>('ALL');
@@ -317,6 +361,38 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
     const [showDetail, setShowDetail] = useState(false);
     const [chartMode, setChartMode] = useState<'actuals' | 'cumulative'>('cumulative');
     const [showHistoryLines, setShowHistoryLines] = useState(false);
+
+    // Compute stage breakdown metrics for ALL tab
+    const stageMetrics = useMemo(() => {
+        if (selectedEventTab !== 'ALL') return [];
+        const STAGES = [
+            { key: 'PCBA Ready', label: 'PCBA Ready', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+            { key: 'Active alignment', label: 'Total AA Done', color: '#d97706', bg: '#fffbe5', border: '#fde68a' },
+            { key: 'Production/Assembly', label: 'Production / Assembly', color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' },
+            { key: 'FQC', label: 'FQC', color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
+            { key: 'Finished goods', label: 'Finished Goods', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+            { key: 'Invoice Date', label: 'Invoiced', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+            { key: 'Shipment Date', label: 'Shipped', color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8' },
+            { key: 'customer place', label: 'Customer Place', color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' }
+        ];
+
+        return STAGES.map(stg => {
+            const stgRecords = records.filter(r => r.event_type === stg.key);
+            let planned = 0;
+            let completed = 0;
+            stgRecords.forEach(r => {
+                planned += r.planned_qty || 0;
+                completed += r.completed || 0;
+            });
+            const remaining = planned > completed ? planned - completed : 0;
+            return {
+                ...stg,
+                planned,
+                completed,
+                remaining
+            };
+        });
+    }, [records, selectedEventTab]);
 
     // Compute edit statistics for this stack
     const editStats = useMemo(() => {
@@ -679,63 +755,98 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
                 </button>
             </div>
 
-            {/* Summary 4 Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                <div style={{ backgroundColor: '#ffffff', padding: '0.9rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Total Planned</div>
-                    <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#1e293b', marginTop: '0.2rem' }}>
-                        {metrics.totalPlanned.toLocaleString()}
-                    </div>
-                </div>
-
-                <div style={{ backgroundColor: '#f0fdf4', padding: '0.9rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Total Completed</div>
-                    <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d', marginTop: '0.2rem' }}>
-                        {metrics.totalCompleted.toLocaleString()}
-                    </div>
-                </div>
-
-                <div style={{ backgroundColor: metrics.totalExcess > 0 ? '#eff6ff' : metrics.totalRemaining > 0 ? '#fefce8' : '#f0fdf4', padding: '0.9rem', borderRadius: '8px', border: metrics.totalExcess > 0 ? '1px solid #bfdbfe' : metrics.totalRemaining > 0 ? '1px solid #fef08a' : '1px solid #bbf7d0' }}>
-                    <div style={{ fontSize: '0.75rem', color: metrics.totalExcess > 0 ? '#1e40af' : metrics.totalRemaining > 0 ? '#854d0e' : '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Remaining / Excess</div>
-                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'baseline', marginTop: '0.2rem' }}>
-                        {metrics.totalRemaining > 0 && (
-                            <div>
-                                <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#a16207' }}>{metrics.totalRemaining.toLocaleString()}</span>
-                                <span style={{ fontSize: '0.7rem', color: '#ca8a04', marginLeft: '0.2rem' }}>rem (deficit)</span>
+            {/* Summary Cards: Stage Breakdown for ALL tab, or 4 standard metric cards for single event tab */}
+            {selectedEventTab === 'ALL' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.85rem' }}>
+                    {stageMetrics.map(stg => (
+                        <div 
+                            key={stg.key}
+                            style={{ 
+                                backgroundColor: stg.bg, 
+                                padding: '0.85rem 1rem', 
+                                borderRadius: '8px', 
+                                border: `1px solid ${stg.border}`,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                            }}
+                        >
+                            <div style={{ fontSize: '0.72rem', color: stg.color, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                {stg.label}
                             </div>
-                        )}
-                        {metrics.totalExcess > 0 && (
-                            <div>
-                                <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#2563eb' }}>+{metrics.totalExcess.toLocaleString()}</span>
-                                <span style={{ fontSize: '0.7rem', color: '#3b82f6', marginLeft: '0.2rem' }}>excess</span>
+                            <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', marginTop: '0.2rem' }}>
+                                {stg.completed.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: '600', color: stg.color }}>done</span>
                             </div>
-                        )}
-                        {metrics.totalRemaining === 0 && metrics.totalExcess === 0 && (
-                            <div>
-                                <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d' }}>0</span>
-                                <span style={{ fontSize: '0.7rem', color: '#166534', marginLeft: '0.2rem' }}>on point</span>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Target: <strong>{stg.planned.toLocaleString()}</strong></span>
+                                {stg.remaining > 0 ? (
+                                    <span style={{ color: '#ca8a04', fontWeight: '600' }}>{stg.remaining.toLocaleString()} rem</span>
+                                ) : (
+                                    <span style={{ color: '#166534', fontWeight: '600' }}>Completed</span>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    ))}
                 </div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    <div style={{ backgroundColor: '#ffffff', padding: '0.9rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Total Planned</div>
+                        <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#1e293b', marginTop: '0.2rem' }}>
+                            {metrics.totalPlanned.toLocaleString()}
+                        </div>
+                    </div>
 
-                <div style={{ 
-                    backgroundColor: metrics.isAheadAsOfToday ? '#f0fdf4' : '#fef2f2', 
-                    padding: '0.9rem', 
-                    borderRadius: '8px', 
-                    border: metrics.isAheadAsOfToday ? '1px solid #bbf7d0' : '1px solid #fecaca' 
-                }}>
-                    <div style={{ fontSize: '0.75rem', color: metrics.isAheadAsOfToday ? '#166534' : '#991b1b', fontWeight: '600', textTransform: 'uppercase' }}>
-                        Pacing Status (As of Today)
+                    <div style={{ backgroundColor: '#f0fdf4', padding: '0.9rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Total Completed</div>
+                        <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d', marginTop: '0.2rem' }}>
+                            {metrics.totalCompleted.toLocaleString()}
+                        </div>
                     </div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: '800', color: metrics.isAheadAsOfToday ? '#15803d' : '#dc2626', marginTop: '0.2rem' }}>
-                        {metrics.isAheadAsOfToday ? `Ahead by ${metrics.diffAsOfToday.toLocaleString()} (+${metrics.percentAsOfToday}%)` : `Behind by ${Math.abs(metrics.diffAsOfToday).toLocaleString()} (${metrics.percentAsOfToday}%)`}
+
+                    <div style={{ backgroundColor: metrics.totalExcess > 0 ? '#eff6ff' : metrics.totalRemaining > 0 ? '#fefce8' : '#f0fdf4', padding: '0.9rem', borderRadius: '8px', border: metrics.totalExcess > 0 ? '1px solid #bfdbfe' : metrics.totalRemaining > 0 ? '1px solid #fef08a' : '1px solid #bbf7d0' }}>
+                        <div style={{ fontSize: '0.75rem', color: metrics.totalExcess > 0 ? '#1e40af' : metrics.totalRemaining > 0 ? '#854d0e' : '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Remaining / Excess</div>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'baseline', marginTop: '0.2rem' }}>
+                            {metrics.totalRemaining > 0 && (
+                                <div>
+                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#a16207' }}>{metrics.totalRemaining.toLocaleString()}</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#ca8a04', marginLeft: '0.2rem' }}>rem (deficit)</span>
+                                </div>
+                            )}
+                            {metrics.totalExcess > 0 && (
+                                <div>
+                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#2563eb' }}>+{metrics.totalExcess.toLocaleString()}</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#3b82f6', marginLeft: '0.2rem' }}>excess</span>
+                                </div>
+                            )}
+                            {metrics.totalRemaining === 0 && metrics.totalExcess === 0 && (
+                                <div>
+                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d' }}>0</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#166534', marginLeft: '0.2rem' }}>on point</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                        Target: <strong>{metrics.plannedAsOfToday.toLocaleString()}</strong> | Done: <strong>{metrics.completedAsOfToday.toLocaleString()}</strong>
+
+                    <div style={{ 
+                        backgroundColor: metrics.isAheadAsOfToday ? '#f0fdf4' : '#fef2f2', 
+                        padding: '0.9rem', 
+                        borderRadius: '8px', 
+                        border: metrics.isAheadAsOfToday ? '1px solid #bbf7d0' : '1px solid #fecaca' 
+                    }}>
+                        <div style={{ fontSize: '0.75rem', color: metrics.isAheadAsOfToday ? '#166534' : '#991b1b', fontWeight: '600', textTransform: 'uppercase' }}>
+                            Pacing Status (As of Today)
+                        </div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: '800', color: metrics.isAheadAsOfToday ? '#15803d' : '#dc2626', marginTop: '0.2rem' }}>
+                            {metrics.isAheadAsOfToday ? `Ahead by ${metrics.diffAsOfToday.toLocaleString()} (+${metrics.percentAsOfToday}%)` : `Behind by ${Math.abs(metrics.diffAsOfToday).toLocaleString()} (${metrics.percentAsOfToday}%)`}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                            Target: <strong>{metrics.plannedAsOfToday.toLocaleString()}</strong> | Done: <strong>{metrics.completedAsOfToday.toLocaleString()}</strong>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Expandable Detail Graph & Edit Stats Sub-Card */}
             {showDetail && (
@@ -871,6 +982,11 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
     const handleBulkSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (!lockInfo.isEditAllowed) {
+            setBulkMsg("Error: Data editing is locked for today (Editing permitted between 00:01 and 14:00 only)");
+            return;
+        }
+
         if (!hasPermission(eventType)) {
             setBulkMsg("Error: you dont have access to it");
             return;
@@ -912,51 +1028,11 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
         setBulkLoading(false);
     };
 
-    const handleDataUpdateSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!hasPermission(duEventType)) {
-            setDuMsg("Error: you dont have access to it");
+    const startEditing = (rec: TrackerRecord) => {
+        if (!lockInfo.isEditAllowed) {
+            alert("Data update is currently locked for today (Locked from 14:01 to 00:00). Next update window opens at 00:01 AM.");
             return;
         }
-
-        setDuLoading(true);
-        setDuMsg('');
-
-        try {
-            const authVal = localStorage.getItem('econ_auth');
-            let token = '';
-            if (authVal) {
-                try { token = JSON.parse(authVal).token || ''; } catch (e) { }
-            }
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch('/api/admin/symb-updated-tracker/data-update', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
-                    variant: duVariant,
-                    event_type: duEventType,
-                    update_date: duUpdateDate,
-                    completed_qty: parseInt(duCompletedQty) || 0
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setDuMsg('Data updated successfully!');
-                setDuCompletedQty('');
-                fetchRecords();
-            } else {
-                setDuMsg(`Error: ${data.detail || 'Failed to update data'}`);
-            }
-        } catch (err: any) {
-            setDuMsg(`Error: ${err.message}`);
-        }
-        setDuLoading(false);
-    };
-
-    const startEditing = (rec: TrackerRecord) => {
         setEditingId(rec._id);
         setEditForm({
             plan_date: rec.plan_date,
@@ -1046,15 +1122,106 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', padding: '1rem 0' }}>
+            {/* Top Header Card: Data Update Time Lock Banner */}
+            <div style={{ 
+                backgroundColor: lockInfo.isEditAllowed ? '#f0fdf4' : '#fef2f2',
+                border: lockInfo.isEditAllowed ? '1px solid #bbf7d0' : '1px solid #fecaca',
+                borderRadius: '10px',
+                padding: '1.25rem 1.5rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '1rem',
+                background: lockInfo.isEditAllowed 
+                    ? 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)' 
+                    : 'linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '50%',
+                        backgroundColor: lockInfo.isEditAllowed ? '#dcfce7' : '#fee2e2',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: lockInfo.isEditAllowed ? '#166534' : '#991b1b',
+                        border: lockInfo.isEditAllowed ? '1px solid #86efac' : '1px solid #fca5a5'
+                    }}>
+                        {lockInfo.isEditAllowed ? <Clock size={24} /> : <ShieldAlert size={24} />}
+                    </div>
+
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#1e293b' }}>
+                                Data Update Lock Status
+                            </span>
+                            <span style={{
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '20px',
+                                fontSize: '0.78rem',
+                                fontWeight: '700',
+                                backgroundColor: lockInfo.isEditAllowed ? '#10b981' : '#ef4444',
+                                color: '#ffffff',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem'
+                            }}>
+                                {lockInfo.isEditAllowed ? '🔓 EDIT ACCESS ACTIVE (00:01 - 14:00)' : '🔒 DATA EDITING LOCKED (14:01 - 00:00)'}
+                            </span>
+                        </div>
+
+                        <div style={{ fontSize: '0.88rem', color: '#475569', marginTop: '0.3rem', fontWeight: '500' }}>
+                            {lockInfo.isEditAllowed ? (
+                                <>
+                                    People can edit data between <strong>00:01 AM</strong> and <strong>14:00 (2:00 PM)</strong>. 
+                                    Edit access locks at <strong>{lockInfo.lockTimeStr}</strong>.
+                                </>
+                            ) : (
+                                <>
+                                    Data editing is locked every day from <strong>14:01 to 00:00</strong> midnight. 
+                                    Next update window opens at <strong>{lockInfo.unlockTimeStr}</strong>.
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{
+                    backgroundColor: '#ffffff',
+                    padding: '0.6rem 1.1rem',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
+                    textAlign: 'right'
+                }}>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>
+                        {lockInfo.isEditAllowed ? 'Edit Access Locks In' : 'Edit Access Reopens In'}
+                    </div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '800', color: lockInfo.isEditAllowed ? '#059669' : '#dc2626', fontFamily: 'monospace' }}>
+                        {String(lockInfo.hrs).padStart(2, '0')}:{String(lockInfo.mins).padStart(2, '0')}:{String(lockInfo.secs).padStart(2, '0')}
+                    </div>
+                </div>
+            </div>
+
             {/* Action Tools: Bulk Plan Generator & Data Update */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Layers size={20} color="#3b82f6" /> Bulk Plan Generator
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', opacity: lockInfo.isEditAllowed ? 1 : 0.8 }}>
+                <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Layers size={20} color="#3b82f6" /> Bulk Plan Generator
+                    </span>
+                    {!lockInfo.isEditAllowed && (
+                        <span style={{ fontSize: '0.75rem', backgroundColor: '#fef2f2', color: '#dc2626', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid #fecaca', fontWeight: '600' }}>
+                            🔒 Locked (14:01 - 00:00)
+                        </span>
+                    )}
                 </h3>
                 <form onSubmit={handleBulkSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Variant</label>
-                        <select value={variant} onChange={e => setVariant(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }}>
+                        <select disabled={!lockInfo.isEditAllowed} value={variant} onChange={e => setVariant(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }}>
                             <option value="1">Variant 1</option>
                             <option value="2">Variant 2</option>
                         </select>
@@ -1062,7 +1229,7 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Event Type</label>
-                        <select value={eventType} onChange={e => setEventType(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }}>
+                        <select disabled={!lockInfo.isEditAllowed} value={eventType} onChange={e => setEventType(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }}>
                             {['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'].map(evt => (
                                 <option key={evt} value={evt} disabled={!hasPermission(evt)}>
                                     {evt} {!hasPermission(evt) && '(No Access)'}
@@ -1073,75 +1240,31 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Start Date</label>
-                        <input type="date" required value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }} />
+                        <input disabled={!lockInfo.isEditAllowed} type="date" required value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }} />
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>End Date</label>
-                        <input type="date" required value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }} />
+                        <input disabled={!lockInfo.isEditAllowed} type="date" required value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }} />
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>UPD (Planned Qty)</label>
-                        <input type="number" required min="0" value={upd} onChange={e => setUpd(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db', width: '120px' }} />
+                        <input disabled={!lockInfo.isEditAllowed} type="number" required min="0" value={upd} onChange={e => setUpd(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db', width: '120px' }} />
                     </div>
 
                     <button 
                         type="submit" 
-                        disabled={bulkLoading}
-                        style={{ padding: '0.6rem 1.5rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: bulkLoading ? 'not-allowed' : 'pointer' }}
+                        disabled={bulkLoading || !lockInfo.isEditAllowed}
+                        style={{ padding: '0.6rem 1.5rem', backgroundColor: lockInfo.isEditAllowed ? '#3b82f6' : '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: (bulkLoading || !lockInfo.isEditAllowed) ? 'not-allowed' : 'pointer' }}
                     >
-                        {bulkLoading ? 'Generating...' : 'Generate Plan'}
+                        {bulkLoading ? 'Generating...' : !lockInfo.isEditAllowed ? 'Locked (14:01 - 00:00)' : 'Generate Plan'}
                     </button>
                     {bulkMsg && <span style={{ color: bulkMsg.includes('Error') ? '#ef4444' : '#10b981', fontSize: '0.9rem', fontWeight: '500' }}>{bulkMsg}</span>}
                 </form>
             </div>
 
-            {/* Data Update Section */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.2rem', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <RefreshCw size={20} color="#10b981" /> Data Update
-                </h3>
-                <form onSubmit={handleDataUpdateSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Variant</label>
-                        <select value={duVariant} onChange={e => setDuVariant(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }}>
-                            <option value="1">Variant 1</option>
-                            <option value="2">Variant 2</option>
-                        </select>
-                    </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Event Type</label>
-                        <select value={duEventType} onChange={e => setDuEventType(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }}>
-                            {['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'].map(evt => (
-                                <option key={evt} value={evt} disabled={!hasPermission(evt)}>
-                                    {evt} {!hasPermission(evt) && '(No Access)'}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Update Date</label>
-                        <input type="date" required value={duUpdateDate} onChange={e => setDuUpdateDate(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }} />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Completed Qty</label>
-                        <input type="number" required min="0" value={duCompletedQty} onChange={e => setDuCompletedQty(e.target.value)} placeholder="Completed numbers" style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db', width: '160px' }} />
-                    </div>
-
-                    <button 
-                        type="submit" 
-                        disabled={duLoading}
-                        style={{ padding: '0.6rem 1.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: duLoading ? 'not-allowed' : 'pointer' }}
-                    >
-                        {duLoading ? 'Updating...' : 'Update Data'}
-                    </button>
-                    {duMsg && <span style={{ color: duMsg.includes('Error') ? '#ef4444' : '#10b981', fontSize: '0.9rem', fontWeight: '500' }}>{duMsg}</span>}
-                </form>
-            </div>
 
             {/* Tracker Table Section */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', overflowX: 'auto' }}>
