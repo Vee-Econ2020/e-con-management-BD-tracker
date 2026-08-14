@@ -255,52 +255,6 @@ const SymbPipelineView: React.FC = () => {
         return null;
     };
 
-    // Calculate Project Coverage Percentage
-    const projectCoverageStats = useMemo(() => {
-        const validRows = filteredAndSortedData.filter(r => {
-            const weekStr = r["Shipment Week"] ? r["Shipment Week"].split(' ')[0] : '';
-            return weekStr && groupedByWeek[weekStr];
-        });
-
-        if (selectedCoverageStage) {
-            const stageConfig = MILESTONE_STAGES.find(s => s.title === selectedCoverageStage);
-            if (!stageConfig) return { stageTitle: selectedCoverageStage, totalPlanned: 0, totalCompleted: 0, percent: 0 };
-
-            const stageRows = validRows.filter(r => stageConfig.eventMatch.includes(r["Event Type"]));
-            const totalPlanned = stageRows.reduce((sum, r) => sum + (Number(r["planned Value"]) || 0), 0);
-            const totalCompleted = stageRows.reduce((sum, r) => sum + (Number(r.completed) || 0), 0);
-
-            let percent = 0;
-            if (totalPlanned > 0) {
-                percent = Math.min(100, Math.round((totalCompleted / totalPlanned) * 100));
-            } else if (stageRows.length > 0 && totalCompleted > 0) {
-                percent = 100;
-            }
-
-            return {
-                stageTitle: selectedCoverageStage,
-                totalPlanned,
-                totalCompleted,
-                percent
-            };
-        } else {
-            const totalPlanned = validRows.reduce((sum, r) => sum + (Number(r["planned Value"]) || 0), 0);
-            const totalCompleted = validRows.reduce((sum, r) => sum + (Number(r.completed) || 0), 0);
-
-            let percent = 0;
-            if (totalPlanned > 0) {
-                percent = Math.min(100, Math.round((totalCompleted / totalPlanned) * 100));
-            }
-
-            return {
-                stageTitle: 'Overall Project',
-                totalPlanned,
-                totalCompleted,
-                percent
-            };
-        }
-    }, [filteredAndSortedData, groupedByWeek, selectedCoverageStage, MILESTONE_STAGES]);
-
     const { completedWeeks, activeWeeks } = useMemo(() => {
         const completed: [string, SymbPlanRow[], number][] = [];
         const active: [string, SymbPlanRow[], number][] = [];
@@ -333,6 +287,43 @@ const SymbPipelineView: React.FC = () => {
 
         return { completedWeeks: completed, activeWeeks: active };
     }, [groupedByWeek]);
+
+    // Calculate Project Coverage Percentage based on Shipment Weeks completion
+    const projectCoverageStats = useMemo(() => {
+        const totalWeeks = sortedShipmentWeeks.length;
+
+        if (selectedCoverageStage) {
+            // Count how many shipment weeks have this stage covered
+            let coveredWeeksCount = 0;
+            sortedShipmentWeeks.forEach(weekStr => {
+                const v1Covered = isStageCoveredForWeekVariant(weekStr, 'Varient 1', selectedCoverageStage);
+                const v2Covered = isStageCoveredForWeekVariant(weekStr, 'Varient 2', selectedCoverageStage);
+                if (v1Covered || v2Covered) {
+                    coveredWeeksCount++;
+                }
+            });
+
+            const percent = totalWeeks > 0 ? Math.round((coveredWeeksCount / totalWeeks) * 100) : 0;
+
+            return {
+                stageTitle: selectedCoverageStage,
+                completedWeeksCount: coveredWeeksCount,
+                totalWeeks,
+                percent
+            };
+        } else {
+            // Overall Project: A week is completed if customer place data is done (pct === 100)
+            const completedWeeksCount = completedWeeks.length;
+            const percent = totalWeeks > 0 ? Math.round((completedWeeksCount / totalWeeks) * 100) : 0;
+
+            return {
+                stageTitle: 'Overall Project',
+                completedWeeksCount,
+                totalWeeks,
+                percent
+            };
+        }
+    }, [sortedShipmentWeeks, completedWeeks, selectedCoverageStage, isStageCoveredForWeekVariant]);
 
     const overallSummaryCards = useMemo(() => {
         const STAGES = [
@@ -835,8 +826,8 @@ const SymbPipelineView: React.FC = () => {
                         </div>
                     </div>
                     <div style={{ textAlign: 'right', fontSize: '0.82rem', color: '#cbd5e1', backgroundColor: 'rgba(255,255,255,0.05)', padding: '0.5rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                        <div>Completed: <strong style={{ color: '#34d399' }}>{projectCoverageStats.totalCompleted.toLocaleString()}</strong></div>
-                        <div style={{ marginTop: '0.15rem' }}>Planned: <strong style={{ color: '#f8fafc' }}>{projectCoverageStats.totalPlanned.toLocaleString()}</strong></div>
+                        <div>{selectedCoverageStage ? 'Covered Weeks:' : 'Completed Weeks:'} <strong style={{ color: '#34d399' }}>{projectCoverageStats.completedWeeksCount}</strong></div>
+                        <div style={{ marginTop: '0.15rem' }}>Total Shipment Weeks: <strong style={{ color: '#f8fafc' }}>{projectCoverageStats.totalWeeks}</strong></div>
                     </div>
                 </div>
 
