@@ -19,6 +19,12 @@ function formatRelativeTime(isoStr?: string): string {
     }
 }
 
+function formatLockDuration(totalSeconds: number): string {
+    const mins = Math.floor(Math.max(0, totalSeconds) / 60);
+    const secs = Math.max(0, totalSeconds) % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
 export default function AccessManagement() {
     const { token } = useAuth();
     const [activeTab, setActiveTab] = useState('pending');
@@ -79,17 +85,85 @@ export default function AccessManagement() {
         columnFilters.passwordStatus !== 'all' ||
         columnFilters.activity !== 'all';
 
+    // Data Update Lock State
+    const [dataLockState, setDataLockState] = useState<any>({
+        is_locked: false,
+        is_edit_allowed: true,
+        is_temp_unlocked: false,
+        temp_remaining_seconds: 0,
+        temp_unlocked_until: null,
+        standard_allowed: true,
+        unlocked_by: null
+    });
+    const [unlockLoading, setUnlockLoading] = useState(false);
+
+    const fetchLockStatus = async () => {
+        try {
+            const res = await fetch('/api/access/data-lock-status', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setDataLockState(data);
+            }
+        } catch (e) {
+            console.error("Failed to fetch data lock status", e);
+        }
+    };
+
+    const handleUnlockDataLock = async () => {
+        setUnlockLoading(true);
+        setError('');
+        try {
+            const res = await fetch('/api/access/unlock-data-lock', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setSuccessMessage(data.message || 'Data update lock temporarily unlocked for 10 minutes!');
+                fetchLockStatus();
+            } else {
+                setError(data.detail || 'Failed to unlock data lock');
+            }
+        } catch (e) {
+            setError('Network error trying to unlock data lock');
+        } finally {
+            setUnlockLoading(false);
+        }
+    };
+
     useEffect(() => {
         setSelectedEmails([]);
         resetFilters();
         fetchData();
+        fetchLockStatus();
 
         const interval = setInterval(() => {
             fetchData();
-        }, 20000);
+            fetchLockStatus();
+        }, 15000);
 
         return () => clearInterval(interval);
     }, [activeTab]);
+
+    useEffect(() => {
+        if (!dataLockState.is_temp_unlocked || dataLockState.temp_remaining_seconds <= 0) return;
+
+        const timer = setInterval(() => {
+            setDataLockState((prev: any) => {
+                const nextSec = prev.temp_remaining_seconds - 1;
+                if (nextSec <= 0) {
+                    fetchLockStatus();
+                    return { ...prev, is_temp_unlocked: false, temp_remaining_seconds: 0 };
+                }
+                return { ...prev, temp_remaining_seconds: nextSec };
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [dataLockState.is_temp_unlocked, dataLockState.temp_remaining_seconds]);
+
 
     const rawList = activeTab === 'pending' ? pendingRequests : activeUsers;
 
@@ -390,6 +464,128 @@ export default function AccessManagement() {
                         style={{ background: activeTab === 'active' ? '#111827' : '#e5e7eb', color: activeTab === 'active' ? 'white' : '#111827' }}
                     >
                         Active Users
+                    </button>
+                </div>
+            </div>
+
+            {/* Data Update Lock Control Card */}
+            <div style={{
+                backgroundColor: dataLockState.is_temp_unlocked ? '#fff7ed' : (dataLockState.is_edit_allowed ? '#f0fdf4' : '#fef2f2'),
+                border: dataLockState.is_temp_unlocked ? '1px solid #fdba74' : (dataLockState.is_edit_allowed ? '1px solid #bbf7d0' : '1px solid #fecaca'),
+                borderRadius: '0.75rem',
+                padding: '1.25rem 1.5rem',
+                marginBottom: '1.5rem',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '1rem'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '50%',
+                        backgroundColor: dataLockState.is_temp_unlocked ? '#ffedd5' : (dataLockState.is_edit_allowed ? '#dcfce7' : '#fee2e2'),
+                        color: dataLockState.is_temp_unlocked ? '#c2410c' : (dataLockState.is_edit_allowed ? '#166534' : '#991b1b'),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1.4rem',
+                        fontWeight: 'bold'
+                    }}>
+                        {dataLockState.is_temp_unlocked ? '⚡' : (dataLockState.is_edit_allowed ? '🔓' : '🔒')}
+                    </div>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#1e293b' }}>
+                                Data Update Lock Control
+                            </h3>
+                            {dataLockState.is_temp_unlocked ? (
+                                <span style={{
+                                    backgroundColor: '#ea580c',
+                                    color: 'white',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '800',
+                                    padding: '0.2rem 0.65rem',
+                                    borderRadius: '9999px',
+                                    letterSpacing: '0.05em'
+                                }}>
+                                    ⚡ TEMPORARILY UNLOCKED (10 MINS)
+                                </span>
+                            ) : dataLockState.is_edit_allowed ? (
+                                <span style={{
+                                    backgroundColor: '#16a34a',
+                                    color: 'white',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '800',
+                                    padding: '0.2rem 0.65rem',
+                                    borderRadius: '9999px'
+                                }}>
+                                    🔓 UNLOCKED (STANDARD WINDOW 00:01 - 14:00)
+                                </span>
+                            ) : (
+                                <span style={{
+                                    backgroundColor: '#dc2626',
+                                    color: 'white',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '800',
+                                    padding: '0.2rem 0.65rem',
+                                    borderRadius: '9999px'
+                                }}>
+                                    🔒 LOCKED (14:01 - 00:00)
+                                </span>
+                            )}
+                        </div>
+                        <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.875rem', color: '#475569' }}>
+                            {dataLockState.is_temp_unlocked ? (
+                                <>
+                                    Temporarily unlocked by <strong>{dataLockState.unlocked_by || 'Admin'}</strong>. Editing is open for all users across the system.
+                                </>
+                            ) : dataLockState.is_edit_allowed ? (
+                                <>Standard data editing window is active (00:01 AM to 14:00 PM).</>
+                            ) : (
+                                <>Data editing is currently locked for today (Locked every day from 14:01 to 00:00 midnight).</>
+                            )}
+                        </p>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    {dataLockState.is_temp_unlocked && (
+                        <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#9a3412', fontWeight: '700', textTransform: 'uppercase', display: 'block' }}>Time Remaining</span>
+                            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#c2410c', fontFamily: 'monospace' }}>
+                                {formatLockDuration(dataLockState.temp_remaining_seconds)}
+                            </div>
+                        </div>
+                    )}
+
+                    <button
+                        onClick={handleUnlockDataLock}
+                        disabled={unlockLoading}
+                        style={{
+                            backgroundColor: dataLockState.is_temp_unlocked ? '#ea580c' : '#0284c7',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.65rem 1.25rem',
+                            borderRadius: '0.5rem',
+                            fontWeight: '700',
+                            fontSize: '0.9rem',
+                            cursor: unlockLoading ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        {unlockLoading ? 'Unlocking...' : (
+                            <>
+                                <span>{dataLockState.is_temp_unlocked ? '⚡ Extend Unlock (10 Mins)' : '🔓 Unlock Data Lock for 10 Mins'}</span>
+                            </>
+                        )}
                     </button>
                 </div>
             </div>

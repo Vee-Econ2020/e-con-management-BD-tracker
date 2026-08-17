@@ -2802,8 +2802,27 @@ async def get_symb_updated_tracker():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def check_symb_time_lock():
+async def check_symb_time_lock():
     from datetime import datetime
+    try:
+        coll = get_collection("system_settings")
+        doc = await coll.find_one({"_id": "data_update_lock"})
+        if doc and doc.get("unlocked_until"):
+            unlocked_until = doc["unlocked_until"]
+            if isinstance(unlocked_until, str):
+                try:
+                    unlocked_until_dt = datetime.fromisoformat(unlocked_until.rstrip("Z"))
+                except Exception:
+                    unlocked_until_dt = None
+            else:
+                unlocked_until_dt = unlocked_until
+                
+            if unlocked_until_dt and datetime.utcnow() < unlocked_until_dt:
+                # Temporary 10-minute override is ACTIVE
+                return True
+    except Exception as e:
+        print(f"Error checking temporary lock override: {e}")
+
     now = datetime.now()
     current_sec = now.hour * 3600 + now.minute * 60 + now.second
     start_sec = 60
@@ -2819,7 +2838,7 @@ async def delete_bulk_symb_updated_tracker(payload: SymbTrackerDeletePayload):
     from bson.objectid import ObjectId
     from routers.auth import _verify_password
     
-    check_symb_time_lock()
+    await check_symb_time_lock()
     try:
         auth_coll = get_collection("admin_users")
         user = await auth_coll.find_one({"username": payload.admin_id})
@@ -2858,7 +2877,7 @@ async def delete_bulk_symb_updated_tracker(payload: SymbTrackerDeletePayload):
 async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate, authorization: Optional[str] = Header(None)):
     from datetime import datetime, timedelta
     from routers.auth import get_optional_current_user
-    check_symb_time_lock()
+    await check_symb_time_lock()
     try:
         user_sess = await get_optional_current_user(authorization)
         user_email = user_sess.get("email") if user_sess else "System"
@@ -2927,7 +2946,7 @@ async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate, autho
 async def data_update_symb_updated_tracker(payload: SymbDataUpdatePayload, authorization: Optional[str] = Header(None)):
     from datetime import datetime
     from routers.auth import get_optional_current_user
-    check_symb_time_lock()
+    await check_symb_time_lock()
     try:
         user_sess = await get_optional_current_user(authorization)
         user_email = user_sess.get("email") if user_sess else "System"
@@ -3014,7 +3033,7 @@ async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow, au
     from bson.objectid import ObjectId
     from datetime import datetime
     from routers.auth import get_optional_current_user
-    check_symb_time_lock()
+    await check_symb_time_lock()
     try:
         user_sess = await get_optional_current_user(authorization)
         user_email = user_sess.get("email") if user_sess else "System"

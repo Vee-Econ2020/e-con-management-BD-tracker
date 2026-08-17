@@ -280,3 +280,78 @@ async def delete_users(payload: DeleteUsersRequest, current_user: dict = Depends
     await db["admin_sessions"].delete_many({"email": {"$in": payload.emails}})
     
     return {"status": "ok", "deleted_count": res.deleted_count, "message": f"Successfully deleted {res.deleted_count} user(s)"}
+
+from datetime import timedelta
+
+@router.get("/data-lock-status")
+async def get_data_lock_status():
+    db = _get_db()
+    doc = await db["system_settings"].find_one({"_id": "data_update_lock"})
+    
+    now_utc = datetime.utcnow()
+    temp_unlocked_until = doc.get("unlocked_until") if doc else None
+    unlocked_by = doc.get("unlocked_by") if doc else None
+    
+    is_temp_unlocked = False
+    temp_remaining_seconds = 0
+    temp_unlocked_until_iso = None
+    
+    if temp_unlocked_until:
+        if isinstance(temp_unlocked_until, str):
+            try:
+                temp_unlocked_until_dt = datetime.fromisoformat(temp_unlocked_until.rstrip("Z"))
+            except Exception:
+                temp_unlocked_until_dt = None
+        else:
+            temp_unlocked_until_dt = temp_unlocked_until
+            
+        if temp_unlocked_until_dt and now_utc < temp_unlocked_until_dt:
+            is_temp_unlocked = True
+            temp_remaining_seconds = max(0, int((temp_unlocked_until_dt - now_utc).total_seconds()))
+            temp_unlocked_until_iso = temp_unlocked_until_dt.isoformat() + "Z"
+
+    # Standard local time window check (00:01 AM to 14:00 PM)
+    now_local = datetime.now()
+    current_sec = now_local.hour * 3600 + now_local.minute * 60 + now_local.second
+    start_sec = 60
+    end_sec = 14 * 3600
+    standard_allowed = (start_sec <= current_sec <= end_sec)
+
+    is_edit_allowed = standard_allowed or is_temp_unlocked
+    is_locked = not is_edit_allowed
+
+    return {
+        "is_locked": is_locked,
+        "is_edit_allowed": is_edit_allowed,
+        "is_temp_unlocked": is_temp_unlocked,
+        "temp_remaining_seconds": temp_remaining_seconds,
+        "temp_unlocked_until": temp_unlocked_until_iso,
+        "standard_allowed": standard_allowed,
+        "unlocked_by": unlocked_by if is_temp_unlocked else None
+    }
+
+@router.post("/unlock-data-lock")
+async def unlock_data_lock(current_user: dict = Depends(get_current_user)):
+    db = _get_db()
+    admin_email = current_user.get("email") or current_user.get("username", "Admin")
+    now_utc = datetime.utcnow()
+    unlocked_until = now_utc + timedelta(minutes=10)
+    
+    await db["system_settings"].update_one(
+        {"_id": "data_update_lock"},
+        {"$set": {
+            "unlocked_until": unlocked_until,
+            "unlocked_by": admin_email,
+            "unlocked_at": now_utc
+        }},
+        upsert=True
+    )
+    
+    return {
+        "status": "ok",
+        "message": "Data update lock temporarily unlocked for 10 minutes",
+        "temp_remaining_seconds": 600,
+        "temp_unlocked_until": unlocked_until.isoformat() + "Z",
+        "unlocked_by": admin_email
+    }
+

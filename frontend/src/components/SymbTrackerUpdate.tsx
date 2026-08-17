@@ -68,7 +68,24 @@ function parseDayDate(dayStr: any): Date | null {
     return isNaN(d.getTime()) ? null : d;
 }
 
-function getLockStatus(nowDate: Date = new Date()) {
+function getLockStatus(nowDate: Date = new Date(), backendState?: any) {
+    if (backendState && backendState.is_temp_unlocked) {
+        const totalSecondsRem = Math.max(0, backendState.temp_remaining_seconds);
+        const mins = Math.floor(totalSecondsRem / 60);
+        const secs = totalSecondsRem % 60;
+        return {
+            isEditAllowed: true,
+            isTempUnlocked: true,
+            tempRemainingSeconds: totalSecondsRem,
+            unlockedBy: backendState.unlocked_by,
+            hrs: 0,
+            mins,
+            secs,
+            lockTimeStr: '14:00 (2:00 PM)',
+            unlockTimeStr: '00:01 AM'
+        };
+    }
+
     const hours = nowDate.getHours();
     const minutes = nowDate.getMinutes();
     const seconds = nowDate.getSeconds();
@@ -102,6 +119,9 @@ function getLockStatus(nowDate: Date = new Date()) {
 
     return {
         isEditAllowed,
+        isTempUnlocked: false,
+        tempRemainingSeconds: 0,
+        unlockedBy: null,
         hrs,
         mins,
         secs,
@@ -776,14 +796,33 @@ export default function SymbTrackerUpdate() {
     const [loading, setLoading] = useState(false);
 
     // Data Update Time Lock State & Live Timer
-    const [lockInfo, setLockInfo] = useState(() => getLockStatus());
+    const [backendLockState, setBackendLockState] = useState<any>(null);
+    const [lockInfo, setLockInfo] = useState(() => getLockStatus(new Date(), null));
+
+    useEffect(() => {
+        const fetchBackendLockStatus = async () => {
+            try {
+                const res = await fetch('/api/access/data-lock-status');
+                if (res.ok) {
+                    const data = await res.json();
+                    setBackendLockState(data);
+                }
+            } catch (e) {
+                console.error("Error fetching lock status", e);
+            }
+        };
+
+        fetchBackendLockStatus();
+        const interval = setInterval(fetchBackendLockStatus, 10000);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         const timer = setInterval(() => {
-            setLockInfo(getLockStatus());
+            setLockInfo(getLockStatus(new Date(), backendLockState));
         }, 1000);
         return () => clearInterval(timer);
-    }, []);
+    }, [backendLockState]);
 
     const hasPermission = (evt: string) => {
         if (!user) return false;
@@ -1108,8 +1147,8 @@ export default function SymbTrackerUpdate() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', padding: '1rem 0' }}>
             {/* Top Header Card: Data Update Time Lock Banner */}
             <div style={{ 
-                backgroundColor: lockInfo.isEditAllowed ? '#f0fdf4' : '#fef2f2',
-                border: lockInfo.isEditAllowed ? '1px solid #bbf7d0' : '1px solid #fecaca',
+                backgroundColor: lockInfo.isTempUnlocked ? '#fff7ed' : (lockInfo.isEditAllowed ? '#f0fdf4' : '#fef2f2'),
+                border: lockInfo.isTempUnlocked ? '1px solid #fdba74' : (lockInfo.isEditAllowed ? '1px solid #bbf7d0' : '1px solid #fecaca'),
                 borderRadius: '10px',
                 padding: '1.25rem 1.5rem',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
@@ -1118,23 +1157,25 @@ export default function SymbTrackerUpdate() {
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
                 gap: '1rem',
-                background: lockInfo.isEditAllowed 
-                    ? 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)' 
-                    : 'linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%)'
+                background: lockInfo.isTempUnlocked
+                    ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)'
+                    : (lockInfo.isEditAllowed 
+                        ? 'linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)' 
+                        : 'linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%)')
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{
                         width: '48px',
                         height: '48px',
                         borderRadius: '50%',
-                        backgroundColor: lockInfo.isEditAllowed ? '#dcfce7' : '#fee2e2',
+                        backgroundColor: lockInfo.isTempUnlocked ? '#ffedd5' : (lockInfo.isEditAllowed ? '#dcfce7' : '#fee2e2'),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: lockInfo.isEditAllowed ? '#166534' : '#991b1b',
-                        border: lockInfo.isEditAllowed ? '1px solid #86efac' : '1px solid #fca5a5'
+                        color: lockInfo.isTempUnlocked ? '#c2410c' : (lockInfo.isEditAllowed ? '#166534' : '#991b1b'),
+                        border: lockInfo.isTempUnlocked ? '1px solid #fdba74' : (lockInfo.isEditAllowed ? '1px solid #86efac' : '1px solid #fca5a5')
                     }}>
-                        {lockInfo.isEditAllowed ? <Clock size={24} /> : <ShieldAlert size={24} />}
+                        {lockInfo.isTempUnlocked ? <Clock size={24} /> : (lockInfo.isEditAllowed ? <Clock size={24} /> : <ShieldAlert size={24} />)}
                     </div>
 
                     <div>
@@ -1147,18 +1188,22 @@ export default function SymbTrackerUpdate() {
                                 borderRadius: '20px',
                                 fontSize: '0.78rem',
                                 fontWeight: '700',
-                                backgroundColor: lockInfo.isEditAllowed ? '#10b981' : '#ef4444',
+                                backgroundColor: lockInfo.isTempUnlocked ? '#ea580c' : (lockInfo.isEditAllowed ? '#10b981' : '#ef4444'),
                                 color: '#ffffff',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '0.3rem'
                             }}>
-                                {lockInfo.isEditAllowed ? '🔓 EDIT ACCESS ACTIVE (00:01 - 14:00)' : '🔒 DATA EDITING LOCKED (14:01 - 00:00)'}
+                                {lockInfo.isTempUnlocked ? '⚡ TEMPORARILY UNLOCKED (10 MINS)' : (lockInfo.isEditAllowed ? '🔓 EDIT ACCESS ACTIVE (00:01 - 14:00)' : '🔒 DATA EDITING LOCKED (14:01 - 00:00)')}
                             </span>
                         </div>
 
                         <div style={{ fontSize: '0.88rem', color: '#475569', marginTop: '0.3rem', fontWeight: '500' }}>
-                            {lockInfo.isEditAllowed ? (
+                            {lockInfo.isTempUnlocked ? (
+                                <>
+                                    Temporarily unlocked by <strong>{lockInfo.unlockedBy || 'Admin'}</strong>. Data editing is currently permitted for all users.
+                                </>
+                            ) : lockInfo.isEditAllowed ? (
                                 <>
                                     People can edit data between <strong>00:01 AM</strong> and <strong>14:00 (2:00 PM)</strong>. 
                                     Edit access locks at <strong>{lockInfo.lockTimeStr}</strong>.
@@ -1182,10 +1227,13 @@ export default function SymbTrackerUpdate() {
                     textAlign: 'right'
                 }}>
                     <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>
-                        {lockInfo.isEditAllowed ? 'Edit Access Locks In' : 'Edit Access Reopens In'}
+                        {lockInfo.isTempUnlocked ? '10-Min Unlock Expires In' : (lockInfo.isEditAllowed ? 'Edit Access Locks In' : 'Edit Access Reopens In')}
                     </div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: '800', color: lockInfo.isEditAllowed ? '#059669' : '#dc2626', fontFamily: 'monospace' }}>
-                        {String(lockInfo.hrs).padStart(2, '0')}:{String(lockInfo.mins).padStart(2, '0')}:{String(lockInfo.secs).padStart(2, '0')}
+                    <div style={{ fontSize: '1.25rem', fontWeight: '800', color: lockInfo.isTempUnlocked ? '#ea580c' : (lockInfo.isEditAllowed ? '#059669' : '#dc2626'), fontFamily: 'monospace' }}>
+                        {lockInfo.isTempUnlocked 
+                            ? `${String(lockInfo.mins).padStart(2, '0')}:${String(lockInfo.secs).padStart(2, '0')}`
+                            : `${String(lockInfo.hrs).padStart(2, '0')}:${String(lockInfo.mins).padStart(2, '0')}:${String(lockInfo.secs).padStart(2, '0')}`
+                        }
                     </div>
                 </div>
             </div>
