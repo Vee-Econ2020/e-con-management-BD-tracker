@@ -13,6 +13,11 @@ interface SymbPlanRow {
     "Delayed by days": number;
     "Delayed by weeks": number;
     "Estimated Completion Date"?: string;
+    is_autofilled?: boolean;
+    unplanned_qty?: number;
+    warning_msg?: string;
+    original_planned_value?: number;
+    [key: string]: any;
 }
 
 const EVENT_ORDER = [
@@ -434,13 +439,16 @@ const SymbPipelineView: React.FC = () => {
         const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
         const isCompleted = isNativeCompleted || isBackfilled;
         const isDelayed = !isCompleted && row["Delayed by days"] > 0;
+        const isAutofilled = row.is_autofilled || (row["is_autofilled"] === true);
+        const unplannedQty = Number(row.unplanned_qty || row["unplanned_qty"] || 0);
+        const warningMsg = row.warning_msg || row["warning_msg"] || (unplannedQty > 0 ? `There is no plan for remaining qty (${unplannedQty.toLocaleString()} units). Please update!` : '');
         
         return (
             <div key={row.id} style={{ 
                 padding: '0.75rem', 
                 backgroundColor: isBackfilled ? '#f1f5f9' : '#f8fafc', 
                 borderRadius: '8px',
-                borderLeft: `4px solid ${isNativeCompleted ? '#10b981' : isBackfilled ? '#94a3b8' : isDelayed ? '#ef4444' : '#f59e0b'}`,
+                borderLeft: `4px solid ${unplannedQty > 0 ? '#ef4444' : isNativeCompleted ? '#10b981' : isBackfilled ? '#94a3b8' : isDelayed ? '#ef4444' : '#f59e0b'}`,
                 marginBottom: '0.5rem',
                 fontSize: '0.85rem'
             }}>
@@ -458,10 +466,24 @@ const SymbPipelineView: React.FC = () => {
                     </span>
                 </div>
                 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem', color: isBackfilled ? '#64748b' : '#475569' }}>
-                    <span>Planned: <strong>{row["planned Value"] || 0}</strong></span>
-                    <span>Completed: <strong>{isBackfilled ? (row["planned Value"] || 0) : (row.completed || 0)}</strong></span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem', color: isBackfilled ? '#64748b' : '#475569', flexWrap: 'wrap', gap: '0.2rem' }}>
+                    <span>Planned: <strong style={{ color: isAutofilled ? '#1d4ed8' : '#1e293b' }}>{Number(row["planned Value"] || 0).toLocaleString()}</strong></span>
+                    <span>Completed: <strong>{isBackfilled ? (Number(row["planned Value"]) || 0).toLocaleString() : (Number(row.completed) || 0).toLocaleString()}</strong></span>
                 </div>
+
+                {isAutofilled && (
+                    <div style={{ color: '#1e40af', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', padding: '0.2rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>
+                        <RefreshCw size={11} style={{ flexShrink: 0 }} />
+                        <span>Planned auto-updated from previous stage completed ({Number(row.original_planned_value || 0).toLocaleString()} ➔ {Number(row["planned Value"] || 0).toLocaleString()})</span>
+                    </div>
+                )}
+
+                {warningMsg && (
+                    <div style={{ color: '#991b1b', fontSize: '0.73rem', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.35rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '0.3rem 0.5rem', borderRadius: '4px', fontWeight: 700 }}>
+                        <ShieldAlert size={14} style={{ color: '#dc2626', flexShrink: 0 }} />
+                        <span>{warningMsg.replace(/^⚠️\s*/, '')}</span>
+                    </div>
+                )}
 
                 {isBackfilled && (
                     <div style={{ color: '#475569', fontSize: '0.73rem', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.3rem', backgroundColor: '#e2e8f0', padding: '0.25rem 0.4rem', borderRadius: '4px' }}>

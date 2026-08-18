@@ -270,6 +270,85 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_mech_agg_varient, df_tr
             
     SYMB_PLAN["completed"] = SYMB_PLAN.get("completed", pd.Series(dtype=float)).fillna(0)
     
+    # Sequential Stage Planned Qty Autofill & Unplanned Qty Warning Pass
+    EVENT_ORDER_SEQ = [
+        "EBOM covered",
+        "PCBA covered",
+        "All Material Available",
+        "Active alignment",
+        "Production/Assembly",
+        "FQC",
+        "Finished goods",
+        "Invoice Date",
+        "Shipment Date",
+        "customer place"
+    ]
+
+    SYMB_PLAN["original_planned_value"] = SYMB_PLAN["planned Value"]
+    SYMB_PLAN["is_autofilled"] = False
+    SYMB_PLAN["unplanned_qty"] = 0.0
+    SYMB_PLAN["warning_msg"] = ""
+
+    def reupdate_stage_plans_and_warnings(df_sub):
+        if df_sub.empty:
+            return df_sub
+        
+        df_sub["_seq_idx"] = df_sub["Event Type"].apply(lambda e: EVENT_ORDER_SEQ.index(e) if e in EVENT_ORDER_SEQ else 999)
+        df_sub = df_sub.sort_values("_seq_idx")
+
+        prev_completed = None
+        prev_planned = None
+
+        for idx in df_sub.index:
+            row = df_sub.loc[idx]
+            orig_p = float(row["planned Value"]) if pd.notna(row["planned Value"]) else 0.0
+            curr_c = float(row["completed"]) if pd.notna(row["completed"]) else 0.0
+
+            if prev_completed is not None:
+                # Rule 1: Autofill from previous stage completed if completed > original planned
+                if prev_completed > orig_p:
+                    effective_p = prev_completed
+                    is_autofill = True
+                else:
+                    effective_p = orig_p
+                    is_autofill = False
+
+                # Rule 2: Warning only if previous stage completed units (>0) exceed current stage effective planned target
+                if prev_completed > 0 and prev_completed > effective_p:
+                    unplanned = prev_completed - effective_p
+                    warn = f"There is no plan for remaining qty ({int(unplanned):,} units). Please update!"
+                else:
+                    unplanned = 0.0
+                    warn = ""
+            else:
+                effective_p = orig_p
+                is_autofill = False
+                unplanned = 0.0
+                warn = ""
+
+            df_sub.at[idx, "original_planned_value"] = orig_p
+            df_sub.at[idx, "planned Value"] = effective_p
+            df_sub.at[idx, "is_autofilled"] = is_autofill
+            df_sub.at[idx, "unplanned_qty"] = unplanned
+            df_sub.at[idx, "warning_msg"] = warn
+
+            prev_completed = curr_c
+            prev_planned = effective_p
+
+        if "_seq_idx" in df_sub.columns:
+            df_sub = df_sub.drop(columns=["_seq_idx"])
+        return df_sub
+
+    if not SYMB_PLAN.empty:
+        try:
+            SYMB_PLAN = (
+                SYMB_PLAN.groupby(["Shipment Week", "Variant Type"], group_keys=False)
+                .apply(reupdate_stage_plans_and_warnings)
+            )
+        except Exception as e:
+            print(f"Stage reupdate error: {e}")
+            pass
+
     SYMB_PLAN["Material Covered"] = np.where(
         SYMB_PLAN["completed"] == SYMB_PLAN["planned Value"],
         "Yes",

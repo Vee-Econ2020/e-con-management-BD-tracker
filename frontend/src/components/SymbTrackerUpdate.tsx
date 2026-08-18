@@ -23,6 +23,7 @@ interface TrackerRecord {
     variant: string;
     event_type: string;
     plan_date: string;
+    input_qty?: number;
     planned_qty: number;
     completed: number;
     acc_comp_date: string | null;
@@ -131,6 +132,7 @@ function getLockStatus(nowDate: Date = new Date(), backendState?: any) {
 }
 
 function calcMetrics(recs: TrackerRecord[]) {
+    let totalInput = 0;
     let totalPlanned = 0;
     let totalCompleted = 0;
 
@@ -141,8 +143,10 @@ function calcMetrics(recs: TrackerRecord[]) {
     const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
 
     recs.forEach(rec => {
+        const inp = typeof rec.input_qty === 'number' ? rec.input_qty : 0;
         const p = rec.planned_qty || 0;
         const c = rec.completed || 0;
+        totalInput += inp;
         totalPlanned += p;
         totalCompleted += c;
 
@@ -156,6 +160,9 @@ function calcMetrics(recs: TrackerRecord[]) {
         }
     });
 
+    const totalFailed = Math.max(0, totalInput - totalCompleted);
+    const failedPct = totalInput > 0 ? ((totalFailed / totalInput) * 100).toFixed(1) : '0.0';
+
     const netDiff = totalCompleted - totalPlanned;
     const totalRemaining = netDiff < 0 ? Math.abs(netDiff) : 0;
     const totalExcess = netDiff > 0 ? netDiff : 0;
@@ -165,8 +172,11 @@ function calcMetrics(recs: TrackerRecord[]) {
     const isAheadAsOfToday = diffAsOfToday >= 0;
 
     return {
+        totalInput,
         totalPlanned,
         totalCompleted,
+        totalFailed,
+        failedPct,
         totalRemaining,
         totalExcess,
         plannedAsOfToday,
@@ -181,15 +191,16 @@ interface MetricCardsStackProps {
     title: string;
     metrics: ReturnType<typeof calcMetrics>;
     records: TrackerRecord[];
+    allVariantRecords?: TrackerRecord[];
     selectedEventTab: string;
 }
 
-const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricCardsStackProps) => {
+const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selectedEventTab }: MetricCardsStackProps) => {
     const [showDetail, setShowDetail] = useState(false);
     const [chartMode, setChartMode] = useState<'actuals' | 'cumulative'>('cumulative');
     const [showHistoryLines, setShowHistoryLines] = useState(false);
 
-    // Compute stage breakdown metrics for ALL tab
+    // Compute stage breakdown metrics for ALL tab with sequential stage planned autofill & remaining qty warnings
     const stageMetrics = useMemo(() => {
         if (selectedEventTab !== 'ALL') return [];
         const STAGES = [
@@ -203,23 +214,112 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
             { key: 'customer place', label: 'Customer Place', color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' }
         ];
 
-        return STAGES.map(stg => {
+        let prevCompleted: number | null = null;
+        let prevPlanned: number | null = null;
+
+        return STAGES.map((stg, idx) => {
             const stgRecords = records.filter(r => r.event_type === stg.key);
-            let planned = 0;
+            let origPlanned = 0;
             let completed = 0;
             stgRecords.forEach(r => {
-                planned += r.planned_qty || 0;
+                origPlanned += r.planned_qty || 0;
                 completed += r.completed || 0;
             });
+
+            let planned = origPlanned;
+            let isAutofilled = false;
+            let unplannedQty = 0;
+            let warningMsg = '';
+
+            if (idx > 0 && prevCompleted !== null) {
+                // Rule 1: Autofill from previous stage completed if completed > origPlanned
+                if (prevCompleted > origPlanned) {
+                    planned = prevCompleted;
+                    isAutofilled = true;
+                } else {
+                    planned = origPlanned;
+                    isAutofilled = false;
+                }
+
+                // Rule 2: Warning only if previous stage completed units (>0) exceed current stage effective planned target
+                if (prevCompleted > 0 && prevCompleted > planned) {
+                    unplannedQty = prevCompleted - planned;
+                    warningMsg = `There is no plan for remaining qty (${unplannedQty.toLocaleString()} units). Please update!`;
+                }
+            }
+
+            prevCompleted = completed;
+            prevPlanned = planned;
+
             const remaining = planned > completed ? planned - completed : 0;
             return {
                 ...stg,
+                origPlanned,
                 planned,
                 completed,
-                remaining
+                remaining,
+                isAutofilled,
+                unplannedQty,
+                warningMsg
             };
         });
     }, [records, selectedEventTab]);
+
+    // Single event tab metrics calculation with Target card & Planned < Target error validation
+    const singleTabStageMetric = useMemo(() => {
+        if (selectedEventTab === 'ALL' || !allVariantRecords) return null;
+
+        const STAGES = [
+            { key: 'PCBA Ready', label: 'PCBA Ready' },
+            { key: 'Active alignment', label: 'Active alignment' },
+            { key: 'Production/Assembly', label: 'Production / Assembly' },
+            { key: 'FQC', label: 'FQC' },
+            { key: 'Finished goods', label: 'Finished Goods' },
+            { key: 'Invoice Date', label: 'Invoiced' },
+            { key: 'Shipment Date', label: 'Shipped' },
+            { key: 'customer place', label: 'Customer Place' }
+        ];
+
+        const currIdx = STAGES.findIndex(s => s.key === selectedEventTab);
+        if (currIdx <= 0) return null;
+
+        const prevStage = STAGES[currIdx - 1];
+        let prevCompleted = 0;
+        allVariantRecords.forEach(r => {
+            if (r.event_type === prevStage.key) {
+                prevCompleted += r.completed || 0;
+            }
+        });
+
+        const plannedQty = metrics.totalPlanned;
+        const totalCompleted = metrics.totalCompleted;
+        const targetQty = prevCompleted > 0 ? prevCompleted : plannedQty;
+        const hasTargetFromPrev = prevCompleted > 0;
+
+        const hasPlanDeficit = plannedQty < targetQty;
+        const unplannedQty = hasPlanDeficit ? targetQty - plannedQty : 0;
+        const errorMsg = hasPlanDeficit
+            ? `Error: Planned quantity (${plannedQty.toLocaleString()}) is less than the required target (${targetQty.toLocaleString()}). There is no plan for remaining ${unplannedQty.toLocaleString()} units. Please update plan!`
+            : '';
+
+        const netDiff = totalCompleted - targetQty;
+        const targetRemaining = netDiff < 0 ? Math.abs(netDiff) : 0;
+        const targetExcess = netDiff > 0 ? netDiff : 0;
+
+        return {
+            plannedQty,
+            targetQty,
+            hasTargetFromPrev,
+            hasError: hasPlanDeficit,
+            hasPlanDeficit,
+            unplannedQty,
+            errorMsg,
+            prevStageLabel: prevStage.label,
+            prevCompleted,
+            targetRemaining,
+            targetExcess
+        };
+    }, [records, allVariantRecords, selectedEventTab, metrics]);
 
     // Compute edit statistics for this stack
     const editStats = useMemo(() => {
@@ -587,86 +687,140 @@ const MetricCardsStack = ({ title, metrics, records, selectedEventTab }: MetricC
                                 backgroundColor: stg.bg, 
                                 padding: '0.85rem 1rem', 
                                 borderRadius: '8px', 
-                                border: `1px solid ${stg.border}`,
+                                border: `1px solid ${stg.unplannedQty > 0 ? '#fca5a5' : stg.border}`,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                                boxShadow: stg.unplannedQty > 0 ? '0 2px 8px rgba(239, 68, 68, 0.15)' : '0 1px 3px rgba(0,0,0,0.02)'
                             }}
                         >
-                            <div style={{ fontSize: '0.72rem', color: stg.color, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                {stg.label}
+                            <div style={{ fontSize: '0.72rem', color: stg.color, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>{stg.label}</span>
+                                {stg.isAutofilled && (
+                                    <span style={{ fontSize: '0.65rem', backgroundColor: '#dbeafe', color: '#1e40af', padding: '0.1rem 0.35rem', borderRadius: '4px', textTransform: 'none', fontWeight: 700 }}>
+                                        Auto-filled
+                                    </span>
+                                )}
                             </div>
                             <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', marginTop: '0.2rem' }}>
                                 {stg.completed.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: '600', color: stg.color }}>done</span>
                             </div>
                             <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>Target: <strong>{stg.planned.toLocaleString()}</strong></span>
+                                <span>Target: <strong style={{ color: stg.isAutofilled ? '#1d4ed8' : '#0f172a' }}>{stg.planned.toLocaleString()}</strong> {stg.isAutofilled && <span style={{ fontSize: '0.65rem', color: '#3b82f6' }}>({stg.origPlanned.toLocaleString()} ➔ {stg.planned.toLocaleString()})</span>}</span>
                                 {stg.remaining > 0 ? (
                                     <span style={{ color: '#ca8a04', fontWeight: '600' }}>{stg.remaining.toLocaleString()} rem</span>
                                 ) : (
                                     <span style={{ color: '#166534', fontWeight: '600' }}>Completed</span>
                                 )}
                             </div>
+                            {stg.unplannedQty > 0 && (
+                                <div style={{ marginTop: '0.5rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '0.35rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                    <ShieldAlert size={14} style={{ color: '#dc2626', flexShrink: 0 }} />
+                                    <span>There is no plan for remaining qty ({stg.unplannedQty.toLocaleString()} units). Please update!</span>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
             ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                    <div style={{ backgroundColor: '#ffffff', padding: '0.9rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Total Planned</div>
-                        <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#1e293b', marginTop: '0.2rem' }}>
-                            {metrics.totalPlanned.toLocaleString()}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+                        {/* 1. TOTAL PLANNED Box */}
+                        <div style={{ backgroundColor: '#ffffff', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Total Planned</div>
+                            <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#1e293b', marginTop: '0.2rem' }}>
+                                {metrics.totalPlanned.toLocaleString()}
+                            </div>
+                        </div>
+
+                        {/* 2. TARGET Box (New Box!) */}
+                        <div style={{ backgroundColor: singleTabStageMetric?.hasTargetFromPrev ? '#eff6ff' : '#ffffff', padding: '0.85rem', borderRadius: '8px', border: singleTabStageMetric?.hasTargetFromPrev ? '1px solid #bfdbfe' : '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '0.72rem', color: singleTabStageMetric?.hasTargetFromPrev ? '#1e40af' : '#64748b', fontWeight: '600', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Target</span>
+                                {singleTabStageMetric?.hasTargetFromPrev && (
+                                    <span style={{ fontSize: '0.62rem', backgroundColor: '#dbeafe', color: '#1e40af', padding: '0.1rem 0.35rem', borderRadius: '4px', textTransform: 'none', fontWeight: 700 }}>
+                                        From {singleTabStageMetric.prevStageLabel}
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ fontSize: '1.35rem', fontWeight: '800', color: singleTabStageMetric?.hasTargetFromPrev ? '#1d4ed8' : '#1e293b', marginTop: '0.2rem' }}>
+                                {(singleTabStageMetric ? singleTabStageMetric.targetQty : metrics.totalPlanned).toLocaleString()}
+                            </div>
+                        </div>
+
+                        {/* 3. TOTAL COMPLETED Box */}
+                        <div style={{ backgroundColor: '#f0fdf4', padding: '0.85rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                            <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Total Completed</div>
+                            <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d', marginTop: '0.2rem' }}>
+                                {metrics.totalCompleted.toLocaleString()}
+                            </div>
+                        </div>
+
+                        {/* 4. FAILED QTY Box (New Box!) */}
+                        <div style={{ backgroundColor: metrics.totalFailed > 0 ? '#fef2f2' : '#ffffff', padding: '0.85rem', borderRadius: '8px', border: metrics.totalFailed > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: '0.72rem', color: metrics.totalFailed > 0 ? '#991b1b' : '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Failed Qty</div>
+                            <div style={{ fontSize: '1.35rem', fontWeight: '800', color: metrics.totalFailed > 0 ? '#dc2626' : '#64748b', marginTop: '0.2rem' }}>
+                                {metrics.totalFailed.toLocaleString()} <span style={{ fontSize: '0.72rem', fontWeight: '600', color: metrics.totalFailed > 0 ? '#ef4444' : '#94a3b8' }}>({metrics.failedPct}%)</span>
+                            </div>
+                        </div>
+
+                        {/* 5. REMAINING / EXCESS Box */}
+                        {(() => {
+                            const rem = singleTabStageMetric ? singleTabStageMetric.targetRemaining : metrics.totalRemaining;
+                            const exc = singleTabStageMetric ? singleTabStageMetric.targetExcess : metrics.totalExcess;
+                            return (
+                                <div style={{ backgroundColor: exc > 0 ? '#eff6ff' : rem > 0 ? '#fefce8' : '#f0fdf4', padding: '0.85rem', borderRadius: '8px', border: exc > 0 ? '1px solid #bfdbfe' : rem > 0 ? '1px solid #fef08a' : '1px solid #bbf7d0' }}>
+                                    <div style={{ fontSize: '0.72rem', color: exc > 0 ? '#1e40af' : rem > 0 ? '#854d0e' : '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Remaining / Excess</div>
+                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', marginTop: '0.2rem' }}>
+                                        {rem > 0 && (
+                                            <div>
+                                                <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#a16207' }}>{rem.toLocaleString()}</span>
+                                                <span style={{ fontSize: '0.7rem', color: '#ca8a04', marginLeft: '0.2rem' }}>rem (deficit)</span>
+                                            </div>
+                                        )}
+                                        {exc > 0 && (
+                                            <div>
+                                                <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#2563eb' }}>+{exc.toLocaleString()}</span>
+                                                <span style={{ fontSize: '0.7rem', color: '#3b82f6', marginLeft: '0.2rem' }}>excess</span>
+                                            </div>
+                                        )}
+                                        {rem === 0 && exc === 0 && (
+                                            <div>
+                                                <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d' }}>0</span>
+                                                <span style={{ fontSize: '0.7rem', color: '#166534', marginLeft: '0.2rem' }}>on point</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* 6. PACING STATUS Box */}
+                        <div style={{ 
+                            backgroundColor: metrics.isAheadAsOfToday ? '#f0fdf4' : '#fef2f2', 
+                            padding: '0.85rem', 
+                            borderRadius: '8px', 
+                            border: metrics.isAheadAsOfToday ? '1px solid #bbf7d0' : '1px solid #fecaca' 
+                        }}>
+                            <div style={{ fontSize: '0.72rem', color: metrics.isAheadAsOfToday ? '#166534' : '#991b1b', fontWeight: '600', textTransform: 'uppercase' }}>
+                                Pacing Status
+                            </div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: '800', color: metrics.isAheadAsOfToday ? '#15803d' : '#dc2626', marginTop: '0.2rem' }}>
+                                {metrics.isAheadAsOfToday ? `Ahead by ${metrics.diffAsOfToday.toLocaleString()} (+${metrics.percentAsOfToday}%)` : `Behind by ${Math.abs(metrics.diffAsOfToday).toLocaleString()} (${metrics.percentAsOfToday}%)`}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                Target: <strong>{(singleTabStageMetric ? singleTabStageMetric.targetQty : metrics.plannedAsOfToday).toLocaleString()}</strong> | Done: <strong>{metrics.completedAsOfToday.toLocaleString()}</strong>
+                            </div>
                         </div>
                     </div>
 
-                    <div style={{ backgroundColor: '#f0fdf4', padding: '0.9rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Total Completed</div>
-                        <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d', marginTop: '0.2rem' }}>
-                            {metrics.totalCompleted.toLocaleString()}
+                    {/* Clean Red Error Banner (No redundant yellow emoji) */}
+                    {singleTabStageMetric?.hasError && (
+                        <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '0.7rem 0.9rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 2px 6px rgba(239,68,68,0.12)' }}>
+                            <ShieldAlert size={18} style={{ color: '#dc2626', flexShrink: 0 }} />
+                            <span>{singleTabStageMetric.errorMsg}</span>
                         </div>
-                    </div>
-
-                    <div style={{ backgroundColor: metrics.totalExcess > 0 ? '#eff6ff' : metrics.totalRemaining > 0 ? '#fefce8' : '#f0fdf4', padding: '0.9rem', borderRadius: '8px', border: metrics.totalExcess > 0 ? '1px solid #bfdbfe' : metrics.totalRemaining > 0 ? '1px solid #fef08a' : '1px solid #bbf7d0' }}>
-                        <div style={{ fontSize: '0.75rem', color: metrics.totalExcess > 0 ? '#1e40af' : metrics.totalRemaining > 0 ? '#854d0e' : '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Remaining / Excess</div>
-                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'baseline', marginTop: '0.2rem' }}>
-                            {metrics.totalRemaining > 0 && (
-                                <div>
-                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#a16207' }}>{metrics.totalRemaining.toLocaleString()}</span>
-                                    <span style={{ fontSize: '0.7rem', color: '#ca8a04', marginLeft: '0.2rem' }}>rem (deficit)</span>
-                                </div>
-                            )}
-                            {metrics.totalExcess > 0 && (
-                                <div>
-                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#2563eb' }}>+{metrics.totalExcess.toLocaleString()}</span>
-                                    <span style={{ fontSize: '0.7rem', color: '#3b82f6', marginLeft: '0.2rem' }}>excess</span>
-                                </div>
-                            )}
-                            {metrics.totalRemaining === 0 && metrics.totalExcess === 0 && (
-                                <div>
-                                    <span style={{ fontSize: '1.35rem', fontWeight: '800', color: '#15803d' }}>0</span>
-                                    <span style={{ fontSize: '0.7rem', color: '#166534', marginLeft: '0.2rem' }}>on point</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div style={{ 
-                        backgroundColor: metrics.isAheadAsOfToday ? '#f0fdf4' : '#fef2f2', 
-                        padding: '0.9rem', 
-                        borderRadius: '8px', 
-                        border: metrics.isAheadAsOfToday ? '1px solid #bbf7d0' : '1px solid #fecaca' 
-                    }}>
-                        <div style={{ fontSize: '0.75rem', color: metrics.isAheadAsOfToday ? '#166534' : '#991b1b', fontWeight: '600', textTransform: 'uppercase' }}>
-                            Pacing Status (As of Today)
-                        </div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: '800', color: metrics.isAheadAsOfToday ? '#15803d' : '#dc2626', marginTop: '0.2rem' }}>
-                            {metrics.isAheadAsOfToday ? `Ahead by ${metrics.diffAsOfToday.toLocaleString()} (+${metrics.percentAsOfToday}%)` : `Behind by ${Math.abs(metrics.diffAsOfToday).toLocaleString()} (${metrics.percentAsOfToday}%)`}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                            Target: <strong>{metrics.plannedAsOfToday.toLocaleString()}</strong> | Done: <strong>{metrics.completedAsOfToday.toLocaleString()}</strong>
-                        </div>
-                    </div>
+                    )}
                 </div>
             )}
 
@@ -1004,6 +1158,9 @@ export default function SymbTrackerUpdate() {
         return s === '2' || s === '2.0' || s === 'v2' || s.includes('variant 2') || s.includes('varient 2');
     };
 
+    const allV1Records = useMemo(() => records.filter((r: TrackerRecord) => isVariant1(r.variant)), [records]);
+    const allV2Records = useMemo(() => records.filter((r: TrackerRecord) => isVariant2(r.variant)), [records]);
+
     const v1Records = useMemo(() => filteredRecords.filter((r: TrackerRecord) => isVariant1(r.variant)), [filteredRecords]);
     const v2Records = useMemo(() => filteredRecords.filter((r: TrackerRecord) => isVariant2(r.variant)), [filteredRecords]);
 
@@ -1067,8 +1224,9 @@ export default function SymbTrackerUpdate() {
         setEditingId(rec._id);
         setEditForm({
             plan_date: rec.plan_date,
-            planned_qty: rec.planned_qty,
-            completed: rec.completed
+            input_qty: rec.input_qty ?? 0,
+            planned_qty: rec.planned_qty || 0,
+            completed: rec.completed || 0
         });
     };
 
@@ -1077,14 +1235,52 @@ export default function SymbTrackerUpdate() {
     };
 
     const saveEditing = async (id: string, original: TrackerRecord) => {
+        const inputVal = editForm.input_qty ?? 0;
+        const origInputVal = original.input_qty ?? 0;
+
         const changed = 
             editForm.plan_date !== original.plan_date || 
+            inputVal !== origInputVal ||
             editForm.planned_qty !== original.planned_qty || 
             editForm.completed !== original.completed;
             
         if (!changed) {
             setEditingId(null);
             return;
+        }
+
+        // Compute stage target dynamically for current row's variant and event_type
+        const isSameV = (v1: any, v2: any) => String(v1 ?? '').trim().toLowerCase() === String(v2 ?? '').trim().toLowerCase();
+        const seqStages = ['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
+        const normEvt = original.event_type === 'PCBA covered' ? 'PCBA Ready' : original.event_type;
+        const stageIdx = seqStages.indexOf(normEvt);
+
+        let stageTarget = 0;
+        const currPlannedSum = records
+            .filter(r => (r.event_type === normEvt || (normEvt === 'PCBA Ready' && r.event_type === 'PCBA covered')) && isSameV(r.variant, original.variant))
+            .reduce((sum, r) => sum + (r.planned_qty || 0), 0);
+
+        if (stageIdx === 0) {
+            stageTarget = currPlannedSum;
+        } else if (stageIdx > 0) {
+            const prevEvt = seqStages[stageIdx - 1];
+            const prevCompletedSum = records
+                .filter(r => (r.event_type === prevEvt || (prevEvt === 'PCBA Ready' && r.event_type === 'PCBA covered')) && isSameV(r.variant, original.variant))
+                .reduce((sum, r) => sum + (r.completed || 0), 0);
+            stageTarget = prevCompletedSum > 0 ? prevCompletedSum : currPlannedSum;
+        }
+
+        // Validate proposed completed quantity against stage target
+        if (editForm.completed !== original.completed && stageTarget > 0) {
+            const otherCompletedSum = records
+                .filter(r => r._id !== id && (r.event_type === original.event_type || (normEvt === 'PCBA Ready' && r.event_type === 'PCBA covered')) && isSameV(r.variant, original.variant))
+                .reduce((sum, r) => sum + (r.completed || 0), 0);
+            const proposedTotalCompleted = otherCompletedSum + editForm.completed;
+
+            if (proposedTotalCompleted > stageTarget) {
+                alert(`Cannot update: Total completed quantity (${proposedTotalCompleted.toLocaleString()}) cannot be higher than the stage target quantity (${stageTarget.toLocaleString()})!`);
+                return;
+            }
         }
 
         const confirmMsg = `Confirm update?\nThis will be recorded as a new edit if values changed.`;
@@ -1099,20 +1295,30 @@ export default function SymbTrackerUpdate() {
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
+            const payload: any = {
+                plan_date: editForm.plan_date,
+                planned_qty: editForm.planned_qty,
+                completed: editForm.completed
+            };
+            if (editForm.input_qty > 0 || (original.input_qty !== undefined)) {
+                payload.input_qty = editForm.input_qty;
+            }
+
             const res = await fetch(`/api/admin/symb-updated-tracker/${id}`, {
                 method: 'PUT',
                 headers,
-                body: JSON.stringify(editForm)
+                body: JSON.stringify(payload)
             });
+            const data = await res.json();
             if (res.ok) {
                 setEditingId(null);
                 fetchRecords();
             } else {
-                alert('Failed to save update.');
+                alert(`Cannot update: ${data.detail || 'Failed to save update.'}`);
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            alert('Failed to save update.');
+            alert(`Cannot update: ${err.message || 'Failed to save update.'}`);
         }
     };
 
@@ -1507,8 +1713,8 @@ export default function SymbTrackerUpdate() {
                 </div>
 
                 {/* Summary Metric Cards - Stack 1: Variant 1 & Stack 2: Variant 2 */}
-                <MetricCardsStack title="Variant 1 Summary" metrics={v1Metrics} records={v1Records} selectedEventTab={selectedEventTab} />
-                <MetricCardsStack title="Variant 2 Summary" metrics={v2Metrics} records={v2Records} selectedEventTab={selectedEventTab} />
+                <MetricCardsStack title="Variant 1 Summary" metrics={v1Metrics} records={v1Records} allVariantRecords={allV1Records} selectedEventTab={selectedEventTab} />
+                <MetricCardsStack title="Variant 2 Summary" metrics={v2Metrics} records={v2Records} allVariantRecords={allV2Records} selectedEventTab={selectedEventTab} />
 
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
                     <thead style={{ backgroundColor: '#f3f4f6' }}>
@@ -1522,8 +1728,10 @@ export default function SymbTrackerUpdate() {
                             >
                                 Plan Date {sortOrder === 'asc' ? '↑ (Oldest)' : '↓ (Newest)'}
                             </th>
+                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Input Qty</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Planned Qty</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Completed</th>
+                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Failed Qty (%)</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Remaining</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Excess</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Actual Comp. Date</th>
@@ -1572,6 +1780,7 @@ export default function SymbTrackerUpdate() {
                                     </div>
                                 </div>
                             </th>
+                            <th style={{ padding: '0.4rem 0.75rem' }}></th>
                             <th style={{ padding: '0.4rem 0.75rem' }}>
                                 <input 
                                     type="text" 
@@ -1590,6 +1799,7 @@ export default function SymbTrackerUpdate() {
                                     style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
                                 />
                             </th>
+                            <th style={{ padding: '0.4rem 0.75rem' }}></th>
                             <th style={{ padding: '0.4rem 0.75rem' }}></th>
                             <th style={{ padding: '0.4rem 0.75rem' }}></th>
                             <th style={{ padding: '0.4rem 0.75rem' }}>
@@ -1625,8 +1835,41 @@ export default function SymbTrackerUpdate() {
                     <tbody>
                         {filteredRecords.map((rec: TrackerRecord) => {
                             const isEditing = editingId === rec._id;
-                            const remaining = Math.max(0, (rec.planned_qty || 0) - (rec.completed || 0));
-                            const excess = Math.max(0, (rec.completed || 0) - (rec.planned_qty || 0));
+                            const hasInput = typeof rec.input_qty === 'number' && rec.input_qty > 0;
+                            const inputQty = hasInput ? rec.input_qty! : 0;
+                            const plannedQty = rec.planned_qty || 0;
+                            const completed = rec.completed || 0;
+                            const failedQty = hasInput ? Math.max(0, inputQty - completed) : 0;
+                            const failedPct = hasInput && inputQty > 0 ? ((failedQty / inputQty) * 100).toFixed(1) + '%' : '0.0%';
+                            const remaining = Math.max(0, plannedQty - completed);
+                            const excess = Math.max(0, completed - plannedQty);
+
+                            // Calculate stage target dynamically for this row
+                            const isSameV = (v1: any, v2: any) => String(v1 ?? '').trim().toLowerCase() === String(v2 ?? '').trim().toLowerCase();
+                            const seqStages = ['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
+                            const normEvt = rec.event_type === 'PCBA covered' ? 'PCBA Ready' : rec.event_type;
+                            const stageIdx = seqStages.indexOf(normEvt);
+
+                            let rowStageTarget = 0;
+                            const currPlannedSum = records
+                                .filter(r => (r.event_type === normEvt || (normEvt === 'PCBA Ready' && r.event_type === 'PCBA covered')) && isSameV(r.variant, rec.variant))
+                                .reduce((sum, r) => sum + (r.planned_qty || 0), 0);
+
+                            if (stageIdx === 0) {
+                                rowStageTarget = currPlannedSum;
+                            } else if (stageIdx > 0) {
+                                const prevEvt = seqStages[stageIdx - 1];
+                                const prevCompletedSum = records
+                                    .filter(r => (r.event_type === prevEvt || (prevEvt === 'PCBA Ready' && r.event_type === 'PCBA covered')) && isSameV(r.variant, rec.variant))
+                                    .reduce((sum, r) => sum + (r.completed || 0), 0);
+                                rowStageTarget = prevCompletedSum > 0 ? prevCompletedSum : currPlannedSum;
+                            }
+
+                            const otherCompletedSum = records
+                                .filter(r => r._id !== rec._id && (r.event_type === rec.event_type || (normEvt === 'PCBA Ready' && r.event_type === 'PCBA covered')) && isSameV(r.variant, rec.variant))
+                                .reduce((sum, r) => sum + (r.completed || 0), 0);
+                            const proposedTotalCompleted = isEditing ? (otherCompletedSum + editForm.completed) : (otherCompletedSum + completed);
+                            const isCompletedExceedingTarget = isEditing && rowStageTarget > 0 && proposedTotalCompleted > rowStageTarget;
 
                             const today = new Date();
                             const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
@@ -1660,6 +1903,18 @@ export default function SymbTrackerUpdate() {
                                             )}
                                         </td>
 
+                                        {/* Input Qty Column */}
+                                        <td style={{ padding: '0.75rem' }}>
+                                            {isEditing ? (
+                                                <input type="number" value={editForm.input_qty || ''} placeholder="Empty" onChange={e => setEditForm({...editForm, input_qty: parseInt(e.target.value) || 0})} style={{ width: '80px', padding: '0.3rem' }} />
+                                            ) : (
+                                                <span style={{ fontWeight: hasInput ? '500' : '400', color: hasInput ? '#1e293b' : '#9ca3af' }}>
+                                                    {hasInput ? inputQty.toLocaleString() : '-'}
+                                                </span>
+                                            )}
+                                        </td>
+
+                                        {/* Planned Qty Column */}
                                         <td style={{ padding: '0.75rem' }}>
                                             {isEditing ? (
                                                 <input type="number" value={editForm.planned_qty} onChange={e => setEditForm({...editForm, planned_qty: parseInt(e.target.value) || 0})} style={{ width: '80px', padding: '0.3rem' }} />
@@ -1675,22 +1930,47 @@ export default function SymbTrackerUpdate() {
                                             )}
                                         </td>
 
+                                        {/* Completed Column */}
                                         <td style={{ padding: '0.75rem' }}>
                                             {isEditing ? (
-                                                <input 
-                                                    type="number" 
-                                                    disabled={isFutureDate}
-                                                    value={editForm.completed} 
-                                                    onChange={e => setEditForm({...editForm, completed: parseInt(e.target.value) || 0})} 
-                                                    style={{ 
-                                                        width: '80px', 
-                                                        padding: '0.3rem',
-                                                        backgroundColor: isFutureDate ? '#f3f4f6' : '#ffffff',
-                                                        color: isFutureDate ? '#9ca3af' : '#1f2937',
-                                                        cursor: isFutureDate ? 'not-allowed' : 'auto'
-                                                    }} 
-                                                    title={isFutureDate ? 'Completed quantity cannot be updated for future dates' : ''}
-                                                />
+                                                <div>
+                                                    <input 
+                                                        type="number" 
+                                                        disabled={isFutureDate}
+                                                        value={editForm.completed} 
+                                                        onChange={e => setEditForm({...editForm, completed: parseInt(e.target.value) || 0})} 
+                                                        style={{ 
+                                                            width: '85px', 
+                                                            padding: '0.3rem',
+                                                            backgroundColor: isFutureDate ? '#f3f4f6' : (isCompletedExceedingTarget ? '#fef2f2' : '#ffffff'),
+                                                            color: isFutureDate ? '#9ca3af' : (isCompletedExceedingTarget ? '#991b1b' : '#1f2937'),
+                                                            border: isCompletedExceedingTarget ? '2px solid #ef4444' : '1px solid #d1d5db',
+                                                            borderRadius: '4px',
+                                                            fontWeight: isCompletedExceedingTarget ? '700' : 'normal',
+                                                            cursor: isFutureDate ? 'not-allowed' : 'auto'
+                                                        }} 
+                                                        title={isFutureDate ? 'Completed quantity cannot be updated for future dates' : ''}
+                                                    />
+                                                    {isCompletedExceedingTarget && (
+                                                        <div style={{ 
+                                                            backgroundColor: '#fef2f2', 
+                                                            border: '1px solid #fecaca', 
+                                                            color: '#dc2626', 
+                                                            padding: '0.25rem 0.4rem', 
+                                                            borderRadius: '4px', 
+                                                            fontSize: '0.68rem', 
+                                                            fontWeight: '700', 
+                                                            marginTop: '0.35rem', 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            gap: '0.25rem',
+                                                            boxShadow: '0 1px 3px rgba(239,68,68,0.15)'
+                                                        }}>
+                                                            <ShieldAlert size={12} style={{ color: '#dc2626', flexShrink: 0 }} />
+                                                            <span>Completed cannot be higher than target ({rowStageTarget.toLocaleString()})</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ) : (
                                                 <div style={{ display: 'flex', alignItems: 'center' }}>
                                                     <span style={{ color: rec.completed >= rec.planned_qty && rec.planned_qty > 0 ? '#10b981' : '#1f2937', fontWeight: '500' }}>
@@ -1702,6 +1982,19 @@ export default function SymbTrackerUpdate() {
                                                         onToggle={() => toggleRowHistory(rec._id)} 
                                                     />
                                                 </div>
+                                            )}
+                                        </td>
+
+                                        {/* Failed Qty Column with % */}
+                                        <td style={{ padding: '0.75rem' }}>
+                                            {hasInput && failedQty > 0 ? (
+                                                <span style={{ color: '#dc2626', fontWeight: '700' }}>
+                                                    {failedQty.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#ef4444' }}>({failedPct})</span>
+                                                </span>
+                                            ) : hasInput ? (
+                                                <span style={{ color: '#64748b' }}>0 (0.0%)</span>
+                                            ) : (
+                                                <span style={{ color: '#9ca3af' }}>-</span>
                                             )}
                                         </td>
 
@@ -1778,7 +2071,7 @@ export default function SymbTrackerUpdate() {
                                     </tr>
                                     {isExpanded && (
                                         <tr key={`${rec._id}-history`} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: '#f8fafc' }}>
-                                            <td colSpan={10} style={{ padding: '0.4rem 1rem 1rem 1rem' }}>
+                                            <td colSpan={12} style={{ padding: '0.4rem 1rem 1rem 1rem' }}>
                                                 <RecordHistorySubTable rec={rec} onClose={() => toggleRowHistory(rec._id)} />
                                             </td>
                                         </tr>
@@ -1788,7 +2081,7 @@ export default function SymbTrackerUpdate() {
                         })}
                         {filteredRecords.length === 0 && !loading && (
                             <tr>
-                                <td colSpan={10} style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                <td colSpan={12} style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                                     No records match the selected sub-tab or column filters.
                                 </td>
                             </tr>
@@ -1844,7 +2137,7 @@ export default function SymbTrackerUpdate() {
 
                             {deleteError && (
                                 <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '0.6rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600' }}>
-                                    ⚠️ {deleteError}
+                                    {deleteError}
                                 </div>
                             )}
 

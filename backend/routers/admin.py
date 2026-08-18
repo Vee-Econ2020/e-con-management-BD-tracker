@@ -2847,6 +2847,7 @@ class SymbTrackerBulkCreate(BaseModel):
     start_date: str
     end_date: str
     upd: int
+    input_qty: Optional[int] = None
 
 class SymbDataUpdatePayload(BaseModel):
     variant: str
@@ -2856,6 +2857,7 @@ class SymbDataUpdatePayload(BaseModel):
 
 class SymbTrackerUpdateRow(BaseModel):
     plan_date: Optional[str] = None
+    input_qty: Optional[int] = None
     planned_qty: Optional[int] = None
     completed: Optional[int] = None
 
@@ -3023,6 +3025,58 @@ async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate, autho
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+async def get_stage_target_qty(variant: str, event_type: str) -> int:
+    try:
+        coll = get_collection("SYMB_Updated_progress_tracker")
+        def is_same_v(v_val, target_v):
+            vs = str(v_val or "").strip().lower()
+            ts = str(target_v or "").strip().lower()
+            if ts in ["1", "v1", "variant 1"]:
+                return vs in ["1", "1.0", "v1"] or "variant 1" in vs or "varient 1" in vs
+            if ts in ["2", "v2", "variant 2"]:
+                return vs in ["2", "2.0", "v2"] or "variant 2" in vs or "varient 2" in vs
+            return vs == ts
+
+        seq_stages = [
+            "PCBA Ready",
+            "Active alignment",
+            "Production/Assembly",
+            "FQC",
+            "Finished goods",
+            "Invoice Date",
+            "Shipment Date",
+            "customer place"
+        ]
+
+        norm_evt = event_type
+        if norm_evt == "PCBA covered": norm_evt = "PCBA Ready"
+
+        if norm_evt not in seq_stages:
+            return 999999999
+
+        idx = seq_stages.index(norm_evt)
+        all_records = await coll.find({}).to_list(10000)
+
+        curr_planned = sum(
+            r.get("planned_qty", 0) for r in all_records
+            if is_same_v(r.get("variant"), variant) and (r.get("event_type") == norm_evt or (norm_evt == "PCBA Ready" and r.get("event_type") == "PCBA covered"))
+        )
+
+        if idx == 0:
+            return curr_planned if curr_planned > 0 else 999999999
+
+        prev_evt = seq_stages[idx - 1]
+        prev_completed = sum(
+            r.get("completed", 0) for r in all_records
+            if is_same_v(r.get("variant"), variant) and (r.get("event_type") == prev_evt or (prev_evt == "PCBA Ready" and r.get("event_type") == "PCBA covered"))
+        )
+
+        target = prev_completed if prev_completed > 0 else curr_planned
+        return target if target > 0 else 0
+    except Exception as e:
+        print(f"Error computing stage target: {e}")
+        return 999999999
+
 @router.post("/symb-updated-tracker/data-update")
 async def data_update_symb_updated_tracker(payload: SymbDataUpdatePayload, authorization: Optional[str] = Header(None)):
     from datetime import datetime
@@ -3036,6 +3090,13 @@ async def data_update_symb_updated_tracker(payload: SymbDataUpdatePayload, autho
 
         if user_role != "Admin" and "ALL" not in user_perms and payload.event_type not in user_perms:
             raise HTTPException(status_code=403, detail="you dont have access to it")
+
+        target_qty = await get_stage_target_qty(payload.variant, payload.event_type)
+        if target_qty > 0 and payload.completed_qty > target_qty:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot update: Completed quantity ({payload.completed_qty:,}) cannot be higher than the target quantity ({target_qty:,})!"
+            )
 
         coll = get_collection("SYMB_Updated_progress_tracker")
         date_obj = datetime.strptime(payload.update_date, "%Y-%m-%d")
@@ -3152,7 +3213,24 @@ async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow, au
             edit_history["planned_qty"] = hist
             updates["planned_qty"] = payload.planned_qty
             
+        if payload.input_qty is not None and payload.input_qty != doc.get("input_qty"):
+            updates["input_qty"] = payload.input_qty
+
         if payload.completed is not None and payload.completed != doc.get("completed"):
+            target_qty = await get_stage_target_qty(doc.get("variant"), doc.get("event_type"))
+            if target_qty > 0:
+                all_records = await coll.find({}).to_list(10000)
+                other_completed = sum(
+                    r.get("completed", 0) for r in all_records
+                    if str(r.get("_id")) != id and r.get("event_type") == doc.get("event_type") and str(r.get("variant")) == str(doc.get("variant"))
+                )
+                proposed_completed = other_completed + payload.completed
+                if proposed_completed > target_qty:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot update: Total completed quantity ({proposed_completed:,}) cannot be higher than the stage target quantity ({target_qty:,})!"
+                    )
+
             hist = edit_history.get("completed", [])
             hist.append({
                 "old_value": doc.get("completed"),
