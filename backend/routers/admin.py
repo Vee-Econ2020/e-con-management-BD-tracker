@@ -3095,7 +3095,7 @@ async def data_update_symb_updated_tracker(payload: SymbDataUpdatePayload, autho
         if target_qty > 0 and payload.completed_qty > target_qty:
             raise HTTPException(
                 status_code=400,
-                detail=f"Cannot update: Completed quantity ({payload.completed_qty:,}) cannot be higher than the target quantity ({target_qty:,})!"
+                detail=f"Cannot update: Completed quantity ({payload.completed_qty:,}) cannot be higher than the available inventory ({target_qty:,})!"
             )
 
         coll = get_collection("SYMB_Updated_progress_tracker")
@@ -3228,7 +3228,7 @@ async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow, au
                 if proposed_completed > target_qty:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Cannot update: Total completed quantity ({proposed_completed:,}) cannot be higher than the stage target quantity ({target_qty:,})!"
+                        detail=f"Cannot update: Total completed quantity ({proposed_completed:,}) cannot be higher than the available inventory ({target_qty:,})!"
                     )
 
             hist = edit_history.get("completed", [])
