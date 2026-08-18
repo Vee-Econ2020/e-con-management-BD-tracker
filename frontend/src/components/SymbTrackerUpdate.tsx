@@ -299,7 +299,7 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
         const hasPlanDeficit = plannedQty < targetQty;
         const unplannedQty = hasPlanDeficit ? targetQty - plannedQty : 0;
         const errorMsg = hasPlanDeficit
-            ? `Error: Planned quantity (${plannedQty.toLocaleString()}) is less than the required target (${targetQty.toLocaleString()}). There is no plan for remaining ${unplannedQty.toLocaleString()} units. Please update plan!`
+            ? `Error: Planned quantity (${plannedQty.toLocaleString()}) is less than the required stage inventory (${targetQty.toLocaleString()}). There is no plan for remaining ${unplannedQty.toLocaleString()} units. Please update plan!`
             : '';
 
         const netDiff = totalCompleted - targetQty;
@@ -706,7 +706,7 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
                                 {stg.completed.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: '600', color: stg.color }}>done</span>
                             </div>
                             <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>Target: <strong style={{ color: stg.isAutofilled ? '#1d4ed8' : '#0f172a' }}>{stg.planned.toLocaleString()}</strong> {stg.isAutofilled && <span style={{ fontSize: '0.65rem', color: '#3b82f6' }}>({stg.origPlanned.toLocaleString()} ➔ {stg.planned.toLocaleString()})</span>}</span>
+                                <span>Stage inventory: <strong style={{ color: stg.isAutofilled ? '#1d4ed8' : '#0f172a' }}>{stg.planned.toLocaleString()}</strong></span>
                                 {stg.remaining > 0 ? (
                                     <span style={{ color: '#ca8a04', fontWeight: '600' }}>{stg.remaining.toLocaleString()} rem</span>
                                 ) : (
@@ -733,10 +733,10 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
                             </div>
                         </div>
 
-                        {/* 2. TARGET Box (New Box!) */}
+                        {/* 2. STAGE INVENTORY Box */}
                         <div style={{ backgroundColor: singleTabStageMetric?.hasTargetFromPrev ? '#eff6ff' : '#ffffff', padding: '0.85rem', borderRadius: '8px', border: singleTabStageMetric?.hasTargetFromPrev ? '1px solid #bfdbfe' : '1px solid #e2e8f0' }}>
                             <div style={{ fontSize: '0.72rem', color: singleTabStageMetric?.hasTargetFromPrev ? '#1e40af' : '#64748b', fontWeight: '600', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>Target</span>
+                                <span>Stage Inventory</span>
                                 {singleTabStageMetric?.hasTargetFromPrev && (
                                     <span style={{ fontSize: '0.62rem', backgroundColor: '#dbeafe', color: '#1e40af', padding: '0.1rem 0.35rem', borderRadius: '4px', textTransform: 'none', fontWeight: 700 }}>
                                         From {singleTabStageMetric.prevStageLabel}
@@ -809,7 +809,7 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
                                 {metrics.isAheadAsOfToday ? `Ahead by ${metrics.diffAsOfToday.toLocaleString()} (+${metrics.percentAsOfToday}%)` : `Behind by ${Math.abs(metrics.diffAsOfToday).toLocaleString()} (${metrics.percentAsOfToday}%)`}
                             </div>
                             <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                                Target: <strong>{(singleTabStageMetric ? singleTabStageMetric.targetQty : metrics.plannedAsOfToday).toLocaleString()}</strong> | Done: <strong>{metrics.completedAsOfToday.toLocaleString()}</strong>
+                                Stage Inventory: <strong>{(singleTabStageMetric ? singleTabStageMetric.targetQty : metrics.plannedAsOfToday).toLocaleString()}</strong> | Done: <strong>{metrics.completedAsOfToday.toLocaleString()}</strong>
                             </div>
                         </div>
                     </div>
