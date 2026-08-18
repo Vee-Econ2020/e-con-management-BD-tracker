@@ -514,7 +514,7 @@ export default function AccessManagement() {
                                 }}>
                                     ⚡ TEMPORARILY UNLOCKED (10 MINS)
                                 </span>
-                            ) : dataLockState.is_edit_allowed ? (
+                            ) : dataLockState.standard_allowed ? (
                                 <span style={{
                                     backgroundColor: '#16a34a',
                                     color: 'white',
@@ -534,7 +534,7 @@ export default function AccessManagement() {
                                     padding: '0.2rem 0.65rem',
                                     borderRadius: '9999px'
                                 }}>
-                                    🔒 LOCKED (14:01 - 00:00)
+                                    🔒 LOCKED FOR STANDARD USERS (14:01 - 00:00)
                                 </span>
                             )}
                         </div>
@@ -543,10 +543,10 @@ export default function AccessManagement() {
                                 <>
                                     Temporarily unlocked by <strong>{dataLockState.unlocked_by || 'Admin'}</strong>. Editing is open for all users across the system.
                                 </>
-                            ) : dataLockState.is_edit_allowed ? (
+                            ) : dataLockState.standard_allowed ? (
                                 <>Standard data editing window is active (00:01 AM to 14:00 PM).</>
                             ) : (
-                                <>Data editing is currently locked for today (Locked every day from 14:01 to 00:00 midnight).</>
+                                <>Data editing is locked for standard users from 14:01 to 00:00. Admin roles have unrestricted edit access at all times.</>
                             )}
                         </p>
                     </div>

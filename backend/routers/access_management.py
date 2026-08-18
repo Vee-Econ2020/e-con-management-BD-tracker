@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 from datetime import datetime
@@ -284,8 +284,18 @@ async def delete_users(payload: DeleteUsersRequest, current_user: dict = Depends
 from datetime import timedelta
 
 @router.get("/data-lock-status")
-async def get_data_lock_status():
+async def get_data_lock_status(authorization: Optional[str] = Header(None)):
     db = _get_db()
+    is_admin = False
+    if authorization:
+        try:
+            from routers.auth import get_optional_current_user
+            user_sess = await get_optional_current_user(authorization)
+            if user_sess and user_sess.get("role") == "Admin":
+                is_admin = True
+        except Exception:
+            pass
+
     doc = await db["system_settings"].find_one({"_id": "data_update_lock"})
     
     now_utc = datetime.utcnow()
@@ -320,8 +330,8 @@ async def get_data_lock_status():
     end_sec = 14 * 3600
     standard_allowed = (start_sec <= current_sec <= end_sec)
 
-    is_edit_allowed = standard_allowed or is_temp_unlocked
-    is_locked = not is_edit_allowed
+    is_edit_allowed = standard_allowed or is_temp_unlocked or is_admin
+    is_locked = not (standard_allowed or is_temp_unlocked)
 
     return {
         "is_locked": is_locked,
@@ -330,7 +340,8 @@ async def get_data_lock_status():
         "temp_remaining_seconds": temp_remaining_seconds,
         "temp_unlocked_until": temp_unlocked_until_iso,
         "standard_allowed": standard_allowed,
-        "unlocked_by": unlocked_by if is_temp_unlocked else None
+        "unlocked_by": unlocked_by if is_temp_unlocked else None,
+        "is_admin": is_admin
     }
 
 @router.post("/unlock-data-lock")

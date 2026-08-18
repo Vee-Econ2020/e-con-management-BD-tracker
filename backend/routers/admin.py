@@ -1266,10 +1266,12 @@ class UpdateWeeklyPlanPayload(BaseModel):
     v2_planned: int
 
 @router.post("/symb-plan/update-weekly-plan")
-async def update_weekly_plan(payload: UpdateWeeklyPlanPayload):
+async def update_weekly_plan(payload: UpdateWeeklyPlanPayload, authorization: Optional[str] = Header(None)):
     import pandas as pd
     from SYMB_plan_transformation import run_symb_plan_pipeline
-    await check_symb_time_lock()
+    from routers.auth import get_optional_current_user
+    user_sess = await get_optional_current_user(authorization)
+    await check_symb_time_lock(user_sess)
     try:
         coll = get_collection("symb_plan_raw")
         
@@ -2881,7 +2883,10 @@ async def get_symb_updated_tracker():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-async def check_symb_time_lock():
+async def check_symb_time_lock(user: Optional[dict] = None):
+    if user and user.get("role") == "Admin":
+        return True
+
     from datetime import datetime
     try:
         coll = get_collection("system_settings")
@@ -2917,11 +2922,14 @@ async def check_symb_time_lock():
         )
 
 @router.post("/symb-updated-tracker/delete-bulk")
-async def delete_bulk_symb_updated_tracker(payload: SymbTrackerDeletePayload):
+async def delete_bulk_symb_updated_tracker(payload: SymbTrackerDeletePayload, authorization: Optional[str] = Header(None)):
     from bson.objectid import ObjectId
-    from routers.auth import _verify_password
+    from routers.auth import _verify_password, get_optional_current_user
     
-    await check_symb_time_lock()
+    user_sess = await get_optional_current_user(authorization)
+    if not user_sess and payload.admin_id:
+        user_sess = {"username": payload.admin_id, "role": "Admin"}
+    await check_symb_time_lock(user_sess)
     try:
         auth_coll = get_collection("admin_users")
         user = await auth_coll.find_one({"username": payload.admin_id})
@@ -2960,7 +2968,8 @@ async def delete_bulk_symb_updated_tracker(payload: SymbTrackerDeletePayload):
 async def bulk_create_symb_updated_tracker(payload: SymbTrackerBulkCreate, authorization: Optional[str] = Header(None)):
     from datetime import datetime, timedelta
     from routers.auth import get_optional_current_user
-    await check_symb_time_lock()
+    user_sess = await get_optional_current_user(authorization)
+    await check_symb_time_lock(user_sess)
     try:
         user_sess = await get_optional_current_user(authorization)
         user_email = user_sess.get("email") if user_sess else "System"
@@ -3081,7 +3090,8 @@ async def get_stage_target_qty(variant: str, event_type: str) -> int:
 async def data_update_symb_updated_tracker(payload: SymbDataUpdatePayload, authorization: Optional[str] = Header(None)):
     from datetime import datetime
     from routers.auth import get_optional_current_user
-    await check_symb_time_lock()
+    user_sess = await get_optional_current_user(authorization)
+    await check_symb_time_lock(user_sess)
     try:
         user_sess = await get_optional_current_user(authorization)
         user_email = user_sess.get("email") if user_sess else "System"
@@ -3175,7 +3185,8 @@ async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow, au
     from bson.objectid import ObjectId
     from datetime import datetime
     from routers.auth import get_optional_current_user
-    await check_symb_time_lock()
+    user_sess = await get_optional_current_user(authorization)
+    await check_symb_time_lock(user_sess)
     try:
         user_sess = await get_optional_current_user(authorization)
         user_email = user_sess.get("email") if user_sess else "System"
@@ -3214,6 +3225,12 @@ async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow, au
             updates["planned_qty"] = payload.planned_qty
             
         if payload.input_qty is not None and payload.input_qty != doc.get("input_qty"):
+            target_qty = await get_stage_target_qty(doc.get("variant"), doc.get("event_type"))
+            if target_qty > 0 and payload.input_qty > target_qty:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot update: Input quantity ({payload.input_qty:,}) cannot be higher than the available inventory ({target_qty:,})!"
+                )
             updates["input_qty"] = payload.input_qty
 
         if payload.completed is not None and payload.completed != doc.get("completed"):
