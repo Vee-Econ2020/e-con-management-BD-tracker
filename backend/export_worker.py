@@ -68,9 +68,9 @@ def run_export():
             update_status(status_file, job_data)
 
             try:
-                page.goto(target_url, wait_until="networkidle", timeout=45000)
-            except Exception:
-                page.goto(target_url, wait_until="domcontentloaded", timeout=45000)
+                page.goto(target_url, wait_until="networkidle", timeout=120000)
+            except Exception as e:
+                print(f"[Worker] Warning: networkidle timeout {e}. Proceeding to DOM wait.")
 
             job_data["progress"] = 60
             job_data["message"] = "Rendering slide data & Plotly charts..."
@@ -79,7 +79,7 @@ def run_export():
             # 1. Wait until 'computing', 'loading...', or spinners disappear from DOM
             try:
                 page.wait_for_function("""() => {
-                    const text = document.body.innerText.toLowerCase();
+                    const text = document.body.textContent.toLowerCase();
                     const hasLoading = text.includes('computing') || text.includes('loading') || text.includes('fetching');
                     const hasSpinners = document.querySelector('.animate-spin, .animate-pulse');
                     return !hasLoading && !hasSpinners;
