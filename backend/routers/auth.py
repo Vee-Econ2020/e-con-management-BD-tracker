@@ -25,8 +25,11 @@ from pydantic import BaseModel, EmailStr
 
 router = APIRouter()
 
+from dotenv import load_dotenv
+load_dotenv()
+
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "DB tracker")
+DB_NAME = os.getenv("DB_NAME", "DB_tracker")
 
 _PBKDF2_ITERATIONS = 200_000
 _SESSION_TTL_HOURS = 12

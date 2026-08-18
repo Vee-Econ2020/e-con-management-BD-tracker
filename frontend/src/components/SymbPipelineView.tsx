@@ -162,11 +162,15 @@ const SymbPipelineView: React.FC = () => {
         return filtered;
     }, [data, fromDate, toDate, sortOrder, selectedVariant]);
 
-    // Group by Shipment Week (filtering out weeks where total planned quantity is 0)
+    // Group by Shipment Week (filtering out weeks where total planned quantity is 0 or week is Unknown)
     const groupedByWeek = useMemo(() => {
         const groups: Record<string, SymbPlanRow[]> = {};
         filteredAndSortedData.forEach(row => {
-            const weekStr = row["Shipment Week"] ? row["Shipment Week"].split(' ')[0] : 'Unknown';
+            const rawWeek = (row["Shipment Week"] || "").trim();
+            if (!rawWeek || ['unknown', 'none', 'nat', 'nan', 'null'].includes(rawWeek.toLowerCase())) {
+                return;
+            }
+            const weekStr = rawWeek.split(' ')[0];
             if (!groups[weekStr]) groups[weekStr] = [];
             groups[weekStr].push(row);
         });
@@ -175,7 +179,7 @@ const SymbPipelineView: React.FC = () => {
         const validGroups: Record<string, SymbPlanRow[]> = {};
         Object.entries(groups).forEach(([weekStr, rows]) => {
             const totalPlannedInWeek = rows.reduce((sum, r) => sum + (Number(r["planned Value"]) || 0), 0);
-            if (totalPlannedInWeek > 0) {
+            if (totalPlannedInWeek > 0 && weekStr !== 'Unknown') {
                 validGroups[weekStr] = rows;
             }
         });

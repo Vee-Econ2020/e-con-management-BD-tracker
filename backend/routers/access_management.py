@@ -297,18 +297,21 @@ async def get_data_lock_status():
     temp_unlocked_until_iso = None
     
     if temp_unlocked_until:
+        temp_unlocked_until_dt = None
         if isinstance(temp_unlocked_until, str):
             try:
                 temp_unlocked_until_dt = datetime.fromisoformat(temp_unlocked_until.rstrip("Z"))
             except Exception:
                 temp_unlocked_until_dt = None
-        else:
+        elif isinstance(temp_unlocked_until, datetime):
             temp_unlocked_until_dt = temp_unlocked_until
             
-        if temp_unlocked_until_dt and now_utc < temp_unlocked_until_dt:
-            is_temp_unlocked = True
-            temp_remaining_seconds = max(0, int((temp_unlocked_until_dt - now_utc).total_seconds()))
-            temp_unlocked_until_iso = temp_unlocked_until_dt.isoformat() + "Z"
+        if temp_unlocked_until_dt:
+            temp_unlocked_until_dt = temp_unlocked_until_dt.replace(tzinfo=None)
+            if now_utc < temp_unlocked_until_dt:
+                is_temp_unlocked = True
+                temp_remaining_seconds = max(0, int((temp_unlocked_until_dt - now_utc).total_seconds()))
+                temp_unlocked_until_iso = temp_unlocked_until_dt.isoformat() + "Z"
 
     # Standard local time window check (00:01 AM to 14:00 PM)
     now_local = datetime.now()

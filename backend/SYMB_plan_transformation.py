@@ -102,8 +102,9 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_mech_agg_varient, df_tr
         if col not in SYMB_PLAN.columns:
             SYMB_PLAN[col] = np.nan
             
-    SYMB_PLAN["Last Batch Date"] = pd.to_datetime(SYMB_PLAN["Last Batch Date"], format="%m/%d/%Y", errors="coerce")
-    SYMB_PLAN["Shipment Week"] = pd.to_datetime(SYMB_PLAN["Shipment Week"], format="%m/%d/%Y", errors="coerce")
+    SYMB_PLAN["Last Batch Date"] = pd.to_datetime(SYMB_PLAN["Last Batch Date"], errors="coerce")
+    SYMB_PLAN["Shipment Week"] = pd.to_datetime(SYMB_PLAN["Shipment Week"], errors="coerce")
+    SYMB_PLAN = SYMB_PLAN.dropna(subset=["Shipment Week"])
     SYMB_PLAN["Variant Type"] = SYMB_PLAN["Variant Type"].replace("V1", "Varient 1").replace("V2", "Varient 2")
     SYMB_PLAN["Event Type"] = SYMB_PLAN["Event Type"].replace("AA", "Active alignment").replace("FG Date", "Finished goods")
 

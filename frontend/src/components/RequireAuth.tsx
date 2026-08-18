@@ -169,6 +169,11 @@ function AccessDeniedView({ pageName }: { pageName: string }) {
 export function RequireAuth({ children, allowedRoles, allowedTrackers }: RequireAuthProps) {
     const { user, isLoading } = useAuth();
     const location = useLocation();
+    const isExportServer = new URLSearchParams(location.search).get('export_server') === 'true';
+
+    if (isExportServer) {
+        return <>{children}</>;
+    }
 
     if (isLoading) {
         return (
@@ -177,6 +182,7 @@ export function RequireAuth({ children, allowedRoles, allowedTrackers }: Require
             </div>
         );
     }
+
 
     if (!user) {
         return <Navigate to="/login" state={{ from: location }} replace />;

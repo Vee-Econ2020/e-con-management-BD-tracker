@@ -318,7 +318,13 @@ function StandardSlideFrame({
 
 const waitForAnimationFrames = async (count = 2) => {
     for (let index = 0; index < count; index += 1) {
-        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        await new Promise<void>(resolve => {
+            if (document.hidden) {
+                setTimeout(resolve, 16);
+            } else {
+                requestAnimationFrame(() => resolve());
+            }
+        });
     }
 };
 
@@ -366,7 +372,7 @@ const installFetchTracker = (): FetchTracker => {
     };
 };
 
-const waitForNetworkIdle = async (fetchTracker: FetchTracker, idleMs = 600, timeoutMs = 30000) => {
+const waitForNetworkIdle = async (fetchTracker: FetchTracker, idleMs = 200, timeoutMs = 15000) => {
     const start = Date.now();
     let idleStart: number | null = null;
 
@@ -380,11 +386,11 @@ const waitForNetworkIdle = async (fetchTracker: FetchTracker, idleMs = 600, time
             idleStart = null;
         }
 
-        await wait(100);
+        await wait(50);
     }
 };
 
-const waitForDomQuiet = async (container: HTMLElement, quietMs = 1200, timeoutMs = 10000) => {
+const waitForDomQuiet = async (container: HTMLElement, quietMs = 150, timeoutMs = 3000) => {
     await new Promise<void>(resolve => {
         let quietTimer: ReturnType<typeof setTimeout> | undefined;
         let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
@@ -417,7 +423,7 @@ const waitForDomQuiet = async (container: HTMLElement, quietMs = 1200, timeoutMs
     });
 };
 
-const waitForPlotlyCharts = async (container: HTMLElement, timeoutMs = 12000) => {
+const waitForPlotlyCharts = async (container: HTMLElement, timeoutMs = 5000) => {
     const start = Date.now();
 
     while (Date.now() - start < timeoutMs) {
@@ -443,15 +449,15 @@ const waitForPlotlyCharts = async (container: HTMLElement, timeoutMs = 12000) =>
         });
 
         if (ready) {
-            await waitForDomQuiet(container, 1200, 5000);
+            await wait(100);
             return;
         }
 
-        await wait(150);
+        await wait(50);
     }
 };
 
-const waitForCanvasPaint = async (container: HTMLElement, timeoutMs = 8000) => {
+const waitForCanvasPaint = async (container: HTMLElement, timeoutMs = 4000) => {
     const start = Date.now();
 
     while (Date.now() - start < timeoutMs) {
@@ -467,19 +473,19 @@ const waitForCanvasPaint = async (container: HTMLElement, timeoutMs = 8000) => {
         });
 
         if (ready) {
-            await wait(1200);
-            await waitForAnimationFrames(4);
+            await wait(100);
+            await waitForAnimationFrames(1);
             return;
         }
 
-        await wait(120);
+        await wait(50);
     }
 };
 
 const waitForSlideReadiness = async (container: HTMLElement, fetchTracker: FetchTracker) => {
     const start = Date.now();
 
-    while (Date.now() - start < 30000) {
+    while (Date.now() - start < 15000) {
         await waitForImages(container);
         await waitForNetworkIdle(fetchTracker);
 
@@ -491,26 +497,29 @@ const waitForSlideReadiness = async (container: HTMLElement, fetchTracker: Fetch
             break;
         }
 
-        await wait(200);
+        await wait(100);
     }
 
     window.dispatchEvent(new Event('resize'));
-    await waitForAnimationFrames(3);
+    await waitForAnimationFrames(2);
     await waitForCanvasPaint(container);
     await waitForPlotlyCharts(container);
-    await waitForDomQuiet(container, 1200, 6000);
+    await waitForDomQuiet(container, 150, 1500);
     await waitForImages(container);
-    await wait(350);
+    await wait(100);
 };
+
 
 // --- Components ---
 
 const LazySlideWrapper = ({ children, slideNum }: { children: React.ReactNode, slideNum: number | string }) => {
-    const [isLoaded, setIsLoaded] = useState(false);
+    const isExportServer = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('export_server') === 'true';
+    const [isLoaded, setIsLoaded] = useState(isExportServer);
 
-    if (isLoaded) {
+    if (isLoaded || isExportServer) {
         return <>{children}</>;
     }
+
 
     return (
         <div style={{
@@ -1545,8 +1554,72 @@ export default function WeeklyTracker() {
             return;
         }
 
-        const fetchTracker = installFetchTracker();
         setIsExporting(true);
+
+        // Try server-side background PDF generation first (allows closing/switching tabs)
+        try {
+            showToast('Starting server-side PDF export... (You can switch tabs freely)');
+            setExportProgress({ current: 0, total: exportSlides.length, title: 'Queueing server export job...' });
+
+            const res = await fetch('/api/admin/export-pdf-job', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    week: currentWeek,
+                    start_slide: exportStartSlide !== '' ? Number(exportStartSlide) : null,
+                    end_slide: exportEndSlide !== '' ? Number(exportEndSlide) : null,
+                    frontend_url: window.location.origin
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const jobId = data.job_id;
+
+                // Poll job status until complete or failed
+                let finished = false;
+                let pollAttempts = 0;
+
+                while (!finished && pollAttempts < 120) {
+                    await wait(2000);
+                    pollAttempts++;
+
+                    const statusRes = await fetch(`/api/admin/export-pdf-status/${jobId}`);
+                    if (!statusRes.ok) break;
+
+                    const statusData = await statusRes.json();
+                    setExportProgress({
+                        current: Math.round((statusData.progress / 100) * exportSlides.length),
+                        total: exportSlides.length,
+                        title: statusData.message || 'Generating PDF on server...'
+                    });
+
+                    if (statusData.status === 'completed') {
+                        finished = true;
+                        // Trigger browser download
+                        const link = document.createElement('a');
+                        link.href = `/api/admin/export-pdf-download/${jobId}`;
+                        link.download = statusData.pdf_filename || `weekly-tracker-week-${currentWeek}.pdf`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        showToast('Weekly Tracker PDF downloaded!');
+                        setIsExporting(false);
+                        setExportProgress(null);
+                        return;
+                    } else if (statusData.status === 'failed') {
+                        console.warn('Server PDF export failed, falling back to fast client export:', statusData.error);
+                        break;
+                    }
+                }
+            }
+        } catch (serverErr) {
+            console.warn('Server export endpoint unavailable, using fast client export:', serverErr);
+        }
+
+        // Fast Client-Side Export Fallback (Resilient to background tabs & optimized)
+        showToast('Running fast client PDF export...');
+        const fetchTracker = installFetchTracker();
 
         const pdf = new jsPDF({
             orientation: 'landscape',
@@ -1582,6 +1655,7 @@ export default function WeeklyTracker() {
             setIsExporting(false);
         }
     };
+
 
     const toggleVisibility = async (slideNum: number | string) => {
         const sNumStr = String(slideNum);
@@ -1784,8 +1858,75 @@ export default function WeeklyTracker() {
 
     }, [currentWeek, refreshTrigger]);
 
+    const isExportServer = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('export_server') === 'true';
+
+    if (isExportServer) {
+        let exportSlides = displaySlides.filter(s => !hiddenSlides.has(String(s.id)));
+        const startParam = new URLSearchParams(window.location.search).get('start');
+        const endParam = new URLSearchParams(window.location.search).get('end');
+
+        if (startParam && endParam && startParam !== '' && endParam !== '') {
+            exportSlides = exportSlides.slice(Number(startParam), Number(endParam) + 1);
+        }
+
+        return (
+            <div style={{ backgroundColor: '#ffffff', width: '1920px', margin: 0, padding: 0 }}>
+                {exportSlides.map((slideItem) => (
+                    <div
+                        key={slideItem.id}
+                        className="export-slide-item"
+                        style={{
+                            width: '1920px',
+                            height: '1080px',
+                            backgroundColor: '#f3f4f6',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative',
+                            boxSizing: 'border-box',
+                            padding: '1rem',
+                            overflow: 'hidden',
+                            pageBreakAfter: 'always',
+                            breakAfter: 'page',
+                            pageBreakInside: 'avoid',
+                            breakInside: 'avoid',
+                        }}
+                    >
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                            <div style={{ width: '100%', height: '100%', maxWidth: '100%' }}>
+                                {renderSlideContent(slideItem, false)}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+                <style>{`
+                    @page {
+                        size: 1920px 1080px;
+                        margin: 0;
+                    }
+                    html, body {
+                        width: 1920px !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: #ffffff !important;
+                    }
+                    * {
+                        box-sizing: border-box;
+                    }
+                `}</style>
+            </div>
+        );
+
+
+
+
+
+    }
+
     return (
         <div className="app-container" style={{ position: 'relative', minHeight: '150vh', padding: '2rem' }}>
+
             {/* Hidden file input for image overlay uploads */}
             <input
                 ref={overlayImageInputRef}

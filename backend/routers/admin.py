@@ -37,7 +37,7 @@ def normalize_gif_position(gif_position: Optional[dict] = None):
 
 load_dotenv()
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "DB tracker")
+DB_NAME = os.getenv("DB_NAME", "DB_tracker")
 
 client = AsyncIOMotorClient(MONGODB_URL)
 db = client[DB_NAME]
@@ -1259,6 +1259,83 @@ def clean_json_nan(obj):
     return obj
 
 
+
+class UpdateWeeklyPlanPayload(BaseModel):
+    shipment_week: str
+    v1_planned: int
+    v2_planned: int
+
+@router.post("/symb-plan/update-weekly-plan")
+async def update_weekly_plan(payload: UpdateWeeklyPlanPayload):
+    import pandas as pd
+    from SYMB_plan_transformation import run_symb_plan_pipeline
+    await check_symb_time_lock()
+    try:
+        coll = get_collection("symb_plan_raw")
+        
+        def norm_week(val):
+            if not val:
+                return ""
+            s = str(val).strip()
+            try:
+                dt = pd.to_datetime(s, errors="coerce")
+                if pd.notna(dt):
+                    return dt.strftime("%Y-%m-%d")
+            except Exception:
+                pass
+            return s
+
+        target_week_key = norm_week(payload.shipment_week)
+        if not target_week_key:
+            raise HTTPException(status_code=400, detail="Invalid shipment week date format")
+
+        cursor = coll.find({})
+        v1_updated = False
+        v2_updated = False
+
+        async for doc in cursor:
+            doc_week_key = norm_week(doc.get("Shipment Week"))
+            doc_var = str(doc.get("Variant Type", "")).strip()
+
+            if doc_week_key == target_week_key:
+                if doc_var in ["V1", "v1", "Variant 1", "Varient 1"]:
+                    await coll.update_one(
+                        {"_id": doc["_id"]},
+                        {"$set": {"planned Value": payload.v1_planned}}
+                    )
+                    v1_updated = True
+                elif doc_var in ["V2", "v2", "Variant 2", "Varient 2"]:
+                    await coll.update_one(
+                        {"_id": doc["_id"]},
+                        {"$set": {"planned Value": payload.v2_planned}}
+                    )
+                    v2_updated = True
+
+        if not v1_updated:
+            await coll.insert_one({
+                "Shipment Week": payload.shipment_week,
+                "Variant Type": "Varient 1",
+                "Event Type": "Finished goods",
+                "planned Value": payload.v1_planned,
+                "Last Batch Date": payload.shipment_week
+            })
+
+        if not v2_updated:
+            await coll.insert_one({
+                "Shipment Week": payload.shipment_week,
+                "Variant Type": "Varient 2",
+                "Event Type": "Finished goods",
+                "planned Value": payload.v2_planned,
+                "Last Batch Date": payload.shipment_week
+            })
+
+        await run_symb_plan_pipeline(db)
+        return {"status": "success", "message": f"Successfully updated planned values for week {payload.shipment_week}"}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error updating weekly plan: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/symb-plan/transformed")
 async def get_symb_plan_transformed():
@@ -2809,17 +2886,21 @@ async def check_symb_time_lock():
         doc = await coll.find_one({"_id": "data_update_lock"})
         if doc and doc.get("unlocked_until"):
             unlocked_until = doc["unlocked_until"]
+            unlocked_until_dt = None
             if isinstance(unlocked_until, str):
                 try:
                     unlocked_until_dt = datetime.fromisoformat(unlocked_until.rstrip("Z"))
                 except Exception:
                     unlocked_until_dt = None
-            else:
+            elif isinstance(unlocked_until, datetime):
                 unlocked_until_dt = unlocked_until
                 
-            if unlocked_until_dt and datetime.utcnow() < unlocked_until_dt:
-                # Temporary 10-minute override is ACTIVE
-                return True
+            if unlocked_until_dt:
+                unlocked_until_dt = unlocked_until_dt.replace(tzinfo=None)
+                now_utc = datetime.utcnow()
+                if now_utc < unlocked_until_dt:
+                    # Temporary 10-minute override is ACTIVE
+                    return True
     except Exception as e:
         print(f"Error checking temporary lock override: {e}")
 
@@ -2830,7 +2911,7 @@ async def check_symb_time_lock():
     if not (start_sec <= current_sec <= end_sec):
         raise HTTPException(
             status_code=403,
-            detail="Data update is locked for today. Editing is permitted between 00:01 AM and 14:00 (2:00 PM) only."
+            detail="Data update is locked for today. Editing is permitted between 00:01 AM and 14:00 (2:00 PM) only (or when temporarily unlocked by Admin)."
         )
 
 @router.post("/symb-updated-tracker/delete-bulk")

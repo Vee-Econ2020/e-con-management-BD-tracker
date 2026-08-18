@@ -4,6 +4,7 @@ import { ArrowLeft, RefreshCw, X, Table, Activity, Calendar } from 'lucide-react
 import '../index.css';
 import SymbTrackerUpdate from '../components/SymbTrackerUpdate';
 import SymbPipelineView from '../components/SymbPipelineView';
+import SymbOverallPlanView from '../components/SymbOverallPlanView';
 
 interface SymbRecord {
     _id?: any;
@@ -44,10 +45,8 @@ export default function SymbTracker() {
     const [availableFileDates, setAvailableFileDates] = useState<string[]>([]);
     const [selectedFileDate, setSelectedFileDate] = useState<string>('');
     const [selectedMonth] = useState<string | null>(null);
-    const [selectedFlag, setSelectedFlag] = useState<string | null>(null);
-    const [searchTerm, setSearchTerm] = useState<string>('');
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-    const [activeSubTab, setActiveSubTab] = useState<'symb_plan_pipeline' | 'tracker_update' | 'detailed'>('symb_plan_pipeline');
+    const [activeSubTab, setActiveSubTab] = useState<'symb_plan_pipeline' | 'tracker_update' | 'overall_plan'>('symb_plan_pipeline');
 
     const activeRecords = useMemo(() => {
         if (!selectedFileDate || selectedFileDate === fileDate) {
@@ -56,7 +55,7 @@ export default function SymbTracker() {
         return records.filter(r => r.file_date === selectedFileDate);
     }, [records, selectedFileDate, fileDate]);
 
-    // Filtered records for table view
+    // Filtered records for modal view
     const filteredRecords = useMemo(() => {
         return activeRecords.filter(rec => {
             if (selectedMonth) {
@@ -64,26 +63,9 @@ export default function SymbTracker() {
                 const recMonth = getMonthYearKey(cdd);
                 if (recMonth !== selectedMonth) return false;
             }
-
-            if (selectedFlag) {
-                const recFlag = (rec.new_flag_algo || rec.new_flag_color || rec.flag || 'green').toLowerCase().trim();
-                if (recFlag !== selectedFlag.toLowerCase()) return false;
-            }
-
-            if (searchTerm.trim()) {
-                const term = searchTerm.toLowerCase();
-                const soNum = String(rec['SO Number'] || rec['SO NUMBER'] || '').toLowerCase();
-                const stage = String(rec['n-reg_stage'] || rec['Regular-Product Stage'] || '').toLowerCase();
-                const who = String(rec.who || '').toLowerCase();
-
-                if (!soNum.includes(term) && !stage.includes(term) && !who.includes(term)) {
-                    return false;
-                }
-            }
-
             return true;
         });
-    }, [activeRecords, selectedMonth, selectedFlag, searchTerm]);
+    }, [activeRecords, selectedMonth]);
 
     // Total quantity sum
     const totalQuantity = useMemo(() => {
@@ -404,15 +386,15 @@ export default function SymbTracker() {
                         </button>
 
                         <button
-                            onClick={() => setActiveSubTab('detailed')}
+                            onClick={() => setActiveSubTab('overall_plan')}
                             style={{
                                 padding: '0.75rem 1.5rem',
                                 fontSize: '0.95rem',
                                 fontWeight: 700,
                                 border: 'none',
-                                borderBottom: activeSubTab === 'detailed' ? '3px solid #f5ad42' : '3px solid transparent',
-                                backgroundColor: activeSubTab === 'detailed' ? '#ffffff' : 'transparent',
-                                color: activeSubTab === 'detailed' ? '#1e293b' : '#64748b',
+                                borderBottom: activeSubTab === 'overall_plan' ? '3px solid #f5ad42' : '3px solid transparent',
+                                backgroundColor: activeSubTab === 'overall_plan' ? '#ffffff' : 'transparent',
+                                color: activeSubTab === 'overall_plan' ? '#1e293b' : '#64748b',
                                 cursor: 'pointer',
                                 borderRadius: '8px 8px 0 0',
                                 transition: 'all 0.2s ease',
@@ -421,183 +403,14 @@ export default function SymbTracker() {
                                 gap: '0.5rem'
                             }}
                         >
-                            <Table size={18} style={{ color: activeSubTab === 'detailed' ? '#f5ad42' : '#64748b' }} />
-                            Detailed Sales Orders Table
+                            <Table size={18} style={{ color: activeSubTab === 'overall_plan' ? '#f5ad42' : '#64748b' }} />
+                            Overall SYMB Plan
                         </button>
                     </div>
 
-                    {/* Sub-Tab 1: Detailed Sales Orders Table */}
-                    {activeSubTab === 'detailed' && (
-                        <>
-                            <div style={{
-                                backgroundColor: '#ffffff',
-                                padding: '1.25rem 1.5rem',
-                                boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-                                border: '1px solid #e2e8f0',
-                                borderTop: 'none',
-                                borderBottom: 'none',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    <Table size={20} style={{ color: '#f5ad42' }} />
-                                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#1e293b' }}>
-                                        Detailed Sales Orders Table
-                                    </h3>
-                                    <span style={{
-                                        backgroundColor: '#f1f5f9',
-                                        color: '#475569',
-                                        padding: '0.2rem 0.6rem',
-                                        borderRadius: '12px',
-                                        fontSize: '0.8rem',
-                                        fontWeight: 700
-                                    }}>
-                                        {filteredRecords.length} records
-                                    </span>
-                                </div>
-
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                    <div style={{ position: 'relative' }}>
-                                        <input
-                                            type="text"
-                                            placeholder="Search SO Number, Stage, Who..."
-                                            value={searchTerm}
-                                            onChange={e => setSearchTerm(e.target.value)}
-                                            style={{
-                                                padding: '0.45rem 1rem',
-                                                borderRadius: '6px',
-                                                border: '1px solid #cbd5e1',
-                                                fontSize: '0.85rem',
-                                                width: '240px',
-                                                outline: 'none'
-                                            }}
-                                        />
-                                        {searchTerm && (
-                                            <button
-                                                onClick={() => setSearchTerm('')}
-                                                style={{
-                                                    position: 'absolute',
-                                                    right: '8px',
-                                                    top: '50%',
-                                                    transform: 'translateY(-50%)',
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    cursor: 'pointer',
-                                                    color: '#94a3b8'
-                                                }}
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    <div style={{ display: 'flex', gap: '0.3rem' }}>
-                                        {['All', 'green', 'red', 'yellow', 'blue'].map(flag => {
-                                            const isActive = (flag === 'All' && !selectedFlag) || (selectedFlag && selectedFlag.toLowerCase() === flag.toLowerCase());
-                                            return (
-                                                <button
-                                                    key={flag}
-                                                    onClick={() => setSelectedFlag(flag === 'All' ? null : flag)}
-                                                    style={{
-                                                        padding: '0.35rem 0.7rem',
-                                                        borderRadius: '6px',
-                                                        fontSize: '0.8rem',
-                                                        fontWeight: 700,
-                                                        cursor: 'pointer',
-                                                        border: isActive ? '2px solid #000' : '1px solid #e2e8f0',
-                                                        backgroundColor: flag === 'green' ? '#dcfce7' : flag === 'red' ? '#fee2e2' : flag === 'yellow' ? '#fef3c7' : flag === 'blue' ? '#dbeafe' : '#f1f5f9',
-                                                        color: flag === 'green' ? '#166534' : flag === 'red' ? '#991b1b' : flag === 'yellow' ? '#92400e' : flag === 'blue' ? '#1e40af' : '#334155'
-                                                    }}
-                                                >
-                                                    {flag.toUpperCase()}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div style={{
-                                backgroundColor: '#ffffff',
-                                borderRadius: '0 0 12px 12px',
-                                border: '1px solid #e2e8f0',
-                                boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
-                                overflowX: 'auto',
-                                marginBottom: '3rem'
-                            }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-                                    <thead>
-                                        <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
-                                            <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>SO Number</th>
-                                            <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Customer Request date</th>
-                                            <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Committed Due date</th>
-                                            <th style={{ padding: '0.85rem 1rem', fontWeight: 700, textAlign: 'right' }}>Quantity</th>
-                                            <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>Regular-Product Stage</th>
-                                            <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>who</th>
-                                            <th style={{ padding: '0.85rem 1rem', fontWeight: 700, textAlign: 'right' }}>week_diff</th>
-                                            <th style={{ padding: '0.85rem 1rem', fontWeight: 700, textAlign: 'center' }}>new_flag_algo</th>
-                                            <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>red</th>
-                                            <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>green</th>
-                                            <th style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>recovery stage</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredRecords.map((row, idx) => {
-                                            const stage = row['n-reg_stage'] || row['Regular-Product Stage'] || '';
-                                            const rules = flagRulesMap[stage.trim()] || { red: '-', green: '-' };
-                                            const flagColor = (row.new_flag_algo || 'green').toLowerCase();
-                                            const soNumber = row['SO Number'] || row['SO NUMBER'] || row['SO_Number'] || '-';
-
-                                            return (
-                                                <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                                                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#1e293b' }}>{soNumber}</td>
-                                                    <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>{formatDatePretty(row['Customer Request date'])}</td>
-                                                    <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>{formatDatePretty(row['Committed Due date'])}</td>
-                                                    <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>{(Number(row.Quantity) || 0).toLocaleString()}</td>
-                                                    <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>{stage || '-'}</td>
-                                                    <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{row.who || '-'}</td>
-                                                    <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 600, color: '#334155' }}>{row.week_diff !== undefined && row.week_diff !== null ? row.week_diff : '-'}</td>
-                                                    <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                                                        <span style={{
-                                                            display: 'inline-block',
-                                                            padding: '0.25rem 0.65rem',
-                                                            borderRadius: '4px',
-                                                            fontWeight: 700,
-                                                            fontSize: '0.75rem',
-                                                            backgroundColor: flagColor === 'green' ? '#52b788' : flagColor === 'red' ? '#e63946' : flagColor === 'yellow' ? '#f5ad42' : '#3b82f6',
-                                                            color: '#ffffff'
-                                                        }}>
-                                                            {flagColor}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ padding: '0.75rem 1rem', color: '#991b1b', backgroundColor: '#fee2e2', fontWeight: 600, fontSize: '0.8rem' }}>{rules.red}</td>
-                                                    <td style={{ padding: '0.75rem 1rem', color: '#166534', backgroundColor: '#dcfce7', fontWeight: 600, fontSize: '0.8rem' }}>{rules.green}</td>
-                                                    <td style={{ padding: '0.75rem 1rem', color: '#334155', fontWeight: 500 }}>{row['recovery stage'] || '-'}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                        {filteredRecords.length === 0 && (
-                                            <tr>
-                                                <td colSpan={11} style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
-                                                    No matching Sales Orders found for the selected filters.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                    {filteredRecords.length > 0 && (
-                                        <tfoot>
-                                            <tr style={{ backgroundColor: '#f1f5f9', borderTop: '2px solid #cbd5e1', fontWeight: 800, color: '#0f172a' }}>
-                                                <td style={{ padding: '0.9rem 1rem' }}>Total</td>
-                                                <td colSpan={2}></td>
-                                                <td style={{ padding: '0.9rem 1rem', textAlign: 'right', fontSize: '0.95rem' }}>{totalQuantity.toLocaleString()}</td>
-                                                <td colSpan={7}></td>
-                                            </tr>
-                                        </tfoot>
-                                    )}
-                                </table>
-                            </div>
-                        </>
+                    {/* Sub-Tab 3: Overall SYMB Plan */}
+                    {activeSubTab === 'overall_plan' && (
+                        <SymbOverallPlanView />
                     )}
 
                     {/* Sub-Tab 2: V1 Progress Charts */}
@@ -646,7 +459,7 @@ export default function SymbTracker() {
                                     Detailed Sales Orders Data
                                 </h3>
                                 <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                                    Showing {filteredRecords.length} records for {selectedMonth || 'All Months'} {selectedFlag ? `(${selectedFlag.toUpperCase()})` : ''}
+                                    Showing {filteredRecords.length} records for {selectedMonth || 'All Months'}
                                 </span>
                             </div>
                             <button

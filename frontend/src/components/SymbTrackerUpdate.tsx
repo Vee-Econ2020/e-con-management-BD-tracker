@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Plot from 'react-plotly.js';
-import { Save, History, Edit2, FileText, RefreshCw, Layers, BarChart2, TrendingUp, Trash2, X, ShieldAlert, Clock } from 'lucide-react';
+import { Save, History, Edit2, FileText, RefreshCw, Layers, BarChart2, TrendingUp, Trash2, X, ShieldAlert, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface EditHistoryEntry {
@@ -794,6 +794,14 @@ export default function SymbTrackerUpdate() {
     const { user } = useAuth();
     const [records, setRecords] = useState<TrackerRecord[]>([]);
     const [loading, setLoading] = useState(false);
+    const [expandedHistoryIds, setExpandedHistoryIds] = useState<Record<string, boolean>>({});
+
+    const toggleRowHistory = (id: string) => {
+        setExpandedHistoryIds(prev => ({
+            ...prev,
+            [id]: !prev[id]
+        }));
+    };
 
     // Data Update Time Lock State & Live Timer
     const [backendLockState, setBackendLockState] = useState<any>(null);
@@ -1108,37 +1116,161 @@ export default function SymbTrackerUpdate() {
         }
     };
 
-    const HistoryTooltip = ({ history = [] }: { history: EditHistoryEntry[] }) => {
-        const [isHovered, setIsHovered] = useState(false);
+    const HistoryButton = ({ history = [], isExpanded, onToggle }: { history: EditHistoryEntry[]; isExpanded: boolean; onToggle: () => void }) => {
         if (!history || history.length === 0) return null;
         return (
-            <div 
-                style={{ position: 'relative', display: 'inline-block', marginLeft: '0.5rem', cursor: 'pointer', color: isHovered ? '#3b82f6' : '#9ca3af' }}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
+            <button
+                type="button"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onToggle();
+                }}
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.2rem',
+                    marginLeft: '0.4rem',
+                    padding: '0.15rem 0.45rem',
+                    borderRadius: '4px',
+                    border: isExpanded ? '1px solid #3b82f6' : '1px solid #d1d5db',
+                    backgroundColor: isExpanded ? '#eff6ff' : '#ffffff',
+                    color: isExpanded ? '#2563eb' : '#64748b',
+                    fontSize: '0.72rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    boxShadow: isExpanded ? '0 1px 2px rgba(59,130,246,0.15)' : 'none'
+                }}
+                title={isExpanded ? 'Click to collapse history sub-table' : 'Click to reveal history sub-table'}
             >
-                <History size={14} />
-                {isHovered && (
-                    <div style={{ position: 'absolute', zIndex: 10, backgroundColor: '#1f2937', color: 'white', fontSize: '0.75rem', padding: '0.6rem', borderRadius: '6px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.2)', width: '16rem', marginTop: '0.25rem', right: 0, border: '1px solid #374151' }}>
-                        <div style={{ fontWeight: 'bold', borderBottom: '1px solid #4b5563', marginBottom: '0.35rem', paddingBottom: '0.25rem' }}>Edit History</div>
-                        {history.map((h, i) => (
-                            <div key={i} style={{ display: 'flex', flexDirection: 'column', padding: '0.35rem 0', borderBottom: i === history.length - 1 ? 'none' : '1px solid #374151' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontWeight: 'bold' }}>Edit #{h.edit}</span>
-                                    <span style={{ fontWeight: '600', color: '#60a5fa' }}>
-                                        {h.old_value !== undefined ? `${h.old_value} → ${h.new_value ?? h.value}` : `${h.value}`}
-                                    </span>
-                                </div>
-                                <div style={{ fontSize: '0.7rem', color: '#cbd5e1', marginTop: '0.2rem' }}>
-                                    By: <strong>{h.edited_by ? h.edited_by.split('@')[0] : 'System'}</strong> ({h.edited_by || ''})
-                                </div>
-                                <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginTop: '0.1rem' }}>
-                                    {new Date(h.timestamp).toLocaleString()}
-                                </div>
-                            </div>
-                        ))}
+                <History size={13} />
+                <span>{history.length}</span>
+                {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+        );
+    };
+
+    const RecordHistorySubTable = ({ rec, onClose }: { rec: TrackerRecord; onClose: () => void }) => {
+        const planDateEdits = (rec.edit_history?.plan_date || []).map(h => ({ ...h, fieldLabel: 'Plan Date', badgeBg: '#dbeafe', badgeColor: '#1e40af' }));
+        const plannedQtyEdits = (rec.edit_history?.planned_qty || []).map(h => ({ ...h, fieldLabel: 'Planned Qty', badgeBg: '#dcfce7', badgeColor: '#166534' }));
+        const completedEdits = (rec.edit_history?.completed || []).map(h => ({ ...h, fieldLabel: 'Completed', badgeBg: '#f3e8ff', badgeColor: '#6b21a8' }));
+
+        const allEdits = [...planDateEdits, ...plannedQtyEdits, ...completedEdits];
+        allEdits.sort((a, b) => {
+            const timeA = new Date(a.timestamp).getTime();
+            const timeB = new Date(b.timestamp).getTime();
+            if (timeA !== timeB) return timeA - timeB;
+            return (a.edit || 0) - (b.edit || 0);
+        });
+
+        if (allEdits.length === 0) {
+            return (
+                <div style={{ padding: '0.75rem', fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+                    No edit history recorded yet.
+                </div>
+            );
+        }
+
+        return (
+            <div style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)',
+                padding: '0.85rem 1.1rem',
+                margin: '0.3rem 0'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingBottom: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+                            <History size={16} />
+                        </div>
+                        <div>
+                            <span style={{ fontWeight: '700', fontSize: '0.88rem', color: '#0f172a' }}>
+                                Edit History Sub-Table
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '0.5rem' }}>
+                                Variant: <strong>{rec.variant}</strong> | Event: <strong>{rec.event_type}</strong> | Plan Date: <strong>{rec.plan_date}</strong> ({allEdits.length} change{allEdits.length > 1 ? 's' : ''})
+                            </span>
+                        </div>
                     </div>
-                )}
+                    <button 
+                        type="button"
+                        onClick={onClose}
+                        style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '0.25rem', 
+                            backgroundColor: '#f1f5f9', 
+                            border: '1px solid #e2e8f0', 
+                            padding: '0.3rem 0.6rem', 
+                            borderRadius: '5px', 
+                            fontSize: '0.75rem', 
+                            color: '#475569', 
+                            cursor: 'pointer',
+                            fontWeight: '600'
+                        }}
+                    >
+                        <X size={14} /> Close
+                    </button>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+                        <thead style={{ backgroundColor: '#f8fafc' }}>
+                            <tr>
+                                <th style={{ padding: '0.55rem 0.75rem', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: '700' }}>Edit #</th>
+                                <th style={{ padding: '0.55rem 0.75rem', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: '700' }}>Field Modified</th>
+                                <th style={{ padding: '0.55rem 0.75rem', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: '700' }}>Previous Value</th>
+                                <th style={{ padding: '0.55rem 0.75rem', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: '700' }}>New Value</th>
+                                <th style={{ padding: '0.55rem 0.75rem', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: '700' }}>Edited By</th>
+                                <th style={{ padding: '0.55rem 0.75rem', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: '700' }}>Date & Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {allEdits.map((h, i) => {
+                                const isOldDef = h.old_value !== undefined;
+                                const prevVal = isOldDef ? String(h.old_value) : '-';
+                                const newVal = isOldDef ? String(h.new_value ?? h.value) : String(h.value);
+                                const editorName = h.edited_by ? h.edited_by.split('@')[0] : 'System';
+                                const formattedTime = new Date(h.timestamp).toLocaleString();
+
+                                return (
+                                    <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
+                                        <td style={{ padding: '0.5rem 0.75rem', fontWeight: '700', color: '#64748b' }}>
+                                            #{h.edit}
+                                        </td>
+                                        <td style={{ padding: '0.5rem 0.75rem' }}>
+                                            <span style={{ 
+                                                backgroundColor: h.badgeBg, 
+                                                color: h.badgeColor, 
+                                                padding: '0.2rem 0.55rem', 
+                                                borderRadius: '12px', 
+                                                fontSize: '0.73rem', 
+                                                fontWeight: '700',
+                                                display: 'inline-block'
+                                            }}>
+                                                {h.fieldLabel}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '0.5rem 0.75rem', color: '#64748b', fontStyle: prevVal === '-' ? 'italic' : 'normal' }}>
+                                            {prevVal}
+                                        </td>
+                                        <td style={{ padding: '0.5rem 0.75rem', fontWeight: '700', color: '#2563eb' }}>
+                                            {newVal}
+                                        </td>
+                                        <td style={{ padding: '0.5rem 0.75rem', color: '#334155' }} title={h.edited_by || ''}>
+                                            <strong>{editorName}</strong>
+                                        </td>
+                                        <td style={{ padding: '0.5rem 0.75rem', color: '#64748b', fontSize: '0.78rem' }}>
+                                            {formattedTime}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         );
     };
@@ -1501,106 +1633,157 @@ export default function SymbTrackerUpdate() {
                             const recDate = parseDayDate(rec.plan_date);
                             const isFutureDate = recDate ? (new Date(recDate.getFullYear(), recDate.getMonth(), recDate.getDate()).getTime() > todayTime) : false;
 
+                            const pDateHist = rec.edit_history?.plan_date || [];
+                            const pQtyHist = rec.edit_history?.planned_qty || [];
+                            const compHist = rec.edit_history?.completed || [];
+                            const totalEditsCount = pDateHist.length + pQtyHist.length + compHist.length;
+                            const isExpanded = !!expandedHistoryIds[rec._id];
+
                             return (
-                                <tr key={rec._id} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: isEditing ? '#eff6ff' : 'transparent' }}>
-                                    <td style={{ padding: '0.75rem' }}>{rec.variant}</td>
-                                    <td style={{ padding: '0.75rem' }}>{rec.event_type}</td>
-                                    
-                                    <td style={{ padding: '0.75rem' }}>
-                                        {isEditing ? (
-                                            <input type="text" value={editForm.plan_date} onChange={e => setEditForm({...editForm, plan_date: e.target.value})} style={{ width: '100px', padding: '0.3rem' }} />
-                                        ) : (
-                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                {rec.plan_date} <HistoryTooltip history={rec.edit_history?.plan_date || []} />
-                                            </div>
-                                        )}
-                                    </td>
+                                <React.Fragment key={rec._id}>
+                                    <tr style={{ borderBottom: isExpanded ? 'none' : '1px solid #e5e7eb', backgroundColor: isEditing ? '#eff6ff' : (isExpanded ? '#f8fafc' : 'transparent') }}>
+                                        <td style={{ padding: '0.75rem' }}>{rec.variant}</td>
+                                        <td style={{ padding: '0.75rem' }}>{rec.event_type}</td>
+                                        
+                                        <td style={{ padding: '0.75rem' }}>
+                                            {isEditing ? (
+                                                <input type="text" value={editForm.plan_date} onChange={e => setEditForm({...editForm, plan_date: e.target.value})} style={{ width: '100px', padding: '0.3rem' }} />
+                                            ) : (
+                                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                    {rec.plan_date} 
+                                                    <HistoryButton 
+                                                        history={pDateHist} 
+                                                        isExpanded={isExpanded} 
+                                                        onToggle={() => toggleRowHistory(rec._id)} 
+                                                    />
+                                                </div>
+                                            )}
+                                        </td>
 
-                                    <td style={{ padding: '0.75rem' }}>
-                                        {isEditing ? (
-                                            <input type="number" value={editForm.planned_qty} onChange={e => setEditForm({...editForm, planned_qty: parseInt(e.target.value) || 0})} style={{ width: '80px', padding: '0.3rem' }} />
-                                        ) : (
-                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                {rec.planned_qty} <HistoryTooltip history={rec.edit_history?.planned_qty || []} />
-                                            </div>
-                                        )}
-                                    </td>
+                                        <td style={{ padding: '0.75rem' }}>
+                                            {isEditing ? (
+                                                <input type="number" value={editForm.planned_qty} onChange={e => setEditForm({...editForm, planned_qty: parseInt(e.target.value) || 0})} style={{ width: '80px', padding: '0.3rem' }} />
+                                            ) : (
+                                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                    {rec.planned_qty} 
+                                                    <HistoryButton 
+                                                        history={pQtyHist} 
+                                                        isExpanded={isExpanded} 
+                                                        onToggle={() => toggleRowHistory(rec._id)} 
+                                                    />
+                                                </div>
+                                            )}
+                                        </td>
 
-                                    <td style={{ padding: '0.75rem' }}>
-                                        {isEditing ? (
-                                            <input 
-                                                type="number" 
-                                                disabled={isFutureDate}
-                                                value={editForm.completed} 
-                                                onChange={e => setEditForm({...editForm, completed: parseInt(e.target.value) || 0})} 
-                                                style={{ 
-                                                    width: '80px', 
-                                                    padding: '0.3rem',
-                                                    backgroundColor: isFutureDate ? '#f3f4f6' : '#ffffff',
-                                                    color: isFutureDate ? '#9ca3af' : '#1f2937',
-                                                    cursor: isFutureDate ? 'not-allowed' : 'auto'
-                                                }} 
-                                                title={isFutureDate ? 'Completed quantity cannot be updated for future dates' : ''}
-                                            />
-                                        ) : (
-                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                <span style={{ color: rec.completed >= rec.planned_qty && rec.planned_qty > 0 ? '#10b981' : '#1f2937', fontWeight: '500' }}>
-                                                    {rec.completed}
-                                                </span>
-                                                <HistoryTooltip history={rec.edit_history?.completed || []} />
-                                            </div>
-                                        )}
-                                    </td>
-
-                                    {/* Remaining Column */}
-                                    <td style={{ padding: '0.75rem', color: remaining > 0 ? '#d97706' : '#9ca3af', fontWeight: remaining > 0 ? '600' : '400' }}>
-                                        {remaining.toLocaleString()}
-                                    </td>
-
-                                    {/* Excess Column */}
-                                    <td style={{ padding: '0.75rem', color: excess > 0 ? '#2563eb' : '#9ca3af', fontWeight: excess > 0 ? '600' : '400' }}>
-                                        {excess > 0 ? `+${excess.toLocaleString()}` : '0'}
-                                    </td>
-
-                                    <td style={{ padding: '0.75rem', color: '#6b7280', fontSize: '0.8rem' }}>
-                                        {rec.acc_comp_date ? new Date(rec.acc_comp_date).toLocaleString() : '-'}
-                                    </td>
-
-                                    {/* Created By & Date Column */}
-                                    <td style={{ padding: '0.75rem', color: '#4b5563', fontSize: '0.8rem' }}>
-                                        {rec.created_by ? `${rec.created_by.split('@')[0]} (${rec.created_at ? new Date(rec.created_at).toLocaleDateString() : '-'})` : 'System'}
-                                    </td>
-
-                                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                                        {isEditing ? (
-                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                                <button onClick={() => saveEditing(rec._id, rec)} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '0.3rem 0.6rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                                                    <Save size={14} /> Save
-                                                </button>
-                                                <button onClick={cancelEditing} style={{ backgroundColor: '#e5e7eb', color: '#4b5563', border: 'none', padding: '0.3rem 0.6rem', borderRadius: '4px', cursor: 'pointer' }}>
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                                {hasPermission(rec.event_type) ? (
-                                                    <button onClick={() => startEditing(rec)} style={{ backgroundColor: 'transparent', border: '1px solid #d1d5db', color: '#4b5563', padding: '0.3rem 0.6rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                                                        <Edit2 size={14} /> Edit
-                                                    </button>
-                                                ) : (
-                                                    <span style={{ fontSize: '0.75rem', color: '#ef4444', fontStyle: 'italic', marginRight: '0.5rem' }}>
-                                                        you dont have access to it
+                                        <td style={{ padding: '0.75rem' }}>
+                                            {isEditing ? (
+                                                <input 
+                                                    type="number" 
+                                                    disabled={isFutureDate}
+                                                    value={editForm.completed} 
+                                                    onChange={e => setEditForm({...editForm, completed: parseInt(e.target.value) || 0})} 
+                                                    style={{ 
+                                                        width: '80px', 
+                                                        padding: '0.3rem',
+                                                        backgroundColor: isFutureDate ? '#f3f4f6' : '#ffffff',
+                                                        color: isFutureDate ? '#9ca3af' : '#1f2937',
+                                                        cursor: isFutureDate ? 'not-allowed' : 'auto'
+                                                    }} 
+                                                    title={isFutureDate ? 'Completed quantity cannot be updated for future dates' : ''}
+                                                />
+                                            ) : (
+                                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                    <span style={{ color: rec.completed >= rec.planned_qty && rec.planned_qty > 0 ? '#10b981' : '#1f2937', fontWeight: '500' }}>
+                                                        {rec.completed}
                                                     </span>
-                                                )}
-                                                {user?.role === 'Admin' && (
-                                                    <button onClick={() => handleOpenDeleteModal([rec._id])} title="Delete record (Admin)" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '0.3rem 0.5rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                                                        <Trash2 size={14} />
+                                                    <HistoryButton 
+                                                        history={compHist} 
+                                                        isExpanded={isExpanded} 
+                                                        onToggle={() => toggleRowHistory(rec._id)} 
+                                                    />
+                                                </div>
+                                            )}
+                                        </td>
+
+                                        {/* Remaining Column */}
+                                        <td style={{ padding: '0.75rem', color: remaining > 0 ? '#d97706' : '#9ca3af', fontWeight: remaining > 0 ? '600' : '400' }}>
+                                            {remaining.toLocaleString()}
+                                        </td>
+
+                                        {/* Excess Column */}
+                                        <td style={{ padding: '0.75rem', color: excess > 0 ? '#2563eb' : '#9ca3af', fontWeight: excess > 0 ? '600' : '400' }}>
+                                            {excess > 0 ? `+${excess.toLocaleString()}` : '0'}
+                                        </td>
+
+                                        <td style={{ padding: '0.75rem', color: '#6b7280', fontSize: '0.8rem' }}>
+                                            {rec.acc_comp_date ? new Date(rec.acc_comp_date).toLocaleString() : '-'}
+                                        </td>
+
+                                        {/* Created By & Date Column */}
+                                        <td style={{ padding: '0.75rem', color: '#4b5563', fontSize: '0.8rem' }}>
+                                            {rec.created_by ? `${rec.created_by.split('@')[0]} (${rec.created_at ? new Date(rec.created_at).toLocaleDateString() : '-'})` : 'System'}
+                                        </td>
+
+                                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                                            {isEditing ? (
+                                                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                    <button onClick={() => saveEditing(rec._id, rec)} style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '0.3rem 0.6rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                                        <Save size={14} /> Save
                                                     </button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </td>
-                                </tr>
+                                                    <button onClick={cancelEditing} style={{ backgroundColor: '#e5e7eb', color: '#4b5563', border: 'none', padding: '0.3rem 0.6rem', borderRadius: '4px', cursor: 'pointer' }}>
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                                    {totalEditsCount > 0 && (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => toggleRowHistory(rec._id)} 
+                                                            style={{ 
+                                                                backgroundColor: isExpanded ? '#eff6ff' : '#ffffff', 
+                                                                border: isExpanded ? '1px solid #3b82f6' : '1px solid #d1d5db', 
+                                                                color: isExpanded ? '#2563eb' : '#4b5563', 
+                                                                padding: '0.3rem 0.55rem', 
+                                                                borderRadius: '4px', 
+                                                                cursor: 'pointer', 
+                                                                display: 'flex', 
+                                                                alignItems: 'center', 
+                                                                gap: '0.25rem',
+                                                                fontSize: '0.78rem',
+                                                                fontWeight: '600'
+                                                            }}
+                                                            title="Toggle history sub-table"
+                                                        >
+                                                            <History size={13} /> History ({totalEditsCount}) {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                                        </button>
+                                                    )}
+                                                    {hasPermission(rec.event_type) ? (
+                                                        <button onClick={() => startEditing(rec)} style={{ backgroundColor: 'transparent', border: '1px solid #d1d5db', color: '#4b5563', padding: '0.3rem 0.6rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                                            <Edit2 size={14} /> Edit
+                                                        </button>
+                                                    ) : (
+                                                        <span style={{ fontSize: '0.75rem', color: '#ef4444', fontStyle: 'italic', marginRight: '0.5rem' }}>
+                                                            you dont have access to it
+                                                        </span>
+                                                    )}
+                                                    {user?.role === 'Admin' && (
+                                                        <button onClick={() => handleOpenDeleteModal([rec._id])} title="Delete record (Admin)" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '0.3rem 0.5rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                    {isExpanded && (
+                                        <tr key={`${rec._id}-history`} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: '#f8fafc' }}>
+                                            <td colSpan={10} style={{ padding: '0.4rem 1rem 1rem 1rem' }}>
+                                                <RecordHistorySubTable rec={rec} onClose={() => toggleRowHistory(rec._id)} />
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
                             );
                         })}
                         {filteredRecords.length === 0 && !loading && (
