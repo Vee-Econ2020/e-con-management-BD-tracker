@@ -80,10 +80,10 @@ def run_export():
             try:
                 page.wait_for_function("""() => {
                     const text = document.body.innerText.toLowerCase();
-                    const hasLoading = text.includes('computing') || text.includes('loading...') || text.includes('fetching');
+                    const hasLoading = text.includes('computing') || text.includes('loading') || text.includes('fetching');
                     const hasSpinners = document.querySelector('.animate-spin, .animate-pulse');
                     return !hasLoading && !hasSpinners;
-                }""", timeout=40000)
+                }""", timeout=180000)
             except Exception as wait_err:
                 print(f"[Worker] Readiness wait function timed out: {wait_err}")
 
@@ -93,7 +93,7 @@ def run_export():
                     const plots = Array.from(document.querySelectorAll('.js-plotly-plot'));
                     if (plots.length === 0) return true;
                     return plots.every(p => p.querySelector('.main-svg, .svg-container, canvas'));
-                }""", timeout=20000)
+                }""", timeout=60000)
             except Exception as plotly_err:
                 print(f"[Worker] Plotly readiness wait timed out: {plotly_err}")
 
