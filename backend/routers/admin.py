@@ -1485,7 +1485,8 @@ from slides_compute import (
     compute_overall_gross_margin_data,
     compute_overall_gross_margin_region_summary_data,
     compute_region_manufacturing_gm_data,
-    compute_region_services_gm_data
+    compute_region_services_gm_data,
+    compute_region_services_cy_gm_data,
 )
 
 @router.get("/slides/slide1")
@@ -1966,6 +1967,18 @@ async def get_region_services_gm_data(region: str):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute services gross margin data for {region}: {str(e)}")
+
+
+@router.get("/slides/region-services-cy-gross-margin")
+async def get_region_services_cy_gm_data(region: str):
+    """
+    Get computed data for a region-specific Services Current Year Gross Margin slide.
+    """
+    try:
+        result = await compute_region_services_cy_gm_data(db, region)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute services current year gross margin data for {region}: {str(e)}")
 
 
 # ====================================================================

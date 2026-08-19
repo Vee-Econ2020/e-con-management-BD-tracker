@@ -1007,6 +1007,68 @@ def transform_gross_margin_data(
     else:
         print("  ⚠ No Service_from_Start rows found — skipping Steps 5 & 6")
 
+    # ── 7) Per-Account Services Current Year Records ───────────────────
+    print("\n[STEP 7] Computing per-account services current year records...")
+    svc_cy = cy[cy["Department"] == "Services"].copy()
+    if len(svc_cy) > 0:
+        svc_cy_acct_agg = (
+            svc_cy.groupby(["Arrived Region", "Account Name"], as_index=False)
+            .agg({"Revenue": "sum", "Gross Margin": "sum"})
+        )
+        svc_cy_acct_agg["gross_margin_pct"] = svc_cy_acct_agg.apply(
+            lambda r: _safe_pct(r["Gross Margin"], r["Revenue"]), axis=1
+        )
+
+        svc_cy_acct_agg["gm_category"] = svc_cy_acct_agg["gross_margin_pct"].apply(_assign_gm_category)
+
+        svc_cy_acct_count = 0
+        for _, row in svc_cy_acct_agg.iterrows():
+            doc = {
+                "category": "region_services_cy_account",
+                "arrived_region": str(row["Arrived Region"]),
+                "account_name": str(row["Account Name"]),
+                "revenue": float(row["Revenue"]),
+                "gross_margin": float(row["Gross Margin"]),
+                "gross_margin_pct": float(row["gross_margin_pct"]),
+                "gm_category": row["gm_category"],
+            }
+            doc.update(base_meta)
+            documents.append(doc)
+            svc_cy_acct_count += 1
+        print(f"  ✓ Generated {svc_cy_acct_count} per-account services current year records")
+
+        # ── 8) Per-Category Services Current Year Summaries ───────────────
+        print("\n[STEP 8] Computing per-category services current year summaries...")
+        svc_cy_cat_agg = (
+            svc_cy_acct_agg.groupby(["Arrived Region", "gm_category"], as_index=False)
+            .agg(
+                revenue=("Revenue", "sum"),
+                gross_margin=("Gross Margin", "sum"),
+                account_count=("Account Name", "count"),
+            )
+        )
+        svc_cy_cat_agg["gross_margin_pct"] = svc_cy_cat_agg.apply(
+            lambda r: _safe_pct(r["gross_margin"], r["revenue"]), axis=1
+        )
+
+        svc_cy_cat_count = 0
+        for _, row in svc_cy_cat_agg.iterrows():
+            doc = {
+                "category": "region_services_cy_category_summary",
+                "arrived_region": str(row["Arrived Region"]),
+                "gm_category": str(row["gm_category"]),
+                "revenue": float(row["revenue"]),
+                "gross_margin": float(row["gross_margin"]),
+                "gross_margin_pct": float(row["gross_margin_pct"]),
+                "account_count": int(row["account_count"]),
+            }
+            doc.update(base_meta)
+            documents.append(doc)
+            svc_cy_cat_count += 1
+        print(f"  ✓ Generated {svc_cy_cat_count} per-category services current year summary records")
+    else:
+        print("  ⚠ No Current_year Services rows found — skipping Steps 7 & 8")
+
     print(f"\n  → Total documents: {len(documents)}")
     print("=" * 70)
     print("GROSS MARGIN TRANSFORMATION COMPLETE")

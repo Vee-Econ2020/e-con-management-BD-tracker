@@ -2825,7 +2825,136 @@ async def compute_region_services_gm_data(
     print("=" * 70 + "\n")
 
     return {
-        "title": f"Gross Margin Services - {region}",
+        "title": f"Gross Margin Services (Service from Start) - {region}",
+        "date": target_date,
+        "upload_week": target_week,
+        "region": region,
+        "region_summary": region_summary,
+        "categories": GM_CATEGORIES_ORDER,
+        "category_summaries": category_summaries,
+        "accounts": accounts,
+    }
+
+
+# ======================================================================
+# REGION-SPECIFIC SERVICES CURRENT YEAR GROSS MARGIN
+# ======================================================================
+
+
+async def compute_region_services_cy_gm_data(
+    db: AsyncIOMotorDatabase, region: str
+) -> Dict:
+    """
+    Compute data for a region-specific Services Current Year Gross Margin slide.
+
+    Uses Current_year sheet-type data filtered for Department == 'Services'.
+    Returns category bar-chart data + per-account detail tables grouped
+    by gross-margin category.
+    """
+    print(f"\n{'=' * 70}")
+    print(f"COMPUTING REGION SERVICES CURRENT YEAR GM DATA — {region}")
+    print("=" * 70)
+
+    collection = db["gross_margin_data"]
+
+    # -- Find the latest upload_week that has services_cy category-summary docs
+    latest_cat = await collection.find_one(
+        {
+            "category": "region_services_cy_category_summary",
+            "arrived_region": region,
+            "type": "gross_margin",
+        },
+        sort=[("upload_week", -1), ("created_at", -1)],
+    )
+
+    if not latest_cat:
+        return {
+            "error": f"No services current year gross margin data found for region '{region}'. "
+            "Upload a Gross Margin CSV first."
+        }
+
+    target_week = latest_cat["upload_week"]
+    target_date = latest_cat.get("date")
+
+    # -- Fetch category summaries (up to 4) ----------------------------------
+    cat_cursor = collection.find(
+        {
+            "category": "region_services_cy_category_summary",
+            "arrived_region": region,
+            "upload_week": target_week,
+            "type": "gross_margin",
+        }
+    )
+    cat_docs = await cat_cursor.to_list(length=100)
+
+    cat_map: Dict[str, Dict] = {}
+    for doc in cat_docs:
+        cat_map[doc["gm_category"]] = {
+            "category": doc["gm_category"],
+            "revenue": float(doc.get("revenue", 0)),
+            "gross_margin": float(doc.get("gross_margin", 0)),
+            "gross_margin_pct": float(doc.get("gross_margin_pct", 0)),
+            "account_count": int(doc.get("account_count", 0)),
+        }
+
+    category_summaries = []
+    for cat in GM_CATEGORIES_ORDER:
+        category_summaries.append(
+            cat_map.get(
+                cat,
+                {
+                    "category": cat,
+                    "revenue": 0,
+                    "gross_margin": 0,
+                    "gross_margin_pct": 0,
+                    "account_count": 0,
+                },
+            )
+        )
+
+    # -- Fetch per-account docs -----------------------------------------------
+    acct_cursor = collection.find(
+        {
+            "category": "region_services_cy_account",
+            "arrived_region": region,
+            "upload_week": target_week,
+            "type": "gross_margin",
+        }
+    ).sort("revenue", -1)
+    acct_docs = await acct_cursor.to_list(length=10000)
+
+    accounts: Dict[str, list] = {cat: [] for cat in GM_CATEGORIES_ORDER}
+    for doc in acct_docs:
+        cat = doc.get("gm_category", ">60%")
+        accounts.setdefault(cat, []).append(
+            {
+                "account_name": doc.get("account_name", ""),
+                "revenue": float(doc.get("revenue", 0)),
+                "gross_margin": float(doc.get("gross_margin", 0)),
+                "gross_margin_pct": float(doc.get("gross_margin_pct", 0)),
+            }
+        )
+
+    # -- Region-level services current year totals (sum from all categories) --
+    total_rev = sum(c["revenue"] for c in category_summaries)
+    total_gm = sum(c["gross_margin"] for c in category_summaries)
+    region_summary = {
+        "revenue": total_rev,
+        "gross_margin": total_gm,
+        "gross_margin_pct": round((total_gm / total_rev) * 100, 2) if total_rev else 0,
+    }
+
+    print(
+        f"  ✓ Region summary (CY Services): Rev={region_summary['revenue']}, "
+        f"GM={region_summary['gross_margin']}, GM%={region_summary['gross_margin_pct']}"
+    )
+    print(f"  ✓ Categories with data: {[c['category'] for c in category_summaries if c['account_count'] > 0]}")
+    total_accounts = sum(len(v) for v in accounts.values())
+    print(f"  ✓ Total accounts: {total_accounts}")
+    print("=" * 70 + "\n")
+
+    return {
+        "title": f"Gross Margin Services Current Year - {region}",
         "date": target_date,
         "upload_week": target_week,
         "region": region,
