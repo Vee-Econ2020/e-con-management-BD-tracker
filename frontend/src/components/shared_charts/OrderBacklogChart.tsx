@@ -23,15 +23,15 @@ function getBacklogTarget(data: any, title: string): number {
         return 7500000 * 1.30; // Overall services default ($9.75M)
     }
 
-    if (titleUpper.includes('WEST') || regionUpper.includes('WEST')) return 15500000 * 1.30; // $20.15M
-    if (titleUpper.includes('EUROPE') || regionUpper.includes('EUROPE')) return 14500000 * 1.30; // $18.85M
-    if (titleUpper.includes('EAST') || regionUpper.includes('EAST')) return 20000000 * 1.30; // $26.00M
-    if (titleUpper.includes('ASEAN') || regionUpper.includes('ASEAN')) return 3500000 * 1.30; // $4.55M
-    if (titleUpper.includes('JAPAN') || regionUpper.includes('JAPAN')) return 2800000 * 1.30; // $3.64M
-    if (titleUpper.includes('KANZ') || regionUpper.includes('KANZ')) return 2000000 * 1.30; // $2.60M
-    if (titleUpper.includes('LEGACY') || titleUpper.includes('MANAGEMENT') || regionUpper.includes('LEGACY')) return 5000000 * 1.30; // $6.50M
+    if (titleUpper.includes('WEST') || regionUpper.includes('WEST')) return 18000000 * 1.30; // $23.40M (Stretch)
+    if (titleUpper.includes('EUROPE') || regionUpper.includes('EUROPE')) return 16000000 * 1.30; // $20.80M (Stretch)
+    if (titleUpper.includes('EAST') || regionUpper.includes('EAST')) return 24000000 * 1.30; // $31.20M (Stretch)
+    if (titleUpper.includes('ASEAN') || regionUpper.includes('ASEAN')) return 3500000 * 1.30; // $4.55M (Base)
+    if (titleUpper.includes('JAPAN') || regionUpper.includes('JAPAN')) return 2800000 * 1.30; // $3.64M (Base)
+    if (titleUpper.includes('KANZ') || regionUpper.includes('KANZ')) return 2000000 * 1.30; // $2.60M (Base)
+    if (titleUpper.includes('LEGACY') || titleUpper.includes('MANAGEMENT') || regionUpper.includes('LEGACY')) return 5000000 * 1.30; // $6.50M (Base)
 
-    return 63800000 * 1.30; // Overall default ($82.94M)
+    return 63800000 * 1.30; // Overall base default ($82.94M)
 }
 
 export function OrderBacklogChart({ data, title }: BacklogChartProps) {
