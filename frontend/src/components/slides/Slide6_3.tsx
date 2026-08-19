@@ -157,7 +157,7 @@ export default function Slide6_3() {
                         letterSpacing: '0.04em',
                         textTransform: 'uppercase',
                     }}>
-                        As on 31-May-2026
+                        As on 31-Jul-2026
                     </div>
                 </div>
                 <h1 style={{

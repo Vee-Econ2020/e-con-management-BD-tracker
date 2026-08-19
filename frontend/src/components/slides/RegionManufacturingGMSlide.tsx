@@ -292,7 +292,7 @@ export default function RegionManufacturingGMSlide({ region }: { region: string 
                         letterSpacing: '0.03em',
                         textTransform: 'uppercase',
                     }}>
-                        As on 31-May-2026
+                        As on 31-Jul-2026
                     </div>
                 </div>
             </div>

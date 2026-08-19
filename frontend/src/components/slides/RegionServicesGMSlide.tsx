@@ -286,7 +286,7 @@ export default function RegionServicesGMSlide({ region }: { region: string }) {
                         letterSpacing: '0.03em',
                         textTransform: 'uppercase',
                     }}>
-                        From Beginning of the Project till 30-Apr-2026
+                        From Beginning of the Project till 31-Jul-2026
                     </div>
                 </div>
             </div>
