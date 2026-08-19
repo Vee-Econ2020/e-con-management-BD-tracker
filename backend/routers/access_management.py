@@ -282,6 +282,19 @@ async def delete_users(payload: DeleteUsersRequest, current_user: dict = Depends
     return {"status": "ok", "deleted_count": res.deleted_count, "message": f"Successfully deleted {res.deleted_count} user(s)"}
 
 from datetime import timedelta
+import re
+
+class UpdateLockWindowPayload(BaseModel):
+    start_time: str
+    end_time: str
+
+def parse_time_to_sec(time_str: Optional[str], default_str: str, is_end: bool = False) -> tuple[str, int]:
+    val = (time_str or default_str).strip()
+    if not re.match(r"^([01]\d|2[0-3]):([0-5]\d)$", val):
+        val = default_str
+    h, m = map(int, val.split(":"))
+    sec = h * 3600 + m * 60 + (59 if is_end else 0)
+    return val, sec
 
 @router.get("/data-lock-status")
 async def get_data_lock_status(authorization: Optional[str] = Header(None)):
@@ -323,12 +336,16 @@ async def get_data_lock_status(authorization: Optional[str] = Header(None)):
                 temp_remaining_seconds = max(0, int((temp_unlocked_until_dt - now_utc).total_seconds()))
                 temp_unlocked_until_iso = temp_unlocked_until_dt.isoformat() + "Z"
 
-    # Standard local time window check (00:01 AM to 14:00 PM)
+    start_time_str, start_sec = parse_time_to_sec(doc.get("start_time") if doc else None, "00:00", is_end=False)
+    end_time_str, end_sec = parse_time_to_sec(doc.get("end_time") if doc else None, "14:00", is_end=True)
+
     now_local = datetime.now()
     current_sec = now_local.hour * 3600 + now_local.minute * 60 + now_local.second
-    start_sec = 60
-    end_sec = 14 * 3600
-    standard_allowed = (start_sec <= current_sec <= end_sec)
+    
+    if start_sec <= end_sec:
+        standard_allowed = (start_sec <= current_sec <= end_sec)
+    else:
+        standard_allowed = (current_sec >= start_sec or current_sec <= end_sec)
 
     is_edit_allowed = standard_allowed or is_temp_unlocked or is_admin
     is_locked = not (standard_allowed or is_temp_unlocked)
@@ -341,7 +358,9 @@ async def get_data_lock_status(authorization: Optional[str] = Header(None)):
         "temp_unlocked_until": temp_unlocked_until_iso,
         "standard_allowed": standard_allowed,
         "unlocked_by": unlocked_by if is_temp_unlocked else None,
-        "is_admin": is_admin
+        "is_admin": is_admin,
+        "start_time": start_time_str,
+        "end_time": end_time_str
     }
 
 @router.post("/unlock-data-lock")
@@ -367,5 +386,38 @@ async def unlock_data_lock(current_user: dict = Depends(get_current_user)):
         "temp_remaining_seconds": 600,
         "temp_unlocked_until": unlocked_until.isoformat() + "Z",
         "unlocked_by": admin_email
+    }
+
+@router.post("/update-lock-window")
+async def update_lock_window(payload: UpdateLockWindowPayload, current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") != "Admin":
+        raise HTTPException(status_code=403, detail="Only Admins can change lock hours")
+    
+    start_time = payload.start_time.strip()
+    end_time = payload.end_time.strip()
+    
+    if not re.match(r"^([01]\d|2[0-3]):([0-5]\d)$", start_time) or not re.match(r"^([01]\d|2[0-3]):([0-5]\d)$", end_time):
+        raise HTTPException(status_code=400, detail="Invalid time format. Use HH:mm format between 00:00 and 23:59")
+    
+    db = _get_db()
+    admin_email = current_user.get("email") or current_user.get("username", "Admin")
+    now_utc = datetime.utcnow()
+    
+    await db["system_settings"].update_one(
+        {"_id": "data_update_lock"},
+        {"$set": {
+            "start_time": start_time,
+            "end_time": end_time,
+            "updated_by": admin_email,
+            "updated_at": now_utc
+        }},
+        upsert=True
+    )
+    
+    return {
+        "status": "ok",
+        "message": f"Lock window updated successfully to {start_time} - {end_time}",
+        "start_time": start_time,
+        "end_time": end_time
     }
 

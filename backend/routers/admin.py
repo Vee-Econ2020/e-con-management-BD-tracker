@@ -2901,37 +2901,58 @@ async def check_symb_time_lock(user: Optional[dict] = None):
         return True
 
     from datetime import datetime
+    import re
+
+    start_time_str = "00:00"
+    end_time_str = "14:00"
+
     try:
         coll = get_collection("system_settings")
         doc = await coll.find_one({"_id": "data_update_lock"})
-        if doc and doc.get("unlocked_until"):
-            unlocked_until = doc["unlocked_until"]
-            unlocked_until_dt = None
-            if isinstance(unlocked_until, str):
-                try:
-                    unlocked_until_dt = datetime.fromisoformat(unlocked_until.rstrip("Z"))
-                except Exception:
-                    unlocked_until_dt = None
-            elif isinstance(unlocked_until, datetime):
-                unlocked_until_dt = unlocked_until
-                
-            if unlocked_until_dt:
-                unlocked_until_dt = unlocked_until_dt.replace(tzinfo=None)
-                now_utc = datetime.utcnow()
-                if now_utc < unlocked_until_dt:
-                    # Temporary 10-minute override is ACTIVE
-                    return True
+        if doc:
+            if doc.get("unlocked_until"):
+                unlocked_until = doc["unlocked_until"]
+                unlocked_until_dt = None
+                if isinstance(unlocked_until, str):
+                    try:
+                        unlocked_until_dt = datetime.fromisoformat(unlocked_until.rstrip("Z"))
+                    except Exception:
+                        unlocked_until_dt = None
+                elif isinstance(unlocked_until, datetime):
+                    unlocked_until_dt = unlocked_until
+                    
+                if unlocked_until_dt:
+                    unlocked_until_dt = unlocked_until_dt.replace(tzinfo=None)
+                    now_utc = datetime.utcnow()
+                    if now_utc < unlocked_until_dt:
+                        # Temporary 10-minute override is ACTIVE
+                        return True
+            
+            if doc.get("start_time") and re.match(r"^([01]\d|2[0-3]):([0-5]\d)$", str(doc["start_time"]).strip()):
+                start_time_str = str(doc["start_time"]).strip()
+            if doc.get("end_time") and re.match(r"^([01]\d|2[0-3]):([0-5]\d)$", str(doc["end_time"]).strip()):
+                end_time_str = str(doc["end_time"]).strip()
     except Exception as e:
-        print(f"Error checking temporary lock override: {e}")
+        print(f"Error checking data lock settings: {e}")
+
+    sh, sm = map(int, start_time_str.split(":"))
+    eh, em = map(int, end_time_str.split(":"))
+
+    start_sec = sh * 3600 + sm * 60
+    end_sec = eh * 3600 + em * 60 + 59
 
     now = datetime.now()
     current_sec = now.hour * 3600 + now.minute * 60 + now.second
-    start_sec = 60
-    end_sec = 14 * 3600
-    if not (start_sec <= current_sec <= end_sec):
+
+    if start_sec <= end_sec:
+        is_allowed = (start_sec <= current_sec <= end_sec)
+    else:
+        is_allowed = (current_sec >= start_sec or current_sec <= end_sec)
+
+    if not is_allowed:
         raise HTTPException(
             status_code=403,
-            detail="Data update is locked for today. Editing is permitted between 00:01 AM and 14:00 (2:00 PM) only (or when temporarily unlocked by Admin)."
+            detail=f"Data update is locked for today. Editing is permitted between {start_time_str} and {end_time_str} only (or when temporarily unlocked by Admin)."
         )
 
 @router.post("/symb-updated-tracker/delete-bulk")

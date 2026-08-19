@@ -93,9 +93,14 @@ export default function AccessManagement() {
         temp_remaining_seconds: 0,
         temp_unlocked_until: null,
         standard_allowed: true,
-        unlocked_by: null
+        unlocked_by: null,
+        start_time: '00:00',
+        end_time: '14:00'
     });
     const [unlockLoading, setUnlockLoading] = useState(false);
+    const [lockStartTime, setLockStartTime] = useState('00:00');
+    const [lockEndTime, setLockEndTime] = useState('14:00');
+    const [updatingLockWindow, setUpdatingLockWindow] = useState(false);
 
     const fetchLockStatus = async () => {
         try {
@@ -105,9 +110,41 @@ export default function AccessManagement() {
             if (res.ok) {
                 const data = await res.json();
                 setDataLockState(data);
+                if (data.start_time) setLockStartTime(data.start_time);
+                if (data.end_time) setLockEndTime(data.end_time);
             }
         } catch (e) {
             console.error("Failed to fetch data lock status", e);
+        }
+    };
+
+    const handleUpdateLockWindow = async () => {
+        setUpdatingLockWindow(true);
+        setError('');
+        setSuccessMessage('');
+        try {
+            const res = await fetch('/api/access/update-lock-window', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    start_time: lockStartTime,
+                    end_time: lockEndTime
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setSuccessMessage(data.message || 'Data update lock window updated successfully!');
+                fetchLockStatus();
+            } else {
+                setError(data.detail || 'Failed to update lock window');
+            }
+        } catch (e) {
+            setError('Network error trying to update lock window');
+        } finally {
+            setUpdatingLockWindow(false);
         }
     };
 
@@ -523,7 +560,7 @@ export default function AccessManagement() {
                                     padding: '0.2rem 0.65rem',
                                     borderRadius: '9999px'
                                 }}>
-                                    🔓 UNLOCKED (STANDARD WINDOW 00:01 - 14:00)
+                                    🔓 UNLOCKED (WINDOW {dataLockState.start_time || '00:00'} - {dataLockState.end_time || '14:00'})
                                 </span>
                             ) : (
                                 <span style={{
@@ -534,7 +571,7 @@ export default function AccessManagement() {
                                     padding: '0.2rem 0.65rem',
                                     borderRadius: '9999px'
                                 }}>
-                                    🔒 LOCKED FOR STANDARD USERS (14:01 - 00:00)
+                                    🔒 LOCKED FOR STANDARD USERS ({dataLockState.start_time || '00:00'} - {dataLockState.end_time || '14:00'})
                                 </span>
                             )}
                         </div>
@@ -544,15 +581,15 @@ export default function AccessManagement() {
                                     Temporarily unlocked by <strong>{dataLockState.unlocked_by || 'Admin'}</strong>. Editing is open for all users across the system.
                                 </>
                             ) : dataLockState.standard_allowed ? (
-                                <>Standard data editing window is active (00:01 AM to 14:00 PM).</>
+                                <>Standard data editing window is active ({dataLockState.start_time || '00:00'} to {dataLockState.end_time || '14:00'}).</>
                             ) : (
-                                <>Data editing is locked for standard users from 14:01 to 00:00. Admin roles have unrestricted edit access at all times.</>
+                                <>Data editing is locked for standard users outside window {dataLockState.start_time || '00:00'} - {dataLockState.end_time || '14:00'}. Admin roles have unrestricted edit access at all times.</>
                             )}
                         </p>
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                     {dataLockState.is_temp_unlocked && (
                         <div style={{ textAlign: 'right' }}>
                             <span style={{ fontSize: '0.75rem', color: '#9a3412', fontWeight: '700', textTransform: 'uppercase', display: 'block' }}>Time Remaining</span>
@@ -586,6 +623,74 @@ export default function AccessManagement() {
                                 <span>{dataLockState.is_temp_unlocked ? '⚡ Extend Unlock (10 Mins)' : '🔓 Unlock Data Lock for 10 Mins'}</span>
                             </>
                         )}
+                    </button>
+                </div>
+
+                <div style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    flexWrap: 'wrap',
+                    marginTop: '0.8rem',
+                    paddingTop: '0.8rem',
+                    borderTop: '1px solid rgba(0,0,0,0.08)'
+                }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#1e293b' }}>
+                        Configure Standard Edit Hours (00:00 - 23:59):
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#475569' }}>Start:</label>
+                        <input
+                            type="time"
+                            value={lockStartTime}
+                            onChange={(e) => setLockStartTime(e.target.value)}
+                            style={{
+                                padding: '0.35rem 0.6rem',
+                                borderRadius: '0.375rem',
+                                border: '1px solid #cbd5e1',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                color: '#0f172a'
+                            }}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#475569' }}>End:</label>
+                        <input
+                            type="time"
+                            value={lockEndTime}
+                            onChange={(e) => setLockEndTime(e.target.value)}
+                            style={{
+                                padding: '0.35rem 0.6rem',
+                                borderRadius: '0.375rem',
+                                border: '1px solid #cbd5e1',
+                                fontSize: '0.875rem',
+                                fontWeight: '600',
+                                color: '#0f172a'
+                            }}
+                        />
+                    </div>
+                    <button
+                        onClick={handleUpdateLockWindow}
+                        disabled={updatingLockWindow}
+                        style={{
+                            backgroundColor: '#0f766e',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.45rem 1rem',
+                            borderRadius: '0.375rem',
+                            fontWeight: '700',
+                            fontSize: '0.85rem',
+                            cursor: updatingLockWindow ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        {updatingLockWindow ? 'Saving...' : '⚙️ Save Lock Hours'}
                     </button>
                 </div>
             </div>

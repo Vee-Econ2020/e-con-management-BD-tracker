@@ -70,6 +70,24 @@ function parseDayDate(dayStr: any): Date | null {
 }
 
 function getLockStatus(nowDate: Date = new Date(), backendState?: any) {
+    const startTimeStr = backendState?.start_time || '00:00';
+    const endTimeStr = backendState?.end_time || '14:00';
+
+    const parseHhMm = (s: string, defaultH: number, defaultM: number, isEnd = false) => {
+        if (!s || typeof s !== 'string') return { h: defaultH, m: defaultM, sec: defaultH * 3600 + defaultM * 60 + (isEnd ? 59 : 0) };
+        const parts = s.trim().split(':');
+        if (parts.length !== 2) return { h: defaultH, m: defaultM, sec: defaultH * 3600 + defaultM * 60 + (isEnd ? 59 : 0) };
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+            return { h: defaultH, m: defaultM, sec: defaultH * 3600 + defaultM * 60 + (isEnd ? 59 : 0) };
+        }
+        return { h, m, sec: h * 3600 + m * 60 + (isEnd ? 59 : 0) };
+    };
+
+    const startInfo = parseHhMm(startTimeStr, 0, 0, false);
+    const endInfo = parseHhMm(endTimeStr, 14, 0, true);
+
     if (backendState && backendState.is_temp_unlocked) {
         const totalSecondsRem = Math.max(0, backendState.temp_remaining_seconds);
         const mins = Math.floor(totalSecondsRem / 60);
@@ -82,33 +100,38 @@ function getLockStatus(nowDate: Date = new Date(), backendState?: any) {
             hrs: 0,
             mins,
             secs,
-            lockTimeStr: '14:00 (2:00 PM)',
-            unlockTimeStr: '00:01 AM'
+            startTimeStr,
+            endTimeStr,
+            lockTimeStr: endTimeStr,
+            unlockTimeStr: startTimeStr
         };
     }
 
     const hours = nowDate.getHours();
     const minutes = nowDate.getMinutes();
     const seconds = nowDate.getSeconds();
-
     const currentTotalSec = hours * 3600 + minutes * 60 + seconds;
-    
-    // 00:01 AM (60 seconds) to 14:00 (14 * 3600 = 50400 seconds)
-    const startSec = 60;
-    const endSec = 14 * 3600;
 
-    const isEditAllowed = currentTotalSec >= startSec && currentTotalSec <= endSec;
+    let isEditAllowed = false;
+    if (startInfo.sec <= endInfo.sec) {
+        isEditAllowed = currentTotalSec >= startInfo.sec && currentTotalSec <= endInfo.sec;
+    } else {
+        isEditAllowed = currentTotalSec >= startInfo.sec || currentTotalSec <= endInfo.sec;
+    }
+
+    if (backendState && typeof backendState.standard_allowed === 'boolean') {
+        isEditAllowed = backendState.standard_allowed;
+    }
 
     let targetDate = new Date(nowDate);
-
     if (isEditAllowed) {
-        targetDate.setHours(14, 0, 0, 0);
+        targetDate.setHours(endInfo.h, endInfo.m, 0, 0);
     } else {
-        if (currentTotalSec > endSec) {
+        if (currentTotalSec > endInfo.sec) {
             targetDate.setDate(targetDate.getDate() + 1);
-            targetDate.setHours(0, 1, 0, 0);
+            targetDate.setHours(startInfo.h, startInfo.m, 0, 0);
         } else {
-            targetDate.setHours(0, 1, 0, 0);
+            targetDate.setHours(startInfo.h, startInfo.m, 0, 0);
         }
     }
 
@@ -126,8 +149,10 @@ function getLockStatus(nowDate: Date = new Date(), backendState?: any) {
         hrs,
         mins,
         secs,
-        lockTimeStr: '14:00 (2:00 PM)',
-        unlockTimeStr: '00:01 AM'
+        startTimeStr,
+        endTimeStr,
+        lockTimeStr: endTimeStr,
+        unlockTimeStr: startTimeStr
     };
 }
 
@@ -1182,7 +1207,7 @@ export default function SymbTrackerUpdate() {
         e.preventDefault();
 
         if (!effectiveIsEditAllowed) {
-            setBulkMsg("Error: Data editing is locked for today (Editing permitted between 00:01 and 14:00 only)");
+            setBulkMsg(`Error: Data editing is locked for today (Editing permitted between ${lockInfo.startTimeStr} and ${lockInfo.endTimeStr} only)`);
             return;
         }
 
@@ -1229,7 +1254,7 @@ export default function SymbTrackerUpdate() {
 
     const startEditing = (rec: TrackerRecord) => {
         if (!effectiveIsEditAllowed) {
-            alert("Data update is currently locked for today (Locked from 14:01 to 00:00). Next update window opens at 00:01 AM.");
+            alert(`Data update is currently locked for today (Editing permitted between ${lockInfo.startTimeStr} and ${lockInfo.endTimeStr} only). Next update window opens at ${lockInfo.unlockTimeStr}.`);
             return;
         }
         setEditingId(rec._id);
@@ -1551,7 +1576,7 @@ export default function SymbTrackerUpdate() {
                                 alignItems: 'center',
                                 gap: '0.3rem'
                             }}>
-                                {lockInfo.isTempUnlocked ? '⚡ TEMPORARILY UNLOCKED (10 MINS)' : (lockInfo.isEditAllowed ? '🔓 EDIT ACCESS ACTIVE (00:01 - 14:00)' : (isAdmin ? '🔓 UNLOCKED FOR ADMIN' : '🔒 DATA EDITING LOCKED (14:01 - 00:00)'))}
+                                {lockInfo.isTempUnlocked ? '⚡ TEMPORARILY UNLOCKED (10 MINS)' : (lockInfo.isEditAllowed ? `🔓 EDIT ACCESS ACTIVE (${lockInfo.startTimeStr} - ${lockInfo.endTimeStr})` : (isAdmin ? '🔓 UNLOCKED FOR ADMIN' : `🔒 DATA EDITING LOCKED OUTSIDE (${lockInfo.startTimeStr} - ${lockInfo.endTimeStr})`))}
                             </span>
                         </div>
 
@@ -1562,16 +1587,16 @@ export default function SymbTrackerUpdate() {
                                 </>
                             ) : lockInfo.isEditAllowed ? (
                                 <>
-                                    People can edit data between <strong>00:01 AM</strong> and <strong>14:00 (2:00 PM)</strong>. 
+                                    People can edit data between <strong>{lockInfo.startTimeStr}</strong> and <strong>{lockInfo.endTimeStr}</strong>. 
                                     Edit access locks at <strong>{lockInfo.lockTimeStr}</strong>.
                                 </>
                             ) : isAdmin ? (
                                 <>
-                                    Data editing is locked from <strong>14:01 to 00:00</strong> for standard users. As an <strong>Admin</strong>, you have unrestricted edit access.
+                                    Data editing is locked outside window <strong>{lockInfo.startTimeStr} - {lockInfo.endTimeStr}</strong> for standard users. As an <strong>Admin</strong>, you have unrestricted edit access.
                                 </>
                             ) : (
                                 <>
-                                    Data editing is locked every day from <strong>14:01 to 00:00</strong> midnight. 
+                                    Data editing is currently locked outside standard hours (<strong>{lockInfo.startTimeStr} - {lockInfo.endTimeStr}</strong>). 
                                     Next update window opens at <strong>{lockInfo.unlockTimeStr}</strong>.
                                 </>
                             )}
