@@ -146,6 +146,15 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_mech_agg_varient, df_tr
             "Last Batch Date": ship_week - pd.Timedelta(weeks=9)
         })
 
+        # Row for Materials Issued (7 weeks before Shipment Week)
+        new_rows.append({
+            "Shipment Week": ship_week,
+            "Variant Type": variant,
+            "Event Type": "Materials Issued",
+            "planned Value": planned_val,
+            "Last Batch Date": ship_week - pd.Timedelta(weeks=7)
+        })
+
         # Row for Production/Assembly (1 week before Finished goods Last Batch Date)
         new_rows.append({
             "Shipment Week": ship_week,
@@ -172,6 +181,7 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_mech_agg_varient, df_tr
         "EBOM covered", 
         "PCBA covered", 
         "All Material Available", 
+        "Materials Issued",
         "Active alignment", 
         "Production/Assembly", 
         "FQC", 
@@ -184,6 +194,7 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_mech_agg_varient, df_tr
     EVENT_MAP = {
         "PCBA covered": "PCBA Ready",
         "All Material Available": "PCBA Ready",
+        "Materials Issued": "Materials Issued",
         "Active alignment": "Active alignment",
         "Production/Assembly": "Production/Assembly",
         "FQC": "FQC",
@@ -275,6 +286,7 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_mech_agg_varient, df_tr
         "EBOM covered",
         "PCBA covered",
         "All Material Available",
+        "Materials Issued",
         "Active alignment",
         "Production/Assembly",
         "FQC",
@@ -313,9 +325,9 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_mech_agg_varient, df_tr
                     effective_p = orig_p
                     is_autofill = False
 
-                # Rule 2: Warning only if previous stage completed units (>0) exceed current stage effective planned target
-                if prev_completed > 0 and prev_completed > effective_p:
-                    unplanned = prev_completed - effective_p
+                # Rule 2: Warning if previous stage completed units (>0) exceed current stage original planned target
+                if prev_completed > 0 and prev_completed > orig_p:
+                    unplanned = prev_completed - orig_p
                     warn = f"There is no plan for remaining qty ({int(unplanned):,} units). Please update!"
                 else:
                     unplanned = 0.0

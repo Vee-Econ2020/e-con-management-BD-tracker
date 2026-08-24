@@ -3082,6 +3082,7 @@ async def get_stage_target_qty(variant: str, event_type: str) -> int:
 
         seq_stages = [
             "PCBA Ready",
+            "Materials Issued",
             "Active alignment",
             "Production/Assembly",
             "FQC",

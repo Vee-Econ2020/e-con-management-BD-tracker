@@ -24,6 +24,7 @@ const EVENT_ORDER = [
     "EBOM covered",
     "PCBA covered",
     "All Material Available",
+    "Materials Issued",
     "Active alignment",
     "Production/Assembly",
     "FQC",
@@ -38,6 +39,7 @@ const STAGE_COLOR_MAP: Record<string, { color: string; bg: string; border: strin
     'PCBA covered': { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
     'PCBA Ready': { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
     'All Material Available': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
+    'Materials Issued': { color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe', text: '#5b21b6' },
     'Active alignment': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
     'Production/Assembly': { color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4', text: '#115e59' },
     'FQC': { color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', text: '#3730a3' },
@@ -102,6 +104,7 @@ const SymbPipelineView: React.FC = () => {
 
     const MILESTONE_STAGES = useMemo(() => [
         { key: 'PCBA', title: 'PCBA', eventMatch: ['PCBA covered', 'PCBA Ready'], color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+        { key: 'Materials Issued', title: 'Materials Issued', eventMatch: ['Materials Issued'], color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' },
         { key: 'Active Alignment', title: 'Active Alignment', eventMatch: ['Active alignment'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
         { key: 'Production / Assembly', title: 'Production / Assembly', eventMatch: ['Production/Assembly'], color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' },
         { key: 'FQC', title: 'FQC', eventMatch: ['FQC'], color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
@@ -287,7 +290,7 @@ const SymbPipelineView: React.FC = () => {
                 });
             });
 
-            const pct = Math.min(100, Math.round(completedSlots * 5));
+            const pct = Math.min(100, Math.round(completedSlots * (100 / 22)));
             if (pct === 100) {
                 completed.push([weekStr, rows, pct]);
             } else {
@@ -346,6 +349,16 @@ const SymbPipelineView: React.FC = () => {
                 titleColor: '#1e40af',
                 numColor: '#1d4ed8',
                 subTextColor: '#2563eb'
+            },
+            { 
+                key: 'Materials Issued', 
+                title: 'Materials Issued', 
+                eventMatch: ['Materials Issued'],
+                bgColor: '#f5f3ff',
+                borderColor: '#ddd6fe',
+                titleColor: '#5b21b6',
+                numColor: '#6d28d9',
+                subTextColor: '#7c3aed'
             },
             { 
                 key: 'Active alignment', 

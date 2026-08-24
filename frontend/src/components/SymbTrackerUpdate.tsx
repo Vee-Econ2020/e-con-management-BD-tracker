@@ -32,7 +32,7 @@ interface TrackerRecord {
     edit_history?: EditHistory;
 }
 
-const EVENT_TABS = ['ALL', 'PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
+const EVENT_TABS = ['ALL', 'PCBA Ready', 'Materials Issued', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
 
 function parseDayDate(dayStr: any): Date | null {
     if (!dayStr) return null;
@@ -230,6 +230,7 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
         if (selectedEventTab !== 'ALL') return [];
         const STAGES = [
             { key: 'PCBA Ready', label: 'PCBA Ready', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+            { key: 'Materials Issued', label: 'Materials Issued', color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' },
             { key: 'Active alignment', label: 'Total AA Done', color: '#d97706', bg: '#fffbe5', border: '#fde68a' },
             { key: 'Production/Assembly', label: 'Production / Assembly', color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' },
             { key: 'FQC', label: 'FQC', color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
@@ -266,9 +267,9 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
                     isAutofilled = false;
                 }
 
-                // Rule 2: Warning only if previous stage completed units (>0) exceed current stage effective planned target
-                if (prevCompleted > 0 && prevCompleted > planned) {
-                    unplannedQty = prevCompleted - planned;
+                // Rule 2: Warning if previous stage completed units (>0) exceed current stage original planned target
+                if (prevCompleted > 0 && prevCompleted > origPlanned) {
+                    unplannedQty = prevCompleted - origPlanned;
                     warningMsg = `There is no plan for remaining qty (${unplannedQty.toLocaleString()} units). Please update!`;
                 }
             }
@@ -296,6 +297,7 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
 
         const STAGES = [
             { key: 'PCBA Ready', label: 'PCBA Ready' },
+            { key: 'Materials Issued', label: 'Materials Issued' },
             { key: 'Active alignment', label: 'Active alignment' },
             { key: 'Production/Assembly', label: 'Production / Assembly' },
             { key: 'FQC', label: 'FQC' },
@@ -561,9 +563,10 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
             .sort((a, b) => a.timestamp - b.timestamp);
         const xDates = sortedDates.map(d => d.dateStr);
 
-        const eventTypes = ['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
+        const eventTypes = ['PCBA Ready', 'Materials Issued', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
         const colorMap: Record<string, string> = {
             'PCBA Ready': '#3b82f6',
+            'Materials Issued': '#8b5cf6',
             'Active alignment': '#f59e0b',
             'Production/Assembly': '#14b8a6',
             'FQC': '#6366f1',
@@ -730,20 +733,25 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
                             <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', marginTop: '0.2rem' }}>
                                 {stg.completed.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: '600', color: stg.color }}>done</span>
                             </div>
-                            <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>Available inventory: <strong style={{ color: stg.isAutofilled ? '#1d4ed8' : '#0f172a' }}>{stg.planned.toLocaleString()}</strong></span>
-                                {stg.remaining > 0 ? (
-                                    <span style={{ color: '#ca8a04', fontWeight: '600' }}>{stg.remaining.toLocaleString()} rem</span>
-                                ) : (
-                                    <span style={{ color: '#166534', fontWeight: '600' }}>Completed</span>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span>Available inventory: <strong style={{ color: stg.isAutofilled ? '#1d4ed8' : '#0f172a' }}>{stg.planned.toLocaleString()}</strong></span>
+                                    {stg.remaining > 0 ? (
+                                        <span style={{ color: '#ca8a04', fontWeight: '600' }}>{stg.remaining.toLocaleString()} rem</span>
+                                    ) : (
+                                        <span style={{ color: '#166534', fontWeight: '600' }}>Completed</span>
+                                    )}
+                                </div>
+                                {stg.unplannedQty > 0 && (
+                                    <div style={{ marginTop: '0.35rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '0.35rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                            <ShieldAlert size={14} style={{ color: '#dc2626', flexShrink: 0 }} />
+                                            <span>no plan for:</span>
+                                        </div>
+                                        <span style={{ color: '#dc2626', fontWeight: '800' }}>{stg.unplannedQty.toLocaleString()} qty</span>
+                                    </div>
                                 )}
                             </div>
-                            {stg.unplannedQty > 0 && (
-                                <div style={{ marginTop: '0.5rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '0.35rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                    <ShieldAlert size={14} style={{ color: '#dc2626', flexShrink: 0 }} />
-                                    <span>There is no plan for remaining qty ({stg.unplannedQty.toLocaleString()} units). Please update!</span>
-                                </div>
-                            )}
                         </div>
                     ))}
                 </div>
@@ -1287,7 +1295,7 @@ export default function SymbTrackerUpdate() {
 
         // Compute stage target dynamically for current row's variant and event_type
         const isSameV = (v1: any, v2: any) => String(v1 ?? '').trim().toLowerCase() === String(v2 ?? '').trim().toLowerCase();
-        const seqStages = ['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
+        const seqStages = ['PCBA Ready', 'Materials Issued', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
         const normEvt = original.event_type === 'PCBA covered' ? 'PCBA Ready' : original.event_type;
         const stageIdx = seqStages.indexOf(normEvt);
 
@@ -1653,7 +1661,7 @@ export default function SymbTrackerUpdate() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#4b5563' }}>Event Type</label>
                         <select disabled={!effectiveIsEditAllowed} value={eventType} onChange={e => setEventType(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db' }}>
-                            {['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'].map(evt => (
+                            {['PCBA Ready', 'Materials Issued', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'].map(evt => (
                                 <option key={evt} value={evt} disabled={!hasPermission(evt)}>
                                     {evt} {!hasPermission(evt) && '(No Access)'}
                                 </option>
@@ -1899,7 +1907,7 @@ export default function SymbTrackerUpdate() {
 
                             // Calculate stage target dynamically for this row
                             const isSameV = (v1: any, v2: any) => String(v1 ?? '').trim().toLowerCase() === String(v2 ?? '').trim().toLowerCase();
-                            const seqStages = ['PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
+                            const seqStages = ['PCBA Ready', 'Materials Issued', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
                             const normEvt = rec.event_type === 'PCBA covered' ? 'PCBA Ready' : rec.event_type;
                             const stageIdx = seqStages.indexOf(normEvt);
 

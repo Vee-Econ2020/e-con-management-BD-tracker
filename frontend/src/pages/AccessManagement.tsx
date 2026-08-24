@@ -1250,7 +1250,7 @@ export default function AccessManagement() {
                                     <div>
                                         <label>SYMB Permissions (Can edit)</label>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.5rem' }}>
-                                            {['ALL', 'PCBA Ready', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'].map(perm => (
+                                            {['ALL', 'PCBA Ready', 'Materials Issued', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'].map(perm => (
                                                 <label key={perm} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
                                                     <input type="checkbox" checked={symbPermissions.includes(perm)} onChange={() => handleSymbPermissionChange(perm)} /> {perm}
                                                 </label>
