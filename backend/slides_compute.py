@@ -3197,6 +3197,47 @@ async def compute_invoice_slide_data(db: AsyncIOMotorDatabase, region_name: str 
     projected_runrate_addition = avg_weekly * remaining_weeks
     projected_fy_end = current_cum_val + projected_runrate_addition
 
+    # Fetch Total PO (Closed Won) amount for the region from weekly_tracker_data
+    closed_won_po_amount = 0.0
+    try:
+        wt_data = await get_current_or_closest_week_data(db)
+        if wt_data is not None and not wt_data.empty:
+            category_col = "projection - category" if "projection - category" in wt_data.columns else ("Projection - Category" if "Projection - Category" in wt_data.columns else None)
+            region_col = "mRegion" if "mRegion" in wt_data.columns else ("Region" if "Region" in wt_data.columns else None)
+            amount_col = "Weighted Amount" if "Weighted Amount" in wt_data.columns else ("Amount" if "Amount" in wt_data.columns else None)
+
+            if category_col and amount_col:
+                df_cw = wt_data[wt_data[category_col] == "Closed Won"]
+                if region_name and region_name != "Overall" and region_col:
+                    reg = region_name.strip()
+                    if reg in ["US West", "USA West"]:
+                        df_cw_reg = df_cw[df_cw[region_col].isin(["US West", "USA West"])]
+                    elif reg in ["US East", "USA East"]:
+                        df_cw_reg = df_cw[df_cw[region_col].isin(["US East", "USA East"])]
+                    elif reg.lower() == "europe":
+                        df_cw_reg = df_cw[df_cw[region_col].isin(["Europe"])]
+                    elif reg.lower() in ["asean"]:
+                        df_cw_reg = df_cw[df_cw[region_col].isin(["Asean", "ASEAN"])]
+                    elif reg.lower() == "japan":
+                        df_cw_reg = df_cw[df_cw[region_col].isin(["Japan"])]
+                    elif reg.lower() in ["kanz", "korea"]:
+                        df_cw_reg = df_cw[df_cw[region_col].isin(["KANZ", "Korea"])]
+                    elif reg.lower() == "legacy":
+                        df_cw_reg = df_cw[df_cw[region_col].isin(["Legacy"])]
+                    elif reg.lower() == "apac":
+                        df_cw_reg = df_cw[df_cw[region_col].isin(["APAC", "Japan", "KANZ", "Asean", "ASEAN"])]
+                    else:
+                        df_cw_reg = df_cw[df_cw[region_col].isin([reg])]
+                    closed_won_po_amount = float(df_cw_reg[amount_col].sum()) if not df_cw_reg.empty else 0.0
+                else:
+                    closed_won_po_amount = float(df_cw[amount_col].sum()) if not df_cw.empty else 0.0
+    except Exception as cw_err:
+        print(f"[ERROR] Error fetching closed won PO amount: {cw_err}")
+        closed_won_po_amount = 0.0
+
+    po_deficit = max(0.0, closed_won_po_amount - current_cum_val)
+    required_weekly_avg = po_deficit / remaining_weeks if remaining_weeks > 0 else 0.0
+
     # 3. Add 8-week average data label annotation in bottom subplot box (xref='x2', yref='y2')
     avg_label = f"<b>8-Wk Avg: ${avg_weekly/1e6:.2f}M/wk</b>" if avg_weekly >= 1e6 else (f"<b>8-Wk Avg: ${avg_weekly/1e3:.0f}K/wk</b>" if avg_weekly >= 1e3 else f"<b>8-Wk Avg: ${avg_weekly:.0f}/wk</b>")
     annotations.append({
@@ -3213,8 +3254,24 @@ async def compute_invoice_slide_data(db: AsyncIOMotorDatabase, region_name: str 
         "type": "static"
     })
 
+    # 4. Add required weekly average data label annotation in bottom subplot box (xref='x2', yref='y2')
+    req_label = f"<b>Req. Avg: ${required_weekly_avg/1e6:.2f}M/wk</b>" if required_weekly_avg >= 1e6 else (f"<b>Req. Avg: ${required_weekly_avg/1e3:.0f}K/wk</b>" if required_weekly_avg >= 1e3 else f"<b>Req. Avg: ${required_weekly_avg:.0f}/wk</b>")
+    annotations.append({
+        "x": 0,
+        "y": required_weekly_avg,
+        "xref": "x2",
+        "yref": "y2",
+        "text": req_label,
+        "showarrow": False,
+        "font": {"size": 13, "color": "#7e22ce", "family": "Arial"},
+        "bgcolor": "rgba(243, 232, 255, 0.95)",
+        "bordercolor": "#9d45eb",
+        "borderpad": 4,
+        "type": "static"
+    })
+
     max_weekly_val = max(weekly_invoiced) if weekly_invoiced else 0.0
-    sec_axis_max = max(max_weekly_val, avg_weekly) * 1.35 if max_weekly_val > 0 else 5_000_000.0
+    sec_axis_max = max(max_weekly_val, avg_weekly, required_weekly_avg) * 1.35 if max_weekly_val > 0 else 5_000_000.0
 
     return {
         "weeks": weeks_labels,
@@ -3229,6 +3286,9 @@ async def compute_invoice_slide_data(db: AsyncIOMotorDatabase, region_name: str 
         "is_invoice": True,
         "sec_axis_max": sec_axis_max,
         "avg_weekly": avg_weekly,
+        "closed_won_po_amount": closed_won_po_amount,
+        "required_weekly_avg": required_weekly_avg,
+        "po_deficit": po_deficit,
         "projected_runrate_addition": projected_runrate_addition,
         "projected_fy_end": projected_fy_end,
         "current_week": max_week,

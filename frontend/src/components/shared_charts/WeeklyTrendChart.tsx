@@ -47,6 +47,7 @@ export function WeeklyTrendChart({ data, title, hideTargets = false }: TrendChar
         // ── Stacked Subplots for Invoiced Amount Slides ─────────────────────
         if (isInvoice) {
             const avgWeekly = data.avg_weekly || (po_achieved.length ? po_achieved.reduce((a: number, b: number) => a + b, 0) / po_achieved.length : 0);
+            const reqWeekly = data.required_weekly_avg || 0;
 
             const initialDataInvoice = [
                 // Subplot 1 (Top): Cumulative Invoiced Amount (Green line)
@@ -80,6 +81,17 @@ export function WeeklyTrendChart({ data, title, hideTargets = false }: TrendChar
                     mode: 'lines',
                     line: { color: '#ea580c', width: 3, dash: 'dot' },
                     name: `8-Week Average (${formatMoney(avgWeekly)}/wk)`,
+                    type: 'scatter',
+                    xaxis: 'x2',
+                    yaxis: 'y2'
+                },
+                // Subplot 2 (Bottom): Required Weekly Average Line (Purple Dashed line)
+                {
+                    x: xNumeric,
+                    y: Array(weeks.length).fill(reqWeekly),
+                    mode: 'lines',
+                    line: { color: '#9d45eb', width: 3, dash: 'dash' },
+                    name: `Required Wkly Avg (${formatMoney(reqWeekly)}/wk)`,
                     type: 'scatter',
                     xaxis: 'x2',
                     yaxis: 'y2'
@@ -138,6 +150,17 @@ export function WeeklyTrendChart({ data, title, hideTargets = false }: TrendChar
                         showarrow: false,
                         font: { size: 18, color: '#047857', family: 'Helvetica, Arial, sans-serif' },
                         xanchor: 'left', yanchor: 'top'
+                    },
+                    {
+                        x: 0.5, y: 0.49, xref: 'paper', yref: 'paper',
+                        text: `<b>REQUIRED WEEKLY AVG TO INVOICE CLOSED WON PO (${formatMoney(data.closed_won_po_amount)}) BY MAR 31, 2027: <span style="color:#7e22ce; font-size:1.05rem;">${formatMoney(reqWeekly)}/wk</span></b>`,
+                        showarrow: false,
+                        font: { size: 13, color: '#4c1d95', family: 'Helvetica, Arial, sans-serif' },
+                        bgcolor: 'rgba(243, 232, 255, 0.95)',
+                        bordercolor: '#c084fc',
+                        borderwidth: 1,
+                        borderpad: 5,
+                        xanchor: 'center', yanchor: 'middle'
                     },
                     {
                         x: 0.01, y: 0.42, xref: 'paper', yref: 'paper',
