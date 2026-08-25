@@ -54,7 +54,7 @@ def spawn_pdf_worker(job_id: str, week: Optional[int], start_slide: Optional[int
         status_file,
         output_pdf,
         str(week) if week is not None else "None",
-        str(start_slide) if start_slide is not None else "None",
+            str(start_slide) if start_slide is not None else "None",
         str(end_slide) if end_slide is not None else "None",
         frontend_url or "http://localhost:5173"
     ]

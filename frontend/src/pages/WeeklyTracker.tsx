@@ -1960,6 +1960,7 @@ export default function WeeklyTracker() {
         }
 
         setIsExporting(true);
+        let serverJobStarted = false;
 
         // Try server-side background PDF generation first (allows closing/switching tabs)
         try {
@@ -1980,22 +1981,32 @@ export default function WeeklyTracker() {
             if (res.ok) {
                 const data = await res.json();
                 const jobId = data.job_id;
+                serverJobStarted = true;
 
                 // Poll job status until complete or failed
                 let finished = false;
-                let pollAttempts = 0;
+                const pollStartedAt = Date.now();
+                const pollTimeoutMs = 14 * 60 * 1000;
 
-                while (!finished && pollAttempts < 120) {
+                while (!finished && Date.now() - pollStartedAt < pollTimeoutMs) {
                     await wait(2000);
-                    pollAttempts++;
 
                     const statusRes = await fetch(`/api/admin/export-pdf-status/${jobId}`);
-                    if (!statusRes.ok) break;
+                    if (!statusRes.ok) {
+                        throw new Error('Unable to retrieve the server export status');
+                    }
 
                     const statusData = await statusRes.json();
+                    const allSlidesRendered = String(statusData.message || '').startsWith('All slides rendered.');
                     setExportProgress({
-                        current: Math.round((statusData.progress / 100) * exportSlides.length),
-                        total: exportSlides.length,
+                        current: typeof statusData.rendered_slides === 'number'
+                            ? statusData.rendered_slides
+                            : allSlidesRendered
+                                ? exportSlides.length
+                                : Math.round((statusData.progress / 100) * exportSlides.length),
+                        total: typeof statusData.total_slides === 'number' && statusData.total_slides > 0
+                            ? statusData.total_slides
+                            : exportSlides.length,
                         title: statusData.message || 'Generating PDF on server...'
                     });
 
@@ -2013,13 +2024,27 @@ export default function WeeklyTracker() {
                         setExportProgress(null);
                         return;
                     } else if (statusData.status === 'failed') {
-                        console.warn('Server PDF export failed, falling back to fast client export:', statusData.error);
-                        break;
+                        finished = true;
+                        setIsExporting(false);
+                        setExportProgress(null);
+                        showToast(statusData.error || 'The server PDF export failed before the file could be created.');
+                        return;
                     }
                 }
+
+                setIsExporting(false);
+                setExportProgress(null);
+                showToast('The server export is taking longer than expected. It was not replaced with a second export.');
+                return;
             }
         } catch (serverErr) {
             console.warn('Server export endpoint unavailable, using fast client export:', serverErr);
+            if (serverJobStarted) {
+                setIsExporting(false);
+                setExportProgress(null);
+                showToast('The server export status could not be reached. The export was not restarted.');
+                return;
+            }
         }
 
         // Fast Client-Side Export Fallback (Resilient to background tabs & optimized)
