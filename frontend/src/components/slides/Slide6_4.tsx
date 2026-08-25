@@ -72,7 +72,7 @@ export default function Slide6_4() {
             marker: { color: series.color },
             text: series.values.map(value => value.toFixed(2)),
             textposition: 'outside' as const,
-            textfont: { size: 10, color: '#334155' },
+            textfont: { size: 13, color: '#334155', weight: 'bold' } as any,
             cliponaxis: false,
             hovertemplate: `${series.label}: %{y:.2f}M<extra></extra>`,
         }));

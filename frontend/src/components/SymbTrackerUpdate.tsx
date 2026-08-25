@@ -523,7 +523,7 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
                 mode: 'lines+markers+text' as any,
                 text: yPlanned.map(v => String(v)),
                 textposition: 'top center',
-                textfont: { size: 14, color: '#1e40af', weight: 'bold' } as any,
+                textfont: { size: 16, color: '#1e40af', weight: 'bold' } as any,
                 line: { shape: 'spline', width: 3.5, color: '#3b82f6' },
                 marker: { size: 8, color: '#3b82f6' }
             },
@@ -534,7 +534,7 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
                 mode: 'lines+markers+text' as any,
                 text: yCompleted.map(v => String(v)),
                 textposition: 'bottom center',
-                textfont: { size: 14, color: '#166534', weight: 'bold' } as any,
+                textfont: { size: 16, color: '#166534', weight: 'bold' } as any,
                 line: { shape: 'spline', width: 3.5, color: '#10b981' },
                 marker: { size: 8, color: '#10b981' }
             }
@@ -649,7 +649,7 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
                 mode: 'lines+markers+text' as any,
                 text: textVals,
                 textposition: 'top center',
-                textfont: { size: 14, color: color, weight: 'bold' } as any,
+                textfont: { size: 16, color: color, weight: 'bold' } as any,
                 line: { shape: 'spline', width: 3, color: color },
                 marker: { size: 7, color: color }
             });

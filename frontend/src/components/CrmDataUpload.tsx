@@ -6,7 +6,7 @@ interface UploadLog {
     week: number;
     file_date: string;
     file_name: string;
-    type: 'weekly' | 'revenue' | 'gross_margin' | 'services_trend';
+    type: 'weekly' | 'invoice' | 'revenue' | 'gross_margin' | 'services_trend';
     created_at?: string;
 }
 
@@ -18,7 +18,7 @@ interface RegionMapping {
 }
 
 export function CrmDataUpload() {
-    const [activeTab, setActiveTab] = useState<'weekly' | 'revenue' | 'region' | 'gross_margin' | 'services_trend' | 'symb_tracker' | 'symb_reference'>('weekly');
+    const [activeTab, setActiveTab] = useState<'weekly' | 'invoice' | 'revenue' | 'region' | 'gross_margin' | 'services_trend' | 'symb_tracker' | 'symb_reference'>('weekly');
     const [file, setFile] = useState<File | null>(null);
     const [logs, setLogs] = useState<UploadLog[]>([]);
     const [refLogs, setRefLogs] = useState<Record<string, UploadLog>>({});
@@ -256,33 +256,72 @@ export function CrmDataUpload() {
             return;
         }
 
-        // 2. Validate Filename Format
-        // "weekly-tracker_26-01-2026.csv" or "Gross-margin_23-03-2026.csv"
-        // Regex: prefix_DD-MM-YYYY or prefix_DD-MM-YY
-        const prefix = getUploadPrefix();
-        const regex = new RegExp(`^${prefix}_(\\d{2}-\\d{2}-(\\d{4}|\\d{2}))\\.csv$`, 'i');
+        let dateStr = '';
+        let weekNum = 0;
 
-        const match = file.name.match(regex);
-        if (!match) {
-            setStatusMsg(`Invalid filename. Expected format: '${prefix}_DD-MM-YYYY.csv'`);
-            return;
+        if (activeTab === 'invoice') {
+            // For invoice, filename can be anything as long as columns match
+            // Attempt to extract date from filename if present (e.g. invoice_26-01-2026.csv)
+            const dateMatch = file.name.match(/(\d{2}-\d{2}-(\d{4}|\d{2}))\.csv$/i);
+            if (dateMatch) {
+                dateStr = dateMatch[1];
+                const parts = dateStr.split('-');
+                let [day, month, year] = parts.map(Number);
+                if (year < 100) year += 2000;
+                const dateObj = new Date(year, month - 1, day);
+                if (!isNaN(dateObj.getTime())) {
+                    weekNum = getSimpleWeekNumber(dateObj);
+                }
+            }
+            if (!dateStr || !weekNum) {
+                const now = new Date();
+                const dd = String(now.getDate()).padStart(2, '0');
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                dateStr = `${dd}-${mm}-${now.getFullYear()}`;
+                weekNum = getSimpleWeekNumber(now);
+            }
+
+            // Client-side CSV column check
+            try {
+                const textHeader = await file.slice(0, 2048).text();
+                const firstLine = textHeader.split('\n')[0].toLowerCase();
+                const requiredCols = ['record id', 'account name', 'grand total', 'econ-region', 'invoice date'];
+                const missing = requiredCols.filter(col => !firstLine.includes(col));
+                if (missing.length > 0) {
+                    setStatusMsg(`Invalid CSV columns. Missing: ${missing.join(', ')}. Required: Record Id, Account Name, Grand Total, econ-Region, Invoice Date.`);
+                    return;
+                }
+            } catch (colErr) {
+                console.warn("Could not pre-read CSV headers:", colErr);
+            }
+        } else {
+            // 2. Validate Filename Format for standard tabs
+            // "weekly-tracker_26-01-2026.csv" or "Gross-margin_23-03-2026.csv"
+            const prefix = getUploadPrefix();
+            const regex = new RegExp(`^${prefix}_(\\d{2}-\\d{2}-(\\d{4}|\\d{2}))\\.csv$`, 'i');
+
+            const match = file.name.match(regex);
+            if (!match) {
+                setStatusMsg(`Invalid filename. Expected format: '${prefix}_DD-MM-YYYY.csv'`);
+                return;
+            }
+
+            dateStr = match[1]; // "26-01-2026" or "26-01-26"
+            const parts = dateStr.split('-');
+            let [day, month, year] = parts.map(Number);
+            if (year < 100) year += 2000; // Handle YY -> 20YY
+            const dateObj = new Date(year, month - 1, day);
+
+            if (isNaN(dateObj.getTime())) {
+                setStatusMsg("Invalid date in filename.");
+                return;
+            }
+
+            weekNum = getSimpleWeekNumber(dateObj);
         }
-
-        const dateStr = match[1]; // "26-01-2026" or "26-01-26"
-        const parts = dateStr.split('-');
-        let [day, month, year] = parts.map(Number);
-        if (year < 100) year += 2000; // Handle YY -> 20YY
-        const dateObj = new Date(year, month - 1, day);
-
-        if (isNaN(dateObj.getTime())) {
-            setStatusMsg("Invalid date in filename.");
-            return;
-        }
-
-        const weekNum = getSimpleWeekNumber(dateObj);
 
         // 3. Confirm
-        if (!window.confirm(`Process file for Week ${weekNum}?`)) {
+        if (!window.confirm(`Process file for ${activeTab === 'invoice' ? 'Invoice Data' : 'Week ' + weekNum}?`)) {
             return;
         }
 
@@ -549,6 +588,23 @@ export function CrmDataUpload() {
                     Weekly
                 </button>
                 <button
+                    onClick={() => setActiveTab('invoice')}
+                    style={{
+                        backgroundColor: activeTab === 'invoice' ? '#333333' : '#6b7280',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.8rem 2rem',
+                        fontSize: '1rem',
+                        fontWeight: '700',
+                        clipPath: 'polygon(0 0, 90% 0, 100% 100%, 0 100%)',
+                        cursor: 'pointer',
+                        minWidth: '150px',
+                        textAlign: 'left'
+                    }}
+                >
+                    Invoice
+                </button>
+                <button
                     onClick={() => setActiveTab('revenue')}
                     style={{
                         backgroundColor: activeTab === 'revenue' ? '#333333' : '#6b7280',
@@ -681,13 +737,15 @@ export function CrmDataUpload() {
                             ? 'Region Mapping Table Upload'
                             : activeTab === 'gross_margin'
                                 ? 'Gross Margin data upload'
-                                : activeTab === 'services_trend'
-                                    ? 'Services Trend Automated Pipeline'
-                                    : activeTab === 'symb_tracker'
-                                        ? 'SYMB Mass Orders Data Upload'
-                                        : activeTab === 'symb_reference'
-                                            ? 'SYMB One-Time Reference Tables Upload'
-                                            : `${activeTab} tracker data upload`}
+                                : activeTab === 'invoice'
+                                    ? 'Invoice Data Upload'
+                                    : activeTab === 'services_trend'
+                                        ? 'Services Trend Automated Pipeline'
+                                        : activeTab === 'symb_tracker'
+                                            ? 'SYMB Mass Orders Data Upload'
+                                            : activeTab === 'symb_reference'
+                                                ? 'SYMB One-Time Reference Tables Upload'
+                                                : `${activeTab} tracker data upload`}
                     </div>
                     <div style={{
                         fontSize: '0.9rem',
@@ -698,13 +756,15 @@ export function CrmDataUpload() {
                     }}>
                         {activeTab === 'region'
                             ? 'CSV must have two columns: "Opportunities Owner" and "Region"'
-                            : activeTab === 'services_trend'
-                                ? 'Services Trend data is automatically generated every time a Weekly Tracker CSV is uploaded. Click below to manually re-sync.'
-                                : activeTab === 'symb_reference'
-                                    ? 'Upload SYMB SO Numbers and Jabil Production List Price reference CSV files below (uploaded once, updated anytime).'
-                                    : activeTab === 'symb_tracker'
-                                        ? 'Upload daily SYMB Mass Orders CSV. Duplicate uploads are restricted per DATE (file_date), allowing daily uploads.'
-                                        : `file name format: "${getUploadPrefix()}_dd-mm-yyyy.csv"`
+                            : activeTab === 'invoice'
+                                ? 'Upload Invoice Data CSV. Required columns: "Record Id", "Account Name", "Grand Total", "econ-Region", "Invoice Date"'
+                                : activeTab === 'services_trend'
+                                    ? 'Services Trend data is automatically generated every time a Weekly Tracker CSV is uploaded. Click below to manually re-sync.'
+                                    : activeTab === 'symb_reference'
+                                        ? 'Upload SYMB SO Numbers and Jabil Production List Price reference CSV files below (uploaded once, updated anytime).'
+                                        : activeTab === 'symb_tracker'
+                                            ? 'Upload daily SYMB Mass Orders CSV. Duplicate uploads are restricted per DATE (file_date), allowing daily uploads.'
+                                            : `file name format: "${getUploadPrefix()}_dd-mm-yyyy.csv"`
                         }
                     </div>
 
@@ -833,7 +893,7 @@ export function CrmDataUpload() {
                             {/* CRM Report Link Button */}
                             <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center', width: '100%' }}>
                                 <a 
-                                    href="https://crm.zoho.com/crm/org1644714/tab/Reports/38660000432721500" 
+                                    href={activeTab === 'invoice' ? "https://crm.zoho.com/crm/org1644714/tab/Reports/38660000622435104" : "https://crm.zoho.com/crm/org1644714/tab/Reports/38660000432721500"}
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                     style={{

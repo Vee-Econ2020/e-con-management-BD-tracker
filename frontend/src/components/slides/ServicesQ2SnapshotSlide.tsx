@@ -7,9 +7,9 @@ interface ServicesQ1SnapshotSlideProps {
 
 const formatCurrency = (value: number) => {
     if (value === 0) return '';
-    if (Math.abs(value) < 1000) return `$${value.toLocaleString()}`;
-    if (Math.abs(value) < 1_000_000) return `$${(value / 1e3).toFixed(1)}K`;
-    return `$${(value / 1e6).toFixed(1)}M`;
+    if (Math.abs(value) < 1000) return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (Math.abs(value) < 1_000_000) return `$${(value / 1e3).toFixed(2)}K`;
+    return `$${(value / 1e6).toFixed(2)}M`;
 };
 
 export default function ServicesQ1SnapshotSlide({ region }: ServicesQ1SnapshotSlideProps) {
@@ -135,12 +135,12 @@ export default function ServicesQ1SnapshotSlide({ region }: ServicesQ1SnapshotSl
                         ax: 0,
                         ay: arrowDirection,
                         font: {
-                            size: 16,
+                            size: 18,
                             color: series.color,
                             family: 'Helvetica, Arial, sans-serif',
-                            weight: 600,
+                            weight: 700,
                         },
-                        bgcolor: 'rgba(255, 255, 255, 0.8)',
+                        bgcolor: 'rgba(255, 255, 255, 0.85)',
                         borderpad: 2,
                     });
                 }
@@ -176,10 +176,10 @@ export default function ServicesQ1SnapshotSlide({ region }: ServicesQ1SnapshotSl
                     ax: 0,
                     ay: arrowDirection,
                     font: {
-                        size: 13,
+                        size: 16,
                         color: series.color,
                         family: 'Helvetica, Arial, sans-serif',
-                        weight: 600,
+                        weight: 700,
                     },
                     bgcolor: 'rgba(255, 255, 255, 0.8)',
                     borderpad: 2,

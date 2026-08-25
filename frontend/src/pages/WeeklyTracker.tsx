@@ -46,6 +46,9 @@ import Slide24 from '../components/slides/Slide24';
 import Slide25 from '../components/slides/Slide25';
 import Slide26 from '../components/slides/Slide26';
 import Slide27 from '../components/slides/Slide27';
+import Slide28 from '../components/slides/Slide28';
+import Slide29 from '../components/slides/Slide29';
+import Slide30 from '../components/slides/Slide30';
 import Slide9_2_2 from '../components/slides/Slide9_2_2';
 import Slide12_2_2 from '../components/slides/Slide12_2_2';
 import Slide15_2_2 from '../components/slides/Slide15_2_2';
@@ -53,27 +56,30 @@ import Slide18_2_2 from '../components/slides/Slide18_2_2';
 import Slide21_2_2 from '../components/slides/Slide21_2_2';
 import Slide24_2_2 from '../components/slides/Slide24_2_2';
 import Slide27_2_2 from '../components/slides/Slide27_2_2';
+import Slide30_2_2 from '../components/slides/Slide30_2_2';
 import {
     Slide9_1, Slide9_2, Slide9_1_1, Slide9_2_1,
     Slide12_1, Slide12_2, Slide12_1_1, Slide12_2_1,
     Slide15_1, Slide15_2, Slide15_1_1, Slide15_2_1,
-    Slide18_1, Slide18_2, Slide18_1_1, Slide18_2_1,
-    Slide21_1, Slide21_2, Slide21_1_1, Slide21_2_1,
-    Slide24_1, Slide24_2, Slide24_1_1, Slide24_2_1,
-    Slide27_1, Slide27_2, Slide27_1_1, Slide27_2_1
+    Slide18_1, Slide18_1_1,
+    Slide21_1, Slide21_1_1,
+    Slide24_1, Slide24_1_1,
+    Slide27_1, Slide27_2, Slide27_1_1, Slide27_2_1,
+    Slide30_1, Slide30_1_1
 } from '../components/slides/RegionActivitySlides';
 import {
     Slide9_2_3, Slide12_2_3, Slide15_2_3, Slide18_2_3,
-    Slide21_2_3, Slide24_2_3, Slide27_2_3,
+    Slide21_2_3, Slide24_2_3, Slide27_2_3, Slide30_2_3,
     Slide9_2_3_cy, Slide12_2_3_cy, Slide15_2_3_cy, Slide18_2_3_cy,
-    Slide21_2_3_cy, Slide24_2_3_cy, Slide27_2_3_cy,
+    Slide21_2_3_cy, Slide24_2_3_cy, Slide27_2_3_cy, Slide30_2_3_cy,
     Slide9_2_4, Slide12_2_4, Slide15_2_4, Slide18_2_4,
-    Slide21_2_4, Slide24_2_4, Slide27_2_4
+    Slide21_2_4, Slide24_2_4, Slide27_2_4, Slide30_2_4
 } from '../components/slides/RegionGMSlides';
 import ServicesChartSlide from '../components/slides/ServicesChartSlide';
 import ServicesBacklogSlide from '../components/slides/ServicesBacklogSlide';
 import { WhaleAccountSlide } from '../components/slides/WhaleAccountSlide';
 import ServicesQ1SnapshotSlide from '../components/slides/ServicesQ1SnapshotSlide';
+import InvoiceChartSlide from '../components/slides/InvoiceChartSlide';
 
 // --- Configuration ---
 // Components that accept isEditing prop
@@ -108,13 +114,17 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     25: Slide25,
     26: Slide26,
     27: Slide27,
+    28: Slide28,
+    29: Slide29,
+    30: Slide30,
     '9.1': Slide9_1, '9.1.1': Slide9_1_1, '9.2': Slide9_2, '9.2.1': Slide9_2_1,
     '12.1': Slide12_1, '12.1.1': Slide12_1_1, '12.2': Slide12_2, '12.2.1': Slide12_2_1,
     '15.1': Slide15_1, '15.1.1': Slide15_1_1, '15.2': Slide15_2, '15.2.1': Slide15_2_1,
-    '18.1': Slide18_1, '18.1.1': Slide18_1_1, '18.2': Slide18_2, '18.2.1': Slide18_2_1,
-    '21.1': Slide21_1, '21.1.1': Slide21_1_1, '21.2': Slide21_2, '21.2.1': Slide21_2_1,
-    '24.1': Slide24_1, '24.1.1': Slide24_1_1, '24.2': Slide24_2, '24.2.1': Slide24_2_1,
+    '18.1': Slide18_1, '18.1.1': Slide18_1_1,
+    '21.1': Slide21_1, '21.1.1': Slide21_1_1,
+    '24.1': Slide24_1, '24.1.1': Slide24_1_1,
     '27.1': Slide27_1, '27.1.1': Slide27_1_1, '27.2': Slide27_2, '27.2.1': Slide27_2_1,
+    '30.1': Slide30_1, '30.1.1': Slide30_1_1,
     '9.2.2': Slide9_2_2,
     '12.2.2': Slide12_2_2,
     '15.2.2': Slide15_2_2,
@@ -122,6 +132,7 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '21.2.2': Slide21_2_2,
     '24.2.2': Slide24_2_2,
     '27.2.2': Slide27_2_2,
+    '30.2.2': Slide30_2_2,
     '9.2.3': Slide9_2_3,
     '12.2.3': Slide12_2_3,
     '15.2.3': Slide15_2_3,
@@ -129,6 +140,7 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '21.2.3': Slide21_2_3,
     '24.2.3': Slide24_2_3,
     '27.2.3': Slide27_2_3,
+    '30.2.3': Slide30_2_3,
     '9.2.3_cy': Slide9_2_3_cy,
     '12.2.3_cy': Slide12_2_3_cy,
     '15.2.3_cy': Slide15_2_3_cy,
@@ -136,6 +148,7 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '21.2.3_cy': Slide21_2_3_cy,
     '24.2.3_cy': Slide24_2_3_cy,
     '27.2.3_cy': Slide27_2_3_cy,
+    '30.2.3_cy': Slide30_2_3_cy,
     '9.2.4': Slide9_2_4,
     '12.2.4': Slide12_2_4,
     '15.2.4': Slide15_2_4,
@@ -143,6 +156,7 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '21.2.4': Slide21_2_4,
     '24.2.4': Slide24_2_4,
     '27.2.4': Slide27_2_4,
+    '30.2.4': Slide30_2_4,
     '9.2.5': (props: any) => <WhaleAccountSlide {...props} region="USA West" />,
     '12.2.5': (props: any) => <WhaleAccountSlide {...props} region="Europe" />,
     '15.2.5': (props: any) => <WhaleAccountSlide {...props} region="USA East" />,
@@ -150,6 +164,7 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '21.2.5': (props: any) => <WhaleAccountSlide {...props} region="Japan" />,
     '24.2.5': (props: any) => <WhaleAccountSlide {...props} region="Korea" />,
     '27.2.5': (props: any) => <WhaleAccountSlide {...props} region="Legacy" />,
+    '30.2.5': (props: any) => <WhaleAccountSlide {...props} region="APAC" />,
 
     // ── Services-only chart mirrors ───────────────────────────────────────
     // Each parent chart slide (cumulative/trend/pipeline) has a sibling here
@@ -187,6 +202,10 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '25_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Legacy" quarter={props.quarter} />,
     '26_services': (props: any) => <ServicesChartSlide slideNo={26} chartKind="trend"      regionLabel="Legacy"  {...props} />,
     '27_services': (props: any) => <ServicesChartSlide slideNo={27} chartKind="pipeline"   regionLabel="Legacy"  {...props} />,
+    '28_services':  (props: any) => <ServicesChartSlide slideNo={28} chartKind="cumulative" regionLabel="APAC"    {...props} />,
+    '28_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="APAC" quarter={props.quarter} />,
+    '29_services':  (props: any) => <ServicesChartSlide slideNo={29} chartKind="trend"      regionLabel="APAC"    {...props} />,
+    '30_services':  (props: any) => <ServicesChartSlide slideNo={30} chartKind="pipeline"   regionLabel="APAC"    {...props} />,
 
     // Services-only Order Backlog mirrors
     '6.2_services':    () => <ServicesBacklogSlide region="Overall" />,
@@ -197,6 +216,18 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '21.2.2_services': () => <ServicesBacklogSlide region="Japan" />,
     '24.2.2_services': () => <ServicesBacklogSlide region="KANZ" />,
     '27.2.2_services': () => <ServicesBacklogSlide region="Legacy" />,
+    '30.2.2_services': () => <ServicesBacklogSlide region="APAC" />,
+
+    // Invoicing Data slides (8-Week Trend)
+    '3_invoice':  (props: any) => <InvoiceChartSlide regionLabel="Overall"  region="Overall"  {...props} />,
+    '7_invoice':  (props: any) => <InvoiceChartSlide regionLabel="US West" region="US West"  {...props} />,
+    '10_invoice': (props: any) => <InvoiceChartSlide regionLabel="Europe"   region="Europe"   {...props} />,
+    '13_invoice': (props: any) => <InvoiceChartSlide regionLabel="US East" region="US East"  {...props} />,
+    '16_invoice': (props: any) => <InvoiceChartSlide regionLabel="Asean"    region="Asean"    {...props} />,
+    '19_invoice': (props: any) => <InvoiceChartSlide regionLabel="Japan"    region="Japan"    {...props} />,
+    '22_invoice': (props: any) => <InvoiceChartSlide regionLabel="KANZ"     region="KANZ"     {...props} />,
+    '25_invoice': (props: any) => <InvoiceChartSlide regionLabel="Legacy"   region="Legacy"   {...props} />,
+    '28_invoice': (props: any) => <InvoiceChartSlide regionLabel="APAC"     region="APAC"     {...props} />,
 };
 
 const EXPORT_SLIDE_WIDTH = 1920;
@@ -718,29 +749,30 @@ export default function WeeklyTracker() {
     // Base slides configuration
     const BASE_SLIDES = [
         2, 2.5,
-        3, '3_services', '3_services_q1', 4, '4_services', 5, '5_services',
+        3, '3_invoice', '3_services', '3_services_q1', 4, '4_services', 5, '5_services',
         6, 6.2, '6.2_services', 6.3, 6.4,
-        13, '13_services', '13_services_q1', 14, '14_services', 15, '15_services',
+        13, '13_invoice', '13_services', '13_services_q1', 14, '14_services', 15, '15_services',
         15.1, '15.1.1', 15.2, '15.2.1',
         '15.2.2', '15.2.2_services', '15.2.3', '15.2.3_cy', '15.2.4', '15.2.5',
-        7, '7_services', '7_services_q1', 8, '8_services', 9, '9_services',
+        7, '7_invoice', '7_services', '7_services_q1', 8, '8_services', 9, '9_services',
         9.1, '9.1.1', 9.2, '9.2.1',
         '9.2.2', '9.2.2_services', '9.2.3', '9.2.3_cy', '9.2.4', '9.2.5',
-        10, '10_services', '10_services_q1', 11, '11_services', 12, '12_services',
+        10, '10_invoice', '10_services', '10_services_q1', 11, '11_services', 12, '12_services',
         12.1, '12.1.1', 12.2, '12.2.1',
         '12.2.2', '12.2.2_services', '12.2.3', '12.2.3_cy', '12.2.4', '12.2.5',
-        16, '16_services', '16_services_q1', 17, '17_services', 18, '18_services',
-        18.1, '18.1.1', 18.2, '18.2.1',
+        28, '28_invoice', '28_services', '28_services_q1', 29, '29_services', 30, '30_services',
+        30.1, '30.1.1',
+        '30.2.2', '30.2.2_services', '30.2.3', '30.2.3_cy', '30.2.4', '30.2.5',
+        16, '16_invoice', '16_services', '16_services_q1', 17, '17_services', 18, '18_services',
+        18.1, '18.1.1',
         '18.2.2', '18.2.2_services', '18.2.3', '18.2.3_cy', '18.2.4', '18.2.5',
-        19, '19_services', '19_services_q1', 20, '20_services',
-        21, '21_services',
-        21.1, '21.1.1', 21.2, '21.2.1',
+        19, '19_invoice', '19_services', '19_services_q1', 20, '20_services', 21, '21_services',
+        21.1, '21.1.1',
         '21.2.2', '21.2.2_services', '21.2.3', '21.2.3_cy', '21.2.4', '21.2.5',
-        22, '22_services', '22_services_q1', 23, '23_services',
-        24, '24_services',
-        24.1, '24.1.1', 24.2, '24.2.1',
+        22, '22_invoice', '22_services', '22_services_q1', 23, '23_services', 24, '24_services',
+        24.1, '24.1.1',
         '24.2.2', '24.2.2_services', '24.2.3', '24.2.3_cy', '24.2.4', '24.2.5',
-        25, '25_services', '25_services_q1', 26, '26_services',
+        25, '25_invoice', '25_services', '25_services_q1', 26, '26_services',
         27, '27_services',
         27.1, '27.1.1', 27.2, '27.2.1',
         '27.2.2', '27.2.2_services', '27.2.3', '27.2.3_cy', '27.2.4', '27.2.5'
@@ -759,12 +791,19 @@ export default function WeeklyTracker() {
         if (mainId <= 21) return 'Japan';
         if (mainId <= 24) return 'Korea';
         if (mainId <= 27) return 'Legacy';
+        if (mainId <= 30) return 'APAC';
         return 'Other';
     };
 
     // Helper to get descriptive slide titles
     const getSlideTitle = (slideId: string | number): string => {
         const idStr = String(slideId);
+
+        // Invoice slides title
+        if (idStr.endsWith('_invoice')) {
+            const parentId = idStr.slice(0, -'_invoice'.length);
+            return `Invoiced Amount — ${getSlideRegion(parentId)}`;
+        }
 
         // Services mirrors: defer to the parent slide's title and prefix it.
         if (idStr.endsWith('_services_q1')) {
@@ -837,6 +876,13 @@ export default function WeeklyTracker() {
             '27.2.3': 'Gross Margin - Manufacturing',
             '27.2.3_cy': 'Gross Margin - Services (Current Year)',
             '27.2.4': 'Gross Margin - Services (Service from Start)',
+            '28': 'Cumulative Performance vs Targets',
+            '29': '8-Week Historical Trend',
+            '30': 'Actual vs Weighted Pipeline',
+            '30.2.2': 'Order Backlog',
+            '30.2.3': 'Gross Margin - Manufacturing',
+            '30.2.3_cy': 'Gross Margin - Services (Current Year)',
+            '30.2.4': 'Gross Margin - Services (Service from Start)',
         };
 
         // For nested pipeline slides like 9.1, 9.2, etc. (Activity lists)
@@ -845,9 +891,9 @@ export default function WeeklyTracker() {
         if (titles[idStr]) return titles[idStr];
         if (idStr.includes('.')) {
             if (idStr.endsWith('.2.5')) return 'Whale accounts';
-            if (idStr.endsWith('.1.1')) return 'Account Management - Action Points';
+            if (idStr.endsWith('.1.1')) return 'Action Points';
             if (idStr.endsWith('.2.1')) return 'New Business - Action Points';
-            if (idStr.endsWith('.1')) return 'Account Management Summary';
+            if (idStr.endsWith('.1')) return 'Account / New Business Summary';
             if (idStr.endsWith('.2')) return 'New Business Summary';
         }
 
@@ -871,7 +917,7 @@ export default function WeeklyTracker() {
         return result;
     }, [customSlides]);
 
-    const REGION_CLUSTER_NAMES = useMemo(() => ['USA West', 'Europe', 'USA East', 'Asean', 'Japan', 'Korea', 'Legacy'], []);
+    const REGION_CLUSTER_NAMES = useMemo(() => ['USA West', 'Europe', 'APAC', 'USA East', 'Asean', 'Japan', 'Korea', 'Legacy'], []);
     const ALL_CLUSTERS = useMemo(() => ['Overall', ...REGION_CLUSTER_NAMES], [REGION_CLUSTER_NAMES]);
 
     const [expandedClusters, setExpandedClusters] = useState<Set<string>>(() => new Set<string>());
@@ -2069,17 +2115,16 @@ export default function WeeklyTracker() {
         }
     };
 
-
-
     // Region -> slideId mapping for pending inputs
     const REGION_SLIDES: Record<string, string[]> = {
         'Overall': [],
         'USA West': ['us_west_acc_mgmt', 'us_west_acc_mgmt_actions', 'us_west_new_biz', 'us_west_new_biz_actions'],
         'Europe': ['europe_acc_mgmt', 'europe_acc_mgmt_actions', 'europe_new_biz', 'europe_new_biz_actions'],
         'USA East': ['us_east_acc_mgmt', 'us_east_acc_mgmt_actions', 'us_east_new_biz', 'us_east_new_biz_actions'],
-        'Asean': ['asean_acc_mgmt', 'asean_acc_mgmt_actions', 'asean_new_biz', 'asean_new_biz_actions'],
-        'Japan': ['japan_acc_mgmt', 'japan_acc_mgmt_actions', 'japan_new_biz', 'japan_new_biz_actions'],
-        'Korea': ['kanz_acc_mgmt', 'kanz_acc_mgmt_actions', 'kanz_new_biz', 'kanz_new_biz_actions'],
+        'APAC': ['apac_acc_new_biz', 'apac_acc_new_biz_actions'],
+        'Asean': ['asean_acc_new_biz', 'asean_acc_new_biz_actions'],
+        'Japan': ['japan_acc_new_biz', 'japan_acc_new_biz_actions'],
+        'Korea': ['kanz_acc_new_biz', 'kanz_acc_new_biz_actions'],
         'Legacy': ['mgmt_acc_mgmt', 'mgmt_acc_mgmt_actions', 'mgmt_new_biz', 'mgmt_new_biz_actions'],
         'Financial Team': []
     };
@@ -2090,9 +2135,10 @@ export default function WeeklyTracker() {
         'USA West': ['9.1', '9.1.1', '9.2', '9.2.1', '9.2.5'],
         'Europe': ['12.1', '12.1.1', '12.2', '12.2.1', '12.2.5'],
         'USA East': ['15.1', '15.1.1', '15.2', '15.2.1', '15.2.5'],
-        'Asean': ['18.1', '18.1.1', '18.2', '18.2.1', '18.2.5'],
-        'Japan': ['21.1', '21.1.1', '21.2', '21.2.1', '21.2.5'],
-        'Korea': ['24.1', '24.1.1', '24.2', '24.2.1', '24.2.5'],
+        'APAC': ['30.1', '30.1.1', '30.2.5'],
+        'Asean': ['18.1', '18.1.1', '18.2.5'],
+        'Japan': ['21.1', '21.1.1', '21.2.5'],
+        'Korea': ['24.1', '24.1.1', '24.2.5'],
         'Legacy': ['27.1', '27.1.1', '27.2', '27.2.1', '27.2.5'],
         'Financial Team': []
     };
@@ -2153,6 +2199,8 @@ export default function WeeklyTracker() {
             const num = sid.split('_whale_account_')[1];
             return `Whale Account ${num}`;
         }
+        if (sid.endsWith('_acc_new_biz_actions')) return 'Account / New Business Action Points';
+        if (sid.endsWith('_acc_new_biz')) return 'Account / New Business Summary';
         if (sid.endsWith('_acc_mgmt_actions')) return 'Account Management - Action Points';
         if (sid.endsWith('_acc_mgmt')) return 'Account Management Summary';
         if (sid.endsWith('_new_biz_actions')) return 'New Business - Action Points';
@@ -2340,7 +2388,7 @@ export default function WeeklyTracker() {
 
             {/* Pending Input Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1.5rem', marginBottom: '5rem', maxWidth: '1200px' }}>
-                {['Overall','USA West','Europe','USA East','Asean','Japan','Korea','Legacy','Financial Team'].map(name => {
+                {['Overall','USA West','Europe','USA East','Asean','Japan','Korea','APAC','Legacy','Financial Team'].map(name => {
                     const stats = regionCounts[name] || { filled: 0, total: REGION_SLIDES[name]?.length || 0, missing: [] as string[], whaleNames: [] as string[] };
                     const hasWhales = name !== 'Overall' && name !== 'Financial Team';
                     return <StatusCard key={name} title={name} filled={stats.filled} total={stats.total} missingNames={stats.missing} whaleAccounts={stats.whaleNames} onView={() => handleViewRegion(name)} onViewWhale={hasWhales ? () => handleViewWhale(name) : undefined} />;
@@ -2469,61 +2517,6 @@ export default function WeeklyTracker() {
                                 ? `Exporting ${exportProgress.current}/${exportProgress.total}: ${exportProgress.title}`
                                 : 'Select a start and end slide to export as PDF'}
                         </div>
-                    </div>
-                </div>
-
-                {/* Jump to Region */}
-                <div style={{ marginLeft: '1rem', marginTop: '0.5rem' }}>
-                    <div style={{ color: '#4a4a55', fontSize: '1rem', fontWeight: '800', letterSpacing: '0.03em', textTransform: 'uppercase', marginBottom: '0.6rem' }}>
-                        Jump to:
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        {(() => {
-                            const jumpRegions: { name: string; firstSlideId: string | null }[] = [
-                                { name: 'Overall', firstSlideId: '3' },
-                                { name: 'USA West', firstSlideId: '7' },
-                                { name: 'Europe', firstSlideId: '10' },
-                                { name: 'USA East', firstSlideId: '13' },
-                                { name: 'Asean', firstSlideId: '16' },
-                                { name: 'Japan', firstSlideId: '19' },
-                                { name: 'Korea', firstSlideId: '22' },
-                                { name: 'Legacy', firstSlideId: '25' },
-                            ];
-                            return jumpRegions.map(({ name, firstSlideId }) => {
-                                let idx = -1;
-                                if (firstSlideId === null) {
-                                    idx = 0;
-                                } else {
-                                    idx = displaySlides.findIndex(s => String(s.id) === firstSlideId);
-                                }
-                                const disabled = idx < 0;
-                                return (
-                                    <button
-                                        key={name}
-                                        onClick={() => handleStartSlideshow(idx)}
-                                        disabled={disabled}
-                                        style={{
-                                            backgroundColor: disabled ? '#e5e7eb' : '#8b5cf6',
-                                            color: disabled ? '#9ca3af' : 'white',
-                                            border: 'none',
-                                            padding: '0.55rem 1.2rem',
-                                            borderRadius: '9999px',
-                                            fontWeight: '700',
-                                            fontSize: '0.95rem',
-                                            cursor: disabled ? 'not-allowed' : 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.4rem',
-                                            boxShadow: disabled ? 'none' : '0 3px 5px rgba(139, 92, 246, 0.35)',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        title={disabled ? `${name} slides not available` : `Start slideshow from ${name}`}
-                                    >
-                                        <Play size={14} fill="currentColor" /> {name}
-                                    </button>
-                                );
-                            });
-                        })()}
                     </div>
                 </div>
             </div>

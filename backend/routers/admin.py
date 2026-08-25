@@ -323,6 +323,9 @@ async def add_upload_log_with_file(
             existing_log = await coll_logs.find_one({"file_date": file_date, "type": type})
             if existing_log:
                 raise HTTPException(status_code=400, detail=f"SYMB Tracker data for date {file_date} already exists. Please delete it first if you wish to re-upload.")
+        elif type == "invoice":
+            # For invoice uploads, allow replacing previous dataset seamlessly
+            pass
         else:
             existing_log = await coll_logs.find_one({"week": week, "type": type})
             if existing_log:
@@ -380,6 +383,13 @@ async def process_upload_background(upload_id: str, contents: bytes, week: int, 
         
         progress_update(upload_id, 2, 11, "Validating", "Validating data format", "processing")
         coll_logs = get_collection("upload_logs")
+
+        # ── Invoice branch ───────────────────────────────────────────
+        if type == "invoice":
+            await _process_invoice_upload(
+                upload_id, df, week, file_date, file_name, type, coll_logs, progress_update
+            )
+            return
 
         # ── Gross Margin branch ───────────────────────────────────────
         if type == "gross_margin":
@@ -742,6 +752,125 @@ async def process_services_trend_upload_background(
         import traceback
         traceback.print_exc()
         progress_update(upload_id, total_steps, total_steps, "Error", str(e), "error")
+
+
+async def _process_invoice_upload(
+    upload_id: str,
+    df,
+    week: int,
+    file_date: str,
+    file_name: str,
+    type_str: str,
+    coll_logs,
+    progress_update,
+):
+    """
+    Dedicated processing path for Invoice Data CSV uploads.
+    """
+    import pandas as pd
+    import numpy as np
+    from transformation import categorize_region_vectorized, normalize_record_id
+
+    total_steps = 5
+
+    try:
+        progress_update(upload_id, 2, total_steps, "Validating", "Validating invoice CSV columns...", "processing")
+
+        col_map = {str(c).strip().lower(): c for c in df.columns}
+        required_keys = ['record id', 'account name', 'grand total', 'econ-region', 'invoice date']
+        missing_keys = [k for k in required_keys if k not in col_map]
+        
+        if missing_keys:
+            missing_labels = [k.title() for k in missing_keys]
+            msg = f"Missing required columns in CSV: {', '.join(missing_labels)}. Required columns: Record Id, Account Name, Grand Total, econ-Region, Invoice Date"
+            print(f"✗ {msg}")
+            progress_update(upload_id, total_steps, total_steps, "Error", msg, "error")
+            return
+
+        progress_update(upload_id, 3, total_steps, "Transforming", "Normalizing fields and mapping regions...", "processing")
+
+        rec_col = col_map['record id']
+        acct_col = col_map['account name']
+        total_col = col_map['grand total']
+        region_col = col_map['econ-region']
+        date_col = col_map['invoice date']
+
+        df_clean = df.copy()
+        df_clean['Record Id'] = df_clean[rec_col].apply(normalize_record_id)
+        df_clean['Account Name'] = df_clean[acct_col].astype(str).str.strip()
+        df_clean['Grand Total'] = pd.to_numeric(df_clean[total_col], errors='coerce').fillna(0.0)
+        df_clean['nRegion'] = df_clean[region_col].apply(categorize_region_vectorized)
+
+        _client = AsyncIOMotorClient(MONGODB_URL)
+        _db = _client[DB_NAME]
+
+        region_mapping_coll = _db["Region_mapping_table"]
+        region_mappings_cursor = region_mapping_coll.find({})
+        region_mappings_list = await region_mappings_cursor.to_list(length=1000)
+        region_lookup = {item.get('opportunities_owner'): item.get('region') for item in region_mappings_list if item.get('opportunities_owner')}
+
+        def map_invoice_region(row):
+            mapped = region_lookup.get(row.get('Account Name'))
+            if mapped and mapped != "YET TO BE MAPPED":
+                return mapped
+            return row['nRegion']
+
+        df_clean['mRegion'] = df_clean.apply(map_invoice_region, axis=1)
+
+        # Parse Invoice Date
+        df_clean['Invoice Date Parsed'] = pd.to_datetime(df_clean[date_col], errors='coerce')
+
+        def extract_week(dt):
+            if pd.isna(dt):
+                return week if week > 0 else 35
+            try:
+                return int(dt.isocalendar().week)
+            except Exception:
+                return week if week > 0 else 35
+
+        df_clean['week'] = df_clean['Invoice Date Parsed'].apply(extract_week)
+        df_clean['week_label'] = df_clean['week'].apply(lambda w: f"Week {str(w).zfill(2)}")
+
+        progress_update(upload_id, 4, total_steps, "Saving Data", f"Saving {len(df_clean)} invoice records to database...", "processing")
+
+        invoice_coll = _db["invoice_data"]
+        await invoice_coll.delete_many({})
+
+        records_to_insert = []
+        for _, row in df_clean.iterrows():
+            records_to_insert.append({
+                "record_id": row['Record Id'],
+                "account_name": row['Account Name'],
+                "grand_total": float(row['Grand Total']),
+                "econ_region": str(row[region_col]),
+                "nRegion": str(row['nRegion']),
+                "mRegion": str(row['mRegion']),
+                "invoice_date": row['Invoice Date Parsed'].isoformat() if not pd.isna(row['Invoice Date Parsed']) else str(row[date_col]),
+                "week": int(row['week']),
+                "week_label": str(row['week_label']),
+                "upload_id": upload_id,
+                "created_at": datetime.now()
+            })
+
+        if records_to_insert:
+            await invoice_coll.insert_many(records_to_insert)
+
+        log_dict = {
+            "week": week,
+            "file_date": file_date,
+            "file_name": file_name,
+            "type": type_str,
+            "created_at": datetime.now(),
+        }
+        await coll_logs.insert_one(log_dict)
+
+        progress_update(upload_id, total_steps, total_steps, "Complete", f"Successfully processed {len(records_to_insert)} invoice records.", "completed")
+        await asyncio.sleep(2)
+        clear_progress(upload_id)
+    except Exception as err:
+        import traceback
+        traceback.print_exc()
+        progress_update(upload_id, total_steps, total_steps, "Error", f"Invoice pipeline error: {err}", "error")
 
 
 async def _process_gross_margin_upload(
@@ -1479,6 +1608,9 @@ from slides_compute import (
     compute_slide25_data,
     compute_slide26_data,
     compute_slide27_data,
+    compute_slide28_data,
+    compute_slide29_data,
+    compute_slide30_data,
     compute_slide_services_data,
     compute_services_q1_snapshot_data,
     compute_order_backlog_data,
@@ -1487,7 +1619,21 @@ from slides_compute import (
     compute_region_manufacturing_gm_data,
     compute_region_services_gm_data,
     compute_region_services_cy_gm_data,
+    compute_invoice_slide_data,
 )
+
+@router.get("/slides/invoice")
+async def get_invoice_slide_data(region: str = "Overall"):
+    """
+    Get computed invoicing trend data for Overall or a specific region.
+    """
+    try:
+        result = await compute_invoice_slide_data(db, region_name=region)
+        return clean_json_nan(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to compute invoice slide data: {str(e)}")
 
 @router.get("/slides/slide1")
 async def get_slide1_data():
@@ -1829,6 +1975,42 @@ async def get_slide27_data():
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 27 data: {str(e)}")
+
+@router.get("/slides/slide28")
+async def get_slide28_data():
+    """
+    Get computed data for Slide 28 of the presentation.
+    APAC Cumulative Performance
+    """
+    try:
+        result = await compute_slide28_data(db)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute slide 28 data: {str(e)}")
+
+@router.get("/slides/slide29")
+async def get_slide29_data():
+    """
+    Get computed data for Slide 29 of the presentation.
+    APAC Trend
+    """
+    try:
+        result = await compute_slide29_data(db)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute slide 29 data: {str(e)}")
+
+@router.get("/slides/slide30")
+async def get_slide30_data():
+    """
+    Get computed data for Slide 30 of the presentation.
+    APAC Pipeline
+    """
+    try:
+        result = await compute_slide30_data(db)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute slide 30 data: {str(e)}")
 
 
 @router.get("/slides/services/{slide_no}")

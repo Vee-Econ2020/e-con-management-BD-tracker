@@ -17,6 +17,13 @@ function getBacklogTarget(data: any, title: string): number {
     const isServices = data?.is_services || titleUpper.includes('SERVICE');
 
     if (isServices) {
+        if (titleUpper.includes('APAC') || regionUpper.includes('APAC') ||
+            titleUpper.includes('ASEAN') || regionUpper.includes('ASEAN') ||
+            titleUpper.includes('JAPAN') || regionUpper.includes('JAPAN') ||
+            titleUpper.includes('KANZ') || regionUpper.includes('KANZ') ||
+            titleUpper.includes('KOREA') || regionUpper.includes('KOREA')) {
+            return 0; // No target for Service order backlog for APAC, ASEAN, Japan, Korea
+        }
         if (titleUpper.includes('WEST') || regionUpper.includes('WEST')) return 2750000 * 1.30;
         if (titleUpper.includes('EUROPE') || regionUpper.includes('EUROPE')) return 1500000 * 1.30;
         if (titleUpper.includes('EAST') || regionUpper.includes('EAST')) return 2000000 * 1.30;
@@ -26,6 +33,7 @@ function getBacklogTarget(data: any, title: string): number {
     if (titleUpper.includes('WEST') || regionUpper.includes('WEST')) return 18000000 * 1.30; // $23.40M (Stretch)
     if (titleUpper.includes('EUROPE') || regionUpper.includes('EUROPE')) return 16000000 * 1.30; // $20.80M (Stretch)
     if (titleUpper.includes('EAST') || regionUpper.includes('EAST')) return 24000000 * 1.30; // $31.20M (Stretch)
+    if (titleUpper.includes('APAC') || regionUpper.includes('APAC')) return 8300000 * 1.30; // $10.79M (Base sum Japan+ASEAN+KANZ)
     if (titleUpper.includes('ASEAN') || regionUpper.includes('ASEAN')) return 3500000 * 1.30; // $4.55M (Base)
     if (titleUpper.includes('JAPAN') || regionUpper.includes('JAPAN')) return 2800000 * 1.30; // $3.64M (Base)
     if (titleUpper.includes('KANZ') || regionUpper.includes('KANZ')) return 2000000 * 1.30; // $2.60M (Base)
@@ -80,7 +88,7 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
                     ? values.map((v: number) => v > 0 ? `$${(v / 1e6).toFixed(2)}M` : '')
                     : [values[0] > 0 ? `$${(values[0] / 1e6).toFixed(2)}M` : ''],
                 textposition: 'inside',
-                textfont: { size: 14, color: '#fff', weight: 'bold' },
+                textfont: { size: 16, color: '#fff', weight: 'bold' },
                 hovertemplate: `${fy}<br>%{y:$,.0f}<extra></extra>`,
             };
         });
@@ -101,7 +109,7 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
                     ? placeholderValues.map((v: number) => v > 0 ? `$${(v / 1e6).toFixed(2)}M` : '')
                     : [placeholderValues[0] > 0 ? `$${(placeholderValues[0] / 1e6).toFixed(2)}M` : ''],
                 textposition: 'inside',
-                textfont: { size: 14, color: '#fff', weight: 'bold' },
+                textfont: { size: 16, color: '#fff', weight: 'bold' },
                 hovertemplate: 'Total<br>%{y:$,.0f}<extra></extra>',
             });
         }
@@ -172,7 +180,7 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
             y: total,
             text: `<b>$${(total / 1e6).toFixed(2)}M</b>`,
             showarrow: false,
-            font: { size: 16, color: '#000000', weight: 'bold', family: 'Arial' },
+            font: { size: 18, color: '#000000', weight: 'bold', family: 'Arial' },
             xanchor: 'center',
             yanchor: 'bottom',
             yshift: 5
@@ -185,7 +193,7 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
                 y: backlog_target,
                 text: `<b>Target: $${(backlog_target / 1e6).toFixed(2)}M</b>`,
                 showarrow: false,
-                font: { size: 14, color: '#E74C3C', weight: 'bold', family: 'Arial' },
+                font: { size: 16, color: '#E74C3C', weight: 'bold', family: 'Arial' },
                 bgcolor: 'rgba(255,255,255,0.9)',
                 bordercolor: '#E74C3C',
                 borderwidth: 1.5,

@@ -21,6 +21,12 @@ interface Slide2Data {
     prev_week_base: PieChartData;
     current_week_base: PieChartData;
     current_week_stretch: PieChartData;
+    invoiced_data?: {
+        total_invoiced: number;
+        last_week_invoiced: number;
+        growth_amount: number;
+        growth_pct: number;
+    };
     error?: string;
 }
 
@@ -30,6 +36,92 @@ const formatDiff = (num: number) => {
     if (absNum >= 1e6) return (absNum / 1e6).toFixed(2) + 'm';
     if (absNum >= 1e3) return Math.round(absNum / 1e3) + 'k';
     return Math.round(absNum) + '';
+};
+
+const InvoicedCard = ({
+    totalInvoiced = 0,
+    lastWeekInvoiced = 0,
+    growthAmount = 0,
+    growthPct = 0
+}: {
+    totalInvoiced?: number;
+    lastWeekInvoiced?: number;
+    growthAmount?: number;
+    growthPct?: number;
+}) => {
+    const isGrowth = growthAmount >= 0;
+    const growthColor = isGrowth ? '#2a9d8f' : '#e76f51';
+    const sign = isGrowth ? '+' : '';
+
+    const formattedTotal = (totalInvoiced / 1e6).toFixed(2) + 'M';
+    const formattedGrowthAmt = sign + (growthAmount / 1e6).toFixed(2) + 'M';
+    const formattedGrowthPct = sign + growthPct.toFixed(1) + '%';
+    const formattedLastWeek = (lastWeekInvoiced / 1e6).toFixed(2) + 'M';
+
+    return (
+        <div style={{
+            backgroundColor: '#f3f4f6',
+            borderRadius: '12px',
+            border: '1px solid #e5e7eb',
+            borderLeft: '12px solid #10b981',
+            width: '100%',
+            height: '100%',
+            minHeight: '130px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '1.25rem 1rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+        }}>
+            <div style={{
+                fontFamily: 'Helvetica, Arial, sans-serif',
+                fontSize: '0.8rem',
+                fontWeight: '800',
+                color: '#059669',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '0.25rem',
+                textAlign: 'center'
+            }}>
+                TOTAL INVOICED
+            </div>
+            <div style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'center',
+                gap: '8px',
+                flexWrap: 'wrap'
+            }}>
+                <div style={{
+                    fontFamily: 'Helvetica, Arial, sans-serif',
+                    fontSize: '2rem',
+                    fontWeight: '900',
+                    color: '#047857',
+                    lineHeight: '1'
+                }}>
+                    ${formattedTotal}
+                </div>
+                <div style={{
+                    fontFamily: 'Helvetica, Arial, sans-serif',
+                    fontSize: '0.95rem',
+                    fontWeight: 'bold',
+                    color: growthColor
+                }}>
+                    ({formattedGrowthAmt}, {formattedGrowthPct})
+                </div>
+            </div>
+            <div style={{
+                fontFamily: 'Helvetica, Arial, sans-serif',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: '#6b7280',
+                marginTop: '0.4rem'
+            }}>
+                last week : until last week ${formattedLastWeek}
+            </div>
+        </div>
+    );
 };
 
 const TargetCard = ({ title, value, color, borderColor, prevValue }: { title: string, value: number, color: string, borderColor: string, prevValue?: number }) => {
@@ -166,7 +258,7 @@ export default function Slide2() {
                 height: '100%'
             }}>
                 {/* 1. Header Text Stack */}
-                <div style={{ marginBottom: '3rem' }}>
+                <div style={{ marginBottom: '2rem' }}>
                     <h3 style={{
                         fontFamily: 'Helvetica, Arial, sans-serif',
                         fontSize: '1.5rem',
@@ -178,17 +270,17 @@ export default function Slide2() {
                     </h3>
                     <h1 style={{
                         fontFamily: 'Helvetica, Arial, sans-serif',
-                        fontSize: '4.5rem',
+                        fontSize: '4.25rem',
                         fontWeight: 'bold',
                         color: '#4b5563',
-                        margin: '0 0 1rem 0',
+                        margin: '0 0 0.75rem 0',
                         lineHeight: '1.1'
                     }}>
                         Weekly Tracker
                     </h1>
                     <h2 style={{
                         fontFamily: 'Helvetica, Arial, sans-serif',
-                        fontSize: '2.5rem',
+                        fontSize: '2.25rem',
                         fontWeight: 'bold',
                         color: '#9ca3af',
                         margin: '0'
@@ -202,7 +294,7 @@ export default function Slide2() {
                     display: 'grid',
                     gridTemplateColumns: 'repeat(2, 1fr)',
                     gridTemplateRows: 'repeat(2, auto)',
-                    gap: '1.5rem',
+                    gap: '1.25rem',
                     width: '100%',
                     maxWidth: '800px', // Constrain width of the cards
                 }}>
@@ -238,6 +330,16 @@ export default function Slide2() {
                         prevValue={data.prev_week_base?.pipeline}
                         color="#dead65ff"
                         borderColor="#fbc14cff"
+                    />
+                </div>
+
+                {/* Invoiced Amount Card */}
+                <div style={{ marginTop: '1.25rem', width: '100%', maxWidth: '800px' }}>
+                    <InvoicedCard
+                        totalInvoiced={data.invoiced_data?.total_invoiced}
+                        lastWeekInvoiced={data.invoiced_data?.last_week_invoiced}
+                        growthAmount={data.invoiced_data?.growth_amount}
+                        growthPct={data.invoiced_data?.growth_pct}
                     />
                 </div>
             </div>

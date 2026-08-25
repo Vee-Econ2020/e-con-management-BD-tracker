@@ -97,6 +97,18 @@ REGION_PLACEHOLDERS = {
             "weighted": [299000, 299000, 299000, 299000, 299000, 299000, 323000]
         }
     },
+    "APAC": {
+        "trend": {
+            "weeks": ["Week 50", "Week 51", "Week 52", "Week 02", "Week 03", "Week 04", "Week 05"],
+            "po": [1922000, 1922000, 2072000, 2072000, 2210000, 2263000, 2318000],
+            "total": [3247000, 3304000, 3454000, 3679000, 3817000, 3942000, 4417000]
+        },
+        "pipeline": {
+            "weeks": ["Week 50", "Week 51", "Week 52", "Week 02", "Week 03", "Week 04", "Week 05"],
+            "actual": [4107000, 4294000, 4294000, 4294000, 5044000, 5284000, 5247000],
+            "weighted": [1324000, 1382000, 1382000, 1607000, 1607000, 1679000, 2099000]
+        }
+    },
     "Legacy": {
         "trend": {
             "weeks": ["Week 50", "Week 51", "Week 52", "Week 02", "Week 03", "Week 04", "Week 05"],
@@ -170,11 +182,11 @@ async def get_current_or_closest_week_data(db: AsyncIOMotorDatabase) -> Optional
     data = await cursor.to_list(length=None)
     
     if data:
-        print(f"✓ Found data for current week {current_week}")
+        print(f"[OK] Found data for current week {current_week}")
         return pd.DataFrame(data)
     
     # If not found, get the closest week
-    print(f"⚠ No data for current week {current_week}, finding closest week...")
+    print(f"[WARN] No data for current week {current_week}, finding closest week...")
     
     # Get all unique weeks
     pipeline = [
@@ -184,14 +196,14 @@ async def get_current_or_closest_week_data(db: AsyncIOMotorDatabase) -> Optional
     weeks = await collection.aggregate(pipeline).to_list(length=None)
     
     if not weeks:
-        print("✗ No weekly data found in database")
+        print("[ERROR] No weekly data found in database")
         return None
     
     # Find closest week
     available_weeks = [w["_id"] for w in weeks]
     closest_week = min(available_weeks, key=lambda x: abs(x - current_week))
     
-    print(f"✓ Using closest week: {closest_week}")
+    print(f"[OK] Using closest week: {closest_week}")
     
     # Fetch data for closest week
     cursor = collection.find({"week": closest_week})
@@ -304,18 +316,17 @@ async def _compute_cumulative_generic(
         cat = doc["category_value"].lower()
         
         print(f"  → Found target: qtr={qtr}, category_value={doc['category_value']}, target_value={val}")
-        
         if "stretch" in cat:
-            stretch_targets[qtr] = val
+            stretch_targets[qtr] = stretch_targets.get(qtr, 0.0) + val
         elif "base" in cat:
-            base_targets[qtr] = val
+            base_targets[qtr] = base_targets.get(qtr, 0.0) + val
     
     print(f"  → Total targets found: {found_count}")
     print(f"  → Base targets: {base_targets}")
     print(f"  → Stretch targets: {stretch_targets}")
             
     # 3. Fetch weekly tracker data
-    print("\\n[2/4] Fetching weekly tracker data...")
+    print("\n[2/4] Fetching weekly tracker data...")
     dataset_agg = await get_current_or_closest_week_data(db)
     
     if dataset_agg is None or dataset_agg.empty:
@@ -326,7 +337,12 @@ async def _compute_cumulative_generic(
         print(f"  → Filtering by: {filter_query}")
         for key, val in filter_query.items():
             if key in dataset_agg.columns:
-                dataset_agg = dataset_agg[dataset_agg[key] == val].copy()
+                if isinstance(val, dict) and "$in" in val:
+                    dataset_agg = dataset_agg[dataset_agg[key].isin(val["$in"])].copy()
+                elif isinstance(val, list):
+                    dataset_agg = dataset_agg[dataset_agg[key].isin(val)].copy()
+                else:
+                    dataset_agg = dataset_agg[dataset_agg[key] == val].copy()
             else:
                 print(f"  ⚠ Column {key} not found in dataset")
         
@@ -430,11 +446,11 @@ async def _compute_cumulative_generic(
             if val > 0:
                 ann = {
                     "x": idx, "y": val,
-                    "text": f"<b>${val/1e6:.1f}M</b>",
+                    "text": f"<b>${val/1e6:.2f}M</b>",
                     "showarrow": True,
                     "arrowhead": 0, "arrowsize": 1, "arrowwidth": 0.5,
                     "arrowcolor": color_map[key],
-                    "font": {"size": 12, "color": color_map[key], "family": "Arial"},
+                    "font": {"size": 15, "color": color_map[key], "family": "Arial"},
                     "bgcolor": "rgba(255,255,255,0.75)",
                     "borderpad": 2,
                     "ax": ax, "ay": ay
@@ -529,11 +545,11 @@ async def _compute_trend_generic(
         if "stretch" in cat:
             max_stretch = max(max_stretch, val)
             if qtr == "Q4":
-                q4_stretch = val
+                q4_stretch = (q4_stretch or 0.0) + val
         elif "base" in cat:
             max_base = max(max_base, val)
             if qtr == "Q4":
-                q4_base = val
+                q4_base = (q4_base or 0.0) + val
 
     fy27_stretch = q4_stretch if q4_stretch is not None else max_stretch
     fy27_base = q4_base if q4_base is not None else max_base
@@ -635,9 +651,9 @@ async def _compute_trend_generic(
     for name, val, style_key in [("Stretch", fy27_stretch, "Stretch")]:
         all_static_annotations.append({
             "x": len(final_weeks) - 1, "y": val,
-            "text": f"<b>${val/1e6:.1f}M</b>",
+            "text": f"<b>${val/1e6:.2f}M</b>",
             "showarrow": False,
-            "font": {"size": 14, "color": styles[style_key]['color'], "family": "Arial"},
+            "font": {"size": 17, "color": styles[style_key]['color'], "family": "Arial"},
             "bgcolor": "rgba(255,255,255,0.85)",
             "xanchor": 'left', "xshift": 10
         })
@@ -658,7 +674,7 @@ async def _compute_trend_generic(
                 "showarrow": True,
                 "arrowhead": 2, "arrowsize": 1, "arrowwidth": 0.5,
                 "arrowcolor": style['color'],
-                "font": {"size": 12, "color": style['color'], "family": "Arial"},
+                "font": {"size": 15, "color": style['color'], "family": "Arial"},
                 "bgcolor": "rgba(255,255,255,0.85)",
                 "borderpad": 2,
                 "ax": 0, "ay": ay,
@@ -697,6 +713,8 @@ async def _compute_pipeline_generic(
     fy27_base = 0.0
     fy27_stretch = 0.0
     
+    q4_stretch = None
+    q4_base = None
     async for doc in collection_targets.find({
         "ppt_type": "Weekly Tracker",
         "financial_year": "FY2027",
@@ -704,10 +722,20 @@ async def _compute_pipeline_generic(
     }):
         val = doc.get("target_value", 0.0)
         cat = doc["category_value"].lower()
+        qtr = str(doc.get("financial_qtr", ""))
         if "stretch" in cat:
             fy27_stretch = max(fy27_stretch, val)
+            if qtr == "Q4":
+                q4_stretch = (q4_stretch or 0.0) + val
         elif "base" in cat:
             fy27_base = max(fy27_base, val)
+            if qtr == "Q4":
+                q4_base = (q4_base or 0.0) + val
+
+    if q4_stretch is not None:
+        fy27_stretch = q4_stretch
+    if q4_base is not None:
+        fy27_base = q4_base
 
     # 2. Fetch Real Data
     print("\\n[2/3] Fetching available database data...")
@@ -786,9 +814,9 @@ async def _compute_pipeline_generic(
     for name, val, style_key in [("Stretch", fy27_stretch, "Stretch")]:
         annotations.append({
             "x": len(final_weeks) - 0.5, "y": val,
-            "text": f"<b>${val/1e6:.1f}M</b>",
+            "text": f"<b>${val/1e6:.2f}M</b>",
             "showarrow": False,
-            "font": {"size": 14, "color": styles[style_key]['color'], "family": "Arial"},
+            "font": {"size": 17, "color": styles[style_key]['color'], "family": "Arial"},
             "bgcolor": "rgba(255,255,255,0.85)",
             "xanchor": 'left', "xshift": 10
         })
@@ -1043,13 +1071,40 @@ async def compute_slide2_data(db: AsyncIOMotorDatabase) -> Dict:
     prev_total = prev_po_sum + prev_pipeline_sum
     prev_base_deficit = base_target - prev_total
     
-    # Prepare result with all three pie charts
+    # Compute INVOICED metrics from invoice_data collection using latest invoice week
+    invoice_coll = db["invoice_data"]
+    all_inv_docs = await invoice_coll.find({}).to_list(length=100000)
+    if all_inv_docs:
+        inv_weeks = [doc.get("week", 35) for doc in all_inv_docs if doc.get("week") is not None]
+        max_inv_week = max(inv_weeks) if inv_weeks else current_week
+    else:
+        max_inv_week = current_week
+
+    prev_inv_week = max_inv_week - 1
+
+    curr_inv_docs = [doc for doc in all_inv_docs if doc.get("week") is not None and doc.get("week") <= max_inv_week]
+    prev_inv_docs = [doc for doc in all_inv_docs if doc.get("week") is not None and doc.get("week") <= prev_inv_week]
+
+    current_invoiced = sum(float(doc.get("grand_total", 0.0)) for doc in curr_inv_docs)
+    last_week_invoiced = sum(float(doc.get("grand_total", 0.0)) for doc in prev_inv_docs)
+
+    growth_amount = current_invoiced - last_week_invoiced
+    growth_pct = (growth_amount / last_week_invoiced * 100.0) if last_week_invoiced > 0 else 0.0
+
+    # Prepare result with all three pie charts and invoiced metrics
     result = {
         "current_week": current_week,
         "previous_week": previous_week,
         "base_target": base_target,
         "stretch_target": stretch_target,
         
+        "invoiced_data": {
+            "total_invoiced": current_invoiced,
+            "last_week_invoiced": last_week_invoiced,
+            "growth_amount": growth_amount,
+            "growth_pct": growth_pct
+        },
+
         # Previous Week Base Target Pie Chart
         "prev_week_base": {
             "week": previous_week,
@@ -1739,6 +1794,45 @@ async def compute_slide27_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
     )
 
 
+async def compute_slide28_data(db: AsyncIOMotorDatabase) -> Dict:
+    """
+    Compute data for Slide 28 (APAC Cumulative Performance vs Targets).
+    Combined data for Japan, Korea (KANZ), and ASEAN.
+    """
+    return await _compute_cumulative_generic(
+        db,
+        region_name="APAC",
+        target_category={"$in": ["Japan", "KANZ", "Asean", "ASEAN"]},
+        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}
+    )
+
+
+async def compute_slide29_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+    """
+    Compute data for Slide 29 (APAC Pipeline Tracking Over Time).
+    Combined data for Japan, Korea (KANZ), and ASEAN.
+    """
+    return await _compute_trend_generic(
+        db,
+        region_name="APAC",
+        target_category={"$in": ["Japan", "KANZ", "Asean", "ASEAN"]},
+        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}
+    )
+
+
+async def compute_slide30_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+    """
+    Compute data for Slide 30 (APAC Actuals vs Pipeline Weekly Bars).
+    Combined data for Japan, Korea (KANZ), and ASEAN.
+    """
+    return await _compute_pipeline_generic(
+        db,
+        region_name="APAC",
+        target_category={"$in": ["Japan", "KANZ", "Asean", "ASEAN"]},
+        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}
+    )
+
+
 async def compute_order_backlog_data(
     db: AsyncIOMotorDatabase,
     region_name: str = "Overall",
@@ -1768,7 +1862,9 @@ async def compute_order_backlog_data(
     
     # 1. Pipeline to get aggregated data
     match_stage = {}
-    if region_name != "Overall":
+    if region_name == "APAC":
+        match_stage["mRegion"] = {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}
+    elif region_name != "Overall":
         match_stage["mRegion"] = region_name
     if opp_type_filter:
         match_stage["OPP_Type"] = opp_type_filter
@@ -1814,6 +1910,8 @@ async def compute_order_backlog_data(
         ph_backlogs = [2496000, 2552000, 2556000, 2463000, 2438000, 2436000, 2430000, 2386000]
     elif region_name == "KANZ":
         ph_backlogs = [447000, 453000, 454000, 451000, 449000, 443000, 435000, 453000]
+    elif region_name == "APAC":
+        ph_backlogs = [3442000, 3480000, 3443000, 4004000, 3960000, 3903000, 3990000, 3917000]
     elif region_name == "Legacy":
         ph_backlogs = [3148000, 3139000, 3123000, 2543000, 3137000, 3198000, 3151000, 3263000]
     else:
@@ -1841,7 +1939,9 @@ async def compute_order_backlog_data(
     
     for week_num in real_db_weeks:
         fy_match = {"week": week_num}
-        if region_name != "Overall":
+        if region_name == "APAC":
+            fy_match["mRegion"] = {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}
+        elif region_name != "Overall":
             fy_match["mRegion"] = region_name
         if opp_type_filter:
             fy_match["OPP_Type"] = opp_type_filter
@@ -2035,6 +2135,10 @@ _SERVICES_SLIDE_CONFIGS: Dict[int, tuple] = {
     25: ("cumulative", "Legacy",  "Legacy",  {"mRegion": "Legacy"}),
     26: ("trend",      "Legacy",  "Legacy",  {"mRegion": "Legacy"}),
     27: ("pipeline",   "Legacy",  "Legacy",  {"mRegion": "Legacy"}),
+    # APAC
+    28: ("cumulative", "APAC",    {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}, {"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}),
+    29: ("trend",      "APAC",    {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}, {"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}),
+    30: ("pipeline",   "APAC",    {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}, {"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}),
 }
 
 
@@ -2051,6 +2155,7 @@ SERVICES_Q1_REGION_ALIASES = {
     "Japan": "Japan",
     "KANZ": "KANZ",
     "Legacy": "Legacy",
+    "APAC": "APAC",
 }
 
 SERVICES_Q1_COLORS = {
@@ -2072,6 +2177,7 @@ SERVICES_Q1_PIPELINE_SLIDES = {
     "Japan": 21,
     "KANZ": 24,
     "Legacy": 27,
+    "APAC": 30,
 }
 
 
@@ -2079,10 +2185,10 @@ def format_services_snapshot_value(value: float) -> str:
     if value == 0:
         return ""
     if abs(value) < 1000:
-        return f"${value:,.0f}"
+        return f"${value:,.2f}"
     if abs(value) < 1_000_000:
-        return f"${value / 1e3:.1f}K"
-    return f"${value / 1e6:.1f}M"
+        return f"${value / 1e3:.2f}K"
+    return f"${value / 1e6:.2f}M"
 
 
 async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: str = "Overall", quarter: str = "Q2") -> Dict:
@@ -2963,3 +3069,169 @@ async def compute_region_services_cy_gm_data(
         "category_summaries": category_summaries,
         "accounts": accounts,
     }
+
+
+async def compute_invoice_slide_data(db: AsyncIOMotorDatabase, region_name: str = "Overall") -> Dict:
+    """
+    Compute data for Invoicing Trend Slide across Overall or individual regions.
+    Generates 8-week historical trend of weekly and cumulative invoiced amount.
+    """
+    print("\n" + "=" * 70)
+    print(f"COMPUTING INVOICE SLIDE DATA FOR REGION: {region_name}")
+    print("=" * 70)
+
+    invoice_coll = db["invoice_data"]
+
+    # Match query based on region_name
+    match_query = {}
+    if region_name and region_name != "Overall":
+        reg = region_name.strip()
+        if reg in ["US West", "USA West"]:
+            match_query = {"$or": [{"mRegion": "US West"}, {"mRegion": "USA West"}, {"nRegion": "US West"}, {"nRegion": "USA West"}]}
+        elif reg in ["US East", "USA East"]:
+            match_query = {"$or": [{"mRegion": "US East"}, {"mRegion": "USA East"}, {"nRegion": "US East"}, {"nRegion": "USA East"}]}
+        elif reg.lower() == "europe":
+            match_query = {"$or": [{"mRegion": "Europe"}, {"nRegion": "Europe"}]}
+        elif reg.lower() in ["asean"]:
+            match_query = {"$or": [{"mRegion": {"$in": ["Asean", "ASEAN"]}}, {"nRegion": {"$in": ["Asean", "ASEAN"]}}]}
+        elif reg.lower() == "japan":
+            match_query = {"$or": [{"mRegion": "Japan"}, {"nRegion": "Japan"}]}
+        elif reg.lower() in ["kanz", "korea"]:
+            match_query = {"$or": [{"mRegion": {"$in": ["KANZ", "Korea"]}}, {"nRegion": {"$in": ["KANZ", "Korea"]}}]}
+        elif reg.lower() == "legacy":
+            match_query = {"$or": [{"mRegion": "Legacy"}, {"nRegion": "Legacy"}]}
+        elif reg.lower() == "apac":
+            match_query = {"$or": [{"mRegion": {"$in": ["APAC", "Japan", "KANZ", "Asean", "ASEAN"]}}, {"nRegion": {"$in": ["APAC", "Japan", "KANZ", "Asean", "ASEAN"]}}]}
+        else:
+            match_query = {"$or": [{"mRegion": reg}, {"nRegion": reg}]}
+
+    # Fetch matching documents
+    all_docs = await invoice_coll.find(match_query).to_list(length=100000)
+    if not all_docs and match_query:
+        # Fallback to all invoice docs if specific filter returns no match
+        all_docs = await invoice_coll.find({}).to_list(length=100000)
+
+    weeks_present = [doc.get("week", 35) for doc in all_docs if doc.get("week") is not None]
+    max_week = max(weeks_present) if weeks_present else 35
+
+    # 8-week historical window
+    weeks_window = list(range(max_week - 7, max_week + 1))
+    weeks_labels = [f"Week {str(w).zfill(2)}" for w in weeks_window]
+
+    weekly_invoiced = []
+    cumulative_invoiced = []
+
+    for w in weeks_window:
+        w_sum = sum(float(doc.get("grand_total", 0.0)) for doc in all_docs if doc.get("week") == w)
+        cum_sum = sum(float(doc.get("grand_total", 0.0)) for doc in all_docs if doc.get("week") is not None and doc.get("week") <= w)
+        weekly_invoiced.append(w_sum)
+        cumulative_invoiced.append(cum_sum)
+
+    stretch_target = max(cumulative_invoiced) * 1.1 if cumulative_invoiced else 0.0
+
+    styles = {
+        'Stretch': {'color': '#9d45eb', 'name': 'Target'},
+        'Base': {'color': '#466cd3', 'name': 'Base Target'},
+        'PO': {'color': '#2563eb', 'name': 'Weekly Invoiced Amount'},
+        'Total': {'color': '#10b981', 'name': 'Invoiced Amount'}
+    }
+
+    annotations = []
+    # 1. Cumulative Invoiced Amount data labels (Green, top subplot box: xref='x', yref='y')
+    for idx, val in enumerate(cumulative_invoiced):
+        text_label = f"<b>${val/1e6:.2f}M</b>" if val >= 1e6 else (f"<b>${val/1e3:.0f}K</b>" if val >= 1e3 else f"<b>${val:.0f}</b>")
+        annotations.append({
+            "x": idx,
+            "y": val,
+            "xref": "x",
+            "yref": "y",
+            "text": text_label,
+            "showarrow": True,
+            "arrowhead": 2,
+            "arrowsize": 1,
+            "arrowwidth": 0.5,
+            "arrowcolor": "#10b981",
+            "font": {"size": 14, "color": "#10b981", "family": "Arial"},
+            "bgcolor": "rgba(255,255,255,0.85)",
+            "borderpad": 2,
+            "ax": 0,
+            "ay": -28,
+            "week_idx": idx,
+            "type": "dynamic"
+        })
+
+    # 2. Weekly Invoiced Amount data labels (Blue, bottom subplot box: xref='x2', yref='y2')
+    for idx, val in enumerate(weekly_invoiced):
+        text_label = f"<b>${val/1e6:.2f}M</b>" if val >= 1e6 else (f"<b>${val/1e3:.0f}K</b>" if val >= 1e3 else f"<b>${val:.0f}</b>")
+        annotations.append({
+            "x": idx,
+            "y": val,
+            "xref": "x2",
+            "yref": "y2",
+            "text": text_label,
+            "showarrow": True,
+            "arrowhead": 2,
+            "arrowsize": 1,
+            "arrowwidth": 0.5,
+            "arrowcolor": "#2563eb",
+            "font": {"size": 14, "color": "#2563eb", "family": "Arial"},
+            "bgcolor": "rgba(255,255,255,0.85)",
+            "borderpad": 2,
+            "ax": 0,
+            "ay": -28,
+            "week_idx": idx,
+            "type": "dynamic"
+        })
+
+    # Compute 8-week average
+    avg_weekly = (sum(weekly_invoiced) / len(weekly_invoiced)) if weekly_invoiced else 0.0
+    current_cum_val = cumulative_invoiced[-1] if cumulative_invoiced else 0.0
+
+    # Remaining weeks from max_week (e.g. Week 35) to March 31, 2027 (Week 13 of 2027)
+    # 2026 weeks remaining: 52 - 35 = 17 weeks. 2027 weeks to Mar 31: 14 weeks -> Total = 31 weeks.
+    if max_week <= 52:
+        remaining_weeks = (52 - max_week) + 14
+    else:
+        remaining_weeks = max(0, 66 - max_week)
+
+    projected_runrate_addition = avg_weekly * remaining_weeks
+    projected_fy_end = current_cum_val + projected_runrate_addition
+
+    # 3. Add 8-week average data label annotation in bottom subplot box (xref='x2', yref='y2')
+    avg_label = f"<b>8-Wk Avg: ${avg_weekly/1e6:.2f}M/wk</b>" if avg_weekly >= 1e6 else (f"<b>8-Wk Avg: ${avg_weekly/1e3:.0f}K/wk</b>" if avg_weekly >= 1e3 else f"<b>8-Wk Avg: ${avg_weekly:.0f}/wk</b>")
+    annotations.append({
+        "x": len(weeks_window) - 1,
+        "y": avg_weekly,
+        "xref": "x2",
+        "yref": "y2",
+        "text": avg_label,
+        "showarrow": False,
+        "font": {"size": 13, "color": "#c2410c", "family": "Arial"},
+        "bgcolor": "rgba(255, 247, 237, 0.95)",
+        "bordercolor": "#ea580c",
+        "borderpad": 4,
+        "type": "static"
+    })
+
+    max_weekly_val = max(weekly_invoiced) if weekly_invoiced else 0.0
+    sec_axis_max = max(max_weekly_val, avg_weekly) * 1.35 if max_weekly_val > 0 else 5_000_000.0
+
+    return {
+        "weeks": weeks_labels,
+        "po_achieved": weekly_invoiced,
+        "po_pipeline": cumulative_invoiced,
+        "stretch_target": stretch_target,
+        "base_target": stretch_target * 0.9,
+        "styles": styles,
+        "annotations": annotations,
+        "region": region_name,
+        "enable_animation": False,
+        "is_invoice": True,
+        "sec_axis_max": sec_axis_max,
+        "avg_weekly": avg_weekly,
+        "projected_runrate_addition": projected_runrate_addition,
+        "projected_fy_end": projected_fy_end,
+        "current_week": max_week,
+        "remaining_weeks": remaining_weeks
+    }
+

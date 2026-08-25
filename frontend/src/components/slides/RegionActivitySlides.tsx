@@ -36,36 +36,21 @@ export const Slide15_2_1 = (props: { isEditing: boolean }) =>
 
 // ASEAN (Anchor: Slide 18)
 export const Slide18_1 = (props: { isEditing: boolean }) =>
-    <RegionInputTableSlide title="ASEAN - Account Management" slideId="asean_acc_mgmt" {...props} />;
+    <RegionInputTableSlide title="ASEAN - Account / New Business" slideId="asean_acc_new_biz" {...props} />;
 export const Slide18_1_1 = (props: { isEditing: boolean }) =>
-    <ActionItemsSlide title="ASEAN - Account Management" slideId="asean_acc_mgmt_actions" {...props} />;
-
-export const Slide18_2 = (props: { isEditing: boolean }) =>
-    <RegionInputTableSlide title="ASEAN - New Business" slideId="asean_new_biz" {...props} />;
-export const Slide18_2_1 = (props: { isEditing: boolean }) =>
-    <ActionItemsSlide title="ASEAN - New Business" slideId="asean_new_biz_actions" {...props} />;
+    <ActionItemsSlide title="ASEAN - Account / New Business" slideId="asean_acc_new_biz_actions" {...props} />;
 
 // Japan (Anchor: Slide 21)
 export const Slide21_1 = (props: { isEditing: boolean }) =>
-    <RegionInputTableSlide title="Japan - Account Management" slideId="japan_acc_mgmt" {...props} />;
+    <RegionInputTableSlide title="Japan - Account / New Business" slideId="japan_acc_new_biz" {...props} />;
 export const Slide21_1_1 = (props: { isEditing: boolean }) =>
-    <ActionItemsSlide title="Japan - Account Management" slideId="japan_acc_mgmt_actions" {...props} />;
+    <ActionItemsSlide title="Japan - Account / New Business" slideId="japan_acc_new_biz_actions" {...props} />;
 
-export const Slide21_2 = (props: { isEditing: boolean }) =>
-    <RegionInputTableSlide title="Japan - New Business" slideId="japan_new_biz" {...props} />;
-export const Slide21_2_1 = (props: { isEditing: boolean }) =>
-    <ActionItemsSlide title="Japan - New Business" slideId="japan_new_biz_actions" {...props} />;
-
-// KANZ (Anchor: Slide 24)
+// KANZ / Korea (Anchor: Slide 24)
 export const Slide24_1 = (props: { isEditing: boolean }) =>
-    <RegionInputTableSlide title="KANZ - Account Management" slideId="kanz_acc_mgmt" {...props} />;
+    <RegionInputTableSlide title="KANZ - Account / New Business" slideId="kanz_acc_new_biz" {...props} />;
 export const Slide24_1_1 = (props: { isEditing: boolean }) =>
-    <ActionItemsSlide title="KANZ - Account Management" slideId="kanz_acc_mgmt_actions" {...props} />;
-
-export const Slide24_2 = (props: { isEditing: boolean }) =>
-    <RegionInputTableSlide title="KANZ - New Business" slideId="kanz_new_biz" {...props} />;
-export const Slide24_2_1 = (props: { isEditing: boolean }) =>
-    <ActionItemsSlide title="KANZ - New Business" slideId="kanz_new_biz_actions" {...props} />;
+    <ActionItemsSlide title="KANZ - Account / New Business" slideId="kanz_acc_new_biz_actions" {...props} />;
 
 // Management / Legacy (Anchor: Slide 27)
 export const Slide27_1 = (props: { isEditing: boolean }) =>
@@ -77,3 +62,9 @@ export const Slide27_2 = (props: { isEditing: boolean }) =>
     <RegionInputTableSlide title="Management - New Business" slideId="mgmt_new_biz" {...props} />;
 export const Slide27_2_1 = (props: { isEditing: boolean }) =>
     <ActionItemsSlide title="Management - New Business" slideId="mgmt_new_biz_actions" {...props} />;
+
+// APAC (Anchor: Slide 30)
+export const Slide30_1 = (props: { isEditing: boolean }) =>
+    <RegionInputTableSlide title="APAC - Account / New Business" slideId="apac_acc_new_biz" {...props} />;
+export const Slide30_1_1 = (props: { isEditing: boolean }) =>
+    <ActionItemsSlide title="APAC - Account / New Business" slideId="apac_acc_new_biz_actions" {...props} />;
