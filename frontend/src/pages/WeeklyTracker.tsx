@@ -2012,38 +2012,39 @@ export default function WeeklyTracker() {
                         consecutiveFailures = 0;
 
                         const statusData = await statusRes.json();
-                    const allSlidesRendered = String(statusData.message || '').startsWith('All slides rendered.');
-                    setExportProgress({
-                        current: typeof statusData.rendered_slides === 'number'
-                            ? statusData.rendered_slides
-                            : allSlidesRendered
-                                ? exportSlides.length
-                                : Math.round((statusData.progress / 100) * exportSlides.length),
-                        total: typeof statusData.total_slides === 'number' && statusData.total_slides > 0
-                            ? statusData.total_slides
-                            : exportSlides.length,
-                        title: statusData.message || 'Generating PDF on server...'
-                    });
+                        const allSlidesRendered = String(statusData.message || '').startsWith('All slides rendered.');
+                        setExportProgress({
+                            current: typeof statusData.rendered_slides === 'number'
+                                ? statusData.rendered_slides
+                                : allSlidesRendered
+                                    ? exportSlides.length
+                                    : Math.round((statusData.progress / 100) * exportSlides.length),
+                            total: typeof statusData.total_slides === 'number' && statusData.total_slides > 0
+                                ? statusData.total_slides
+                                : exportSlides.length,
+                            title: statusData.message || 'Generating PDF on server...'
+                        });
 
-                    if (statusData.status === 'completed') {
-                        finished = true;
-                        // Trigger browser download
-                        const link = document.createElement('a');
-                        link.href = `/api/admin/export-pdf-download/${jobId}`;
-                        link.download = statusData.pdf_filename || `weekly-tracker-week-${currentWeek}.pdf`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        showToast('Weekly Tracker PDF downloaded!');
-                        setIsExporting(false);
-                        setExportProgress(null);
-                        return;
-                    } else if (statusData.status === 'failed') {
-                        finished = true;
-                        setIsExporting(false);
-                        setExportProgress(null);
-                        showToast(statusData.error || 'The server PDF export failed before the file could be created.');
-                        return;
+                        if (statusData.status === 'completed') {
+                            finished = true;
+                            // Trigger browser download
+                            const link = document.createElement('a');
+                            link.href = `/api/admin/export-pdf-download/${jobId}`;
+                            link.download = statusData.pdf_filename || `weekly-tracker-week-${currentWeek}.pdf`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            showToast('Weekly Tracker PDF downloaded!');
+                            setIsExporting(false);
+                            setExportProgress(null);
+                            return;
+                        } else if (statusData.status === 'failed') {
+                            finished = true;
+                            setIsExporting(false);
+                            setExportProgress(null);
+                            showToast(statusData.error || 'The server PDF export failed before the file could be created.');
+                            return;
+                        }
                     } catch (pollErr) {
                         consecutiveFailures += 1;
                         if (consecutiveFailures >= 5) {
