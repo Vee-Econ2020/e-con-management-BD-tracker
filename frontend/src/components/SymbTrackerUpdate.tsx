@@ -16,6 +16,8 @@ interface EditHistory {
     planned_qty?: EditHistoryEntry[];
     completed?: EditHistoryEntry[];
     plan_date?: EditHistoryEntry[];
+    input_qty?: EditHistoryEntry[];
+    acc_work_qty?: EditHistoryEntry[];
 }
 
 interface TrackerRecord {
@@ -25,6 +27,7 @@ interface TrackerRecord {
     plan_date: string;
     input_qty?: number;
     planned_qty: number;
+    acc_work_qty?: number;
     completed: number;
     acc_comp_date: string | null;
     created_by?: string;
@@ -159,6 +162,7 @@ function getLockStatus(nowDate: Date = new Date(), backendState?: any) {
 function calcMetrics(recs: TrackerRecord[]) {
     let totalInput = 0;
     let totalPlanned = 0;
+    let totalAccWork = 0;
     let totalCompleted = 0;
 
     let plannedAsOfToday = 0;
@@ -170,9 +174,11 @@ function calcMetrics(recs: TrackerRecord[]) {
     recs.forEach(rec => {
         const inp = typeof rec.input_qty === 'number' ? rec.input_qty : 0;
         const p = rec.planned_qty || 0;
+        const acc = typeof rec.acc_work_qty === 'number' ? rec.acc_work_qty : 0;
         const c = rec.completed || 0;
         totalInput += inp;
         totalPlanned += p;
+        totalAccWork += acc;
         totalCompleted += c;
 
         const recDate = parseDayDate(rec.plan_date);
@@ -185,8 +191,8 @@ function calcMetrics(recs: TrackerRecord[]) {
         }
     });
 
-    const totalFailed = Math.max(0, totalInput - totalCompleted);
-    const failedPct = totalInput > 0 ? ((totalFailed / totalInput) * 100).toFixed(1) : '0.0';
+    const totalFailed = Math.max(0, totalAccWork - totalCompleted);
+    const failedPct = totalAccWork > 0 ? ((totalFailed / totalAccWork) * 100).toFixed(1) : '0.0';
 
     const netDiff = totalCompleted - totalPlanned;
     const totalRemaining = netDiff < 0 ? Math.abs(netDiff) : 0;
@@ -199,6 +205,7 @@ function calcMetrics(recs: TrackerRecord[]) {
     return {
         totalInput,
         totalPlanned,
+        totalAccWork,
         totalCompleted,
         totalFailed,
         failedPct,
@@ -241,7 +248,6 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
         ];
 
         let prevCompleted: number | null = null;
-        let prevPlanned: number | null = null;
 
         return STAGES.map((stg, idx) => {
             const stgRecords = records.filter(r => r.event_type === stg.key);
@@ -275,7 +281,6 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
             }
 
             prevCompleted = completed;
-            prevPlanned = planned;
 
             const remaining = planned > completed ? planned - completed : 0;
             return {
@@ -352,15 +357,17 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
     const editStats = useMemo(() => {
         let planDateEdits = 0;
         let plannedQtyEdits = 0;
+        let accWorkQtyEdits = 0;
         let completedEdits = 0;
 
         records.forEach(r => {
             planDateEdits += r.edit_history?.plan_date?.length || 0;
             plannedQtyEdits += r.edit_history?.planned_qty?.length || 0;
+            accWorkQtyEdits += r.edit_history?.acc_work_qty?.length || 0;
             completedEdits += r.edit_history?.completed?.length || 0;
         });
 
-        return { planDateEdits, plannedQtyEdits, completedEdits };
+        return { planDateEdits, plannedQtyEdits, accWorkQtyEdits, completedEdits };
     }, [records]);
 
     // Prepare chart data & traces for single event tab (Planned vs Completed + Past Edits)
@@ -789,11 +796,11 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
                             </div>
                         </div>
 
-                        {/* 4. FAILED QTY Box (New Box!) */}
+                        {/* 4. FAILED QTY Box (First Pass Fail %) */}
                         <div style={{ backgroundColor: metrics.totalFailed > 0 ? '#fef2f2' : '#ffffff', padding: '0.85rem', borderRadius: '8px', border: metrics.totalFailed > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0' }}>
-                            <div style={{ fontSize: '0.72rem', color: metrics.totalFailed > 0 ? '#991b1b' : '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Failed Qty</div>
+                            <div style={{ fontSize: '0.72rem', color: metrics.totalFailed > 0 ? '#991b1b' : '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Failed Qty (First Pass Fail %)</div>
                             <div style={{ fontSize: '1.35rem', fontWeight: '800', color: metrics.totalFailed > 0 ? '#dc2626' : '#64748b', marginTop: '0.2rem' }}>
-                                {metrics.totalFailed.toLocaleString()} <span style={{ fontSize: '0.72rem', fontWeight: '600', color: metrics.totalFailed > 0 ? '#ef4444' : '#94a3b8' }}>({metrics.failedPct}%)</span>
+                                {metrics.totalFailed.toLocaleString()} <span style={{ fontSize: '0.72rem', fontWeight: '600', color: metrics.totalFailed > 0 ? '#ef4444' : '#94a3b8' }}>({metrics.failedPct}% First Pass Fail)</span>
                             </div>
                         </div>
 
@@ -1054,6 +1061,7 @@ export default function SymbTrackerUpdate() {
         plan_date_from: '',
         plan_date_to: '',
         planned_qty: '',
+        acc_work_qty: '',
         completed: '',
         acc_comp_date: '',
         created_by: ''
@@ -1064,7 +1072,7 @@ export default function SymbTrackerUpdate() {
 
     // Editing State
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [editForm, setEditForm] = useState({ plan_date: '', planned_qty: 0, completed: 0 });
+    const [editForm, setEditForm] = useState({ plan_date: '', input_qty: 0, planned_qty: 0, acc_work_qty: 0, completed: 0 });
 
     // Delete Modal State
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -1156,6 +1164,9 @@ export default function SymbTrackerUpdate() {
             }
 
             if (columnFilters.planned_qty && !String(rec.planned_qty || '').toLowerCase().includes(columnFilters.planned_qty.toLowerCase())) {
+                return false;
+            }
+            if (columnFilters.acc_work_qty && !String(rec.acc_work_qty || '').toLowerCase().includes(columnFilters.acc_work_qty.toLowerCase())) {
                 return false;
             }
             if (columnFilters.completed && !String(rec.completed || '').toLowerCase().includes(columnFilters.completed.toLowerCase())) {
@@ -1270,6 +1281,7 @@ export default function SymbTrackerUpdate() {
             plan_date: rec.plan_date,
             input_qty: rec.input_qty ?? 0,
             planned_qty: rec.planned_qty || 0,
+            acc_work_qty: rec.acc_work_qty ?? 0,
             completed: rec.completed || 0
         });
     };
@@ -1281,11 +1293,14 @@ export default function SymbTrackerUpdate() {
     const saveEditing = async (id: string, original: TrackerRecord) => {
         const inputVal = editForm.input_qty ?? 0;
         const origInputVal = original.input_qty ?? 0;
+        const accWorkVal = editForm.acc_work_qty ?? 0;
+        const origAccWorkVal = original.acc_work_qty ?? 0;
 
         const changed = 
             editForm.plan_date !== original.plan_date || 
             inputVal !== origInputVal ||
             editForm.planned_qty !== original.planned_qty || 
+            accWorkVal !== origAccWorkVal ||
             editForm.completed !== original.completed;
             
         if (!changed) {
@@ -1355,6 +1370,9 @@ export default function SymbTrackerUpdate() {
             if (editForm.input_qty > 0 || (original.input_qty !== undefined)) {
                 payload.input_qty = editForm.input_qty;
             }
+            if (editForm.acc_work_qty > 0 || (original.acc_work_qty !== undefined)) {
+                payload.acc_work_qty = editForm.acc_work_qty;
+            }
 
             const res = await fetch(`/api/admin/symb-updated-tracker/${id}`, {
                 method: 'PUT',
@@ -1411,9 +1429,10 @@ export default function SymbTrackerUpdate() {
     const RecordHistorySubTable = ({ rec, onClose }: { rec: TrackerRecord; onClose: () => void }) => {
         const planDateEdits = (rec.edit_history?.plan_date || []).map(h => ({ ...h, fieldLabel: 'Plan Date', badgeBg: '#dbeafe', badgeColor: '#1e40af' }));
         const plannedQtyEdits = (rec.edit_history?.planned_qty || []).map(h => ({ ...h, fieldLabel: 'Planned Qty', badgeBg: '#dcfce7', badgeColor: '#166534' }));
+        const accWorkQtyEdits = (rec.edit_history?.acc_work_qty || []).map(h => ({ ...h, fieldLabel: 'Acc Work Qty', badgeBg: '#fed7aa', badgeColor: '#c2410c' }));
         const completedEdits = (rec.edit_history?.completed || []).map(h => ({ ...h, fieldLabel: 'Completed', badgeBg: '#f3e8ff', badgeColor: '#6b21a8' }));
 
-        const allEdits = [...planDateEdits, ...plannedQtyEdits, ...completedEdits];
+        const allEdits = [...planDateEdits, ...plannedQtyEdits, ...accWorkQtyEdits, ...completedEdits];
         allEdits.sort((a, b) => {
             const timeA = new Date(a.timestamp).getTime();
             const timeB = new Date(b.timestamp).getTime();
@@ -1791,8 +1810,9 @@ export default function SymbTrackerUpdate() {
                             </th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Input Qty</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Planned Qty</th>
+                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Acc Work QTY</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Completed</th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Failed Qty (%)</th>
+                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>First Pass Fail %</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Remaining</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Excess</th>
                             <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Actual Comp. Date</th>
@@ -1855,6 +1875,15 @@ export default function SymbTrackerUpdate() {
                                 <input 
                                     type="text" 
                                     placeholder="Filter..." 
+                                    value={columnFilters.acc_work_qty} 
+                                    onChange={e => setColumnFilters({...columnFilters, acc_work_qty: e.target.value})} 
+                                    style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
+                                />
+                            </th>
+                            <th style={{ padding: '0.4rem 0.75rem' }}>
+                                <input 
+                                    type="text" 
+                                    placeholder="Filter..." 
                                     value={columnFilters.completed} 
                                     onChange={e => setColumnFilters({...columnFilters, completed: e.target.value})} 
                                     style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
@@ -1882,9 +1911,9 @@ export default function SymbTrackerUpdate() {
                                 />
                             </th>
                             <th style={{ padding: '0.4rem 0.75rem', textAlign: 'right' }}>
-                                {(columnFilters.variant || columnFilters.event_type || columnFilters.plan_date_from || columnFilters.plan_date_to || columnFilters.planned_qty || columnFilters.completed || columnFilters.acc_comp_date || columnFilters.created_by) && (
+                                {(columnFilters.variant || columnFilters.event_type || columnFilters.plan_date_from || columnFilters.plan_date_to || columnFilters.planned_qty || columnFilters.acc_work_qty || columnFilters.completed || columnFilters.acc_comp_date || columnFilters.created_by) && (
                                     <button 
-                                        onClick={() => setColumnFilters({ variant: '', event_type: '', plan_date_from: '', plan_date_to: '', planned_qty: '', completed: '', acc_comp_date: '', created_by: '' })}
+                                        onClick={() => setColumnFilters({ variant: '', event_type: '', plan_date_from: '', plan_date_to: '', planned_qty: '', acc_work_qty: '', completed: '', acc_comp_date: '', created_by: '' })}
                                         style={{ fontSize: '0.72rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}
                                     >
                                         Clear
@@ -1898,10 +1927,12 @@ export default function SymbTrackerUpdate() {
                             const isEditing = editingId === rec._id;
                             const hasInput = typeof rec.input_qty === 'number' && rec.input_qty > 0;
                             const inputQty = hasInput ? rec.input_qty! : 0;
+                            const hasAccWork = typeof rec.acc_work_qty === 'number' && rec.acc_work_qty > 0;
+                            const accWorkQty = hasAccWork ? rec.acc_work_qty! : 0;
                             const plannedQty = rec.planned_qty || 0;
                             const completed = rec.completed || 0;
-                            const failedQty = hasInput ? Math.max(0, inputQty - completed) : 0;
-                            const failedPct = hasInput && inputQty > 0 ? ((failedQty / inputQty) * 100).toFixed(1) + '%' : '0.0%';
+                            const failedQty = hasAccWork ? Math.max(0, accWorkQty - completed) : 0;
+                            const firstPassFailPct = hasAccWork && accWorkQty > 0 ? ((failedQty / accWorkQty) * 100).toFixed(1) + '%' : '0.0%';
                             const remaining = Math.max(0, plannedQty - completed);
                             const excess = Math.max(0, completed - plannedQty);
 
@@ -1941,8 +1972,9 @@ export default function SymbTrackerUpdate() {
 
                             const pDateHist = rec.edit_history?.plan_date || [];
                             const pQtyHist = rec.edit_history?.planned_qty || [];
+                            const accWorkHist = rec.edit_history?.acc_work_qty || [];
                             const compHist = rec.edit_history?.completed || [];
-                            const totalEditsCount = pDateHist.length + pQtyHist.length + compHist.length;
+                            const totalEditsCount = pDateHist.length + pQtyHist.length + accWorkHist.length + compHist.length;
                             const isExpanded = !!expandedHistoryIds[rec._id];
 
                             return (
@@ -2028,6 +2060,35 @@ export default function SymbTrackerUpdate() {
                                             )}
                                         </td>
 
+                                        {/* Acc Work QTY Column */}
+                                        <td style={{ padding: '0.75rem' }}>
+                                            {isEditing ? (
+                                                <input 
+                                                    type="number" 
+                                                    value={editForm.acc_work_qty || ''} 
+                                                    placeholder="Empty" 
+                                                    onChange={e => setEditForm({...editForm, acc_work_qty: parseInt(e.target.value) || 0})} 
+                                                    style={{ 
+                                                        width: '85px', 
+                                                        padding: '0.3rem',
+                                                        borderRadius: '4px',
+                                                        border: '1px solid #d1d5db'
+                                                    }} 
+                                                />
+                                            ) : (
+                                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                    <span style={{ fontWeight: hasAccWork ? '500' : '400', color: hasAccWork ? '#1e293b' : '#9ca3af' }}>
+                                                        {hasAccWork ? accWorkQty.toLocaleString() : '-'}
+                                                    </span>
+                                                    <HistoryButton 
+                                                        history={accWorkHist} 
+                                                        isExpanded={isExpanded} 
+                                                        onToggle={() => toggleRowHistory(rec._id)} 
+                                                    />
+                                                </div>
+                                            )}
+                                        </td>
+
                                         {/* Completed Column */}
                                         <td style={{ padding: '0.75rem' }}>
                                             {isEditing ? (
@@ -2083,13 +2144,13 @@ export default function SymbTrackerUpdate() {
                                             )}
                                         </td>
 
-                                        {/* Failed Qty Column with % */}
+                                        {/* First Pass Fail % Column */}
                                         <td style={{ padding: '0.75rem' }}>
-                                            {hasInput && failedQty > 0 ? (
+                                            {hasAccWork && failedQty > 0 ? (
                                                 <span style={{ color: '#dc2626', fontWeight: '700' }}>
-                                                    {failedQty.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#ef4444' }}>({failedPct})</span>
+                                                    {failedQty.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#ef4444' }}>({firstPassFailPct})</span>
                                                 </span>
-                                            ) : hasInput ? (
+                                            ) : hasAccWork ? (
                                                 <span style={{ color: '#64748b' }}>0 (0.0%)</span>
                                             ) : (
                                                 <span style={{ color: '#9ca3af' }}>-</span>
@@ -2169,7 +2230,7 @@ export default function SymbTrackerUpdate() {
                                     </tr>
                                     {isExpanded && (
                                         <tr key={`${rec._id}-history`} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: '#f8fafc' }}>
-                                            <td colSpan={12} style={{ padding: '0.4rem 1rem 1rem 1rem' }}>
+                                            <td colSpan={13} style={{ padding: '0.4rem 1rem 1rem 1rem' }}>
                                                 <RecordHistorySubTable rec={rec} onClose={() => toggleRowHistory(rec._id)} />
                                             </td>
                                         </tr>
@@ -2179,7 +2240,7 @@ export default function SymbTrackerUpdate() {
                         })}
                         {filteredRecords.length === 0 && !loading && (
                             <tr>
-                                <td colSpan={12} style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                                <td colSpan={13} style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                                     No records match the selected sub-tab or column filters.
                                 </td>
                             </tr>

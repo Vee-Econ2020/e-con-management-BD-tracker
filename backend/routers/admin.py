@@ -2670,7 +2670,9 @@ class SymbTrackerBulkCreate(BaseModel):
 
 class SymbTrackerUpdateRow(BaseModel):
     plan_date: Optional[str] = None
+    input_qty: Optional[int] = None
     planned_qty: Optional[int] = None
+    acc_work_qty: Optional[int] = None
     completed: Optional[int] = None
 
 class SymbTrackerDeletePayload(BaseModel):
@@ -2874,6 +2876,7 @@ class SymbTrackerUpdateRow(BaseModel):
     plan_date: Optional[str] = None
     input_qty: Optional[int] = None
     planned_qty: Optional[int] = None
+    acc_work_qty: Optional[int] = None
     completed: Optional[int] = None
 
 class SymbTrackerDeletePayload(BaseModel):
@@ -3267,6 +3270,19 @@ async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow, au
                     detail=f"Cannot update: Input quantity ({payload.input_qty:,}) cannot be higher than the available inventory ({target_qty:,})!"
                 )
             updates["input_qty"] = payload.input_qty
+
+        if payload.acc_work_qty is not None and payload.acc_work_qty != doc.get("acc_work_qty"):
+            hist = edit_history.get("acc_work_qty", [])
+            hist.append({
+                "old_value": doc.get("acc_work_qty"),
+                "new_value": payload.acc_work_qty,
+                "value": doc.get("acc_work_qty"),
+                "edited_by": user_email,
+                "timestamp": datetime.now().isoformat(),
+                "edit": len(hist) + 1
+            })
+            edit_history["acc_work_qty"] = hist
+            updates["acc_work_qty"] = payload.acc_work_qty
 
         if payload.completed is not None and payload.completed != doc.get("completed"):
             target_qty = await get_stage_target_qty(doc.get("variant"), doc.get("event_type"))

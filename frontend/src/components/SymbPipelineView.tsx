@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Filter, AlertCircle, CalendarDays, ArrowRight, RefreshCw, Clock, CheckCircle2, ChevronDown, Eye, Check, Layers, X } from 'lucide-react';
+import { Calendar, Filter, AlertCircle, CalendarDays, ArrowRight, RefreshCw, Clock, CheckCircle2, ChevronDown, Eye, Check, Layers, X, ShieldAlert } from 'lucide-react';
 
 interface SymbPlanRow {
     id: string;
@@ -452,7 +452,7 @@ const SymbPipelineView: React.FC = () => {
         const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
         const isCompleted = isNativeCompleted || isBackfilled;
         const isDelayed = !isCompleted && row["Delayed by days"] > 0;
-        const isAutofilled = row.is_autofilled || (row["is_autofilled"] === true);
+        const isAutofilled = Boolean(row.is_autofilled || row["is_autofilled"]);
         const unplannedQty = Number(row.unplanned_qty || row["unplanned_qty"] || 0);
         const warningMsg = row.warning_msg || row["warning_msg"] || (unplannedQty > 0 ? `There is no plan for remaining qty (${unplannedQty.toLocaleString()} units). Please update!` : '');
         
