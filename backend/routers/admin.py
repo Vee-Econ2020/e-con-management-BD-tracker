@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Body, File, Form, UploadFile, Back
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import uuid
 import asyncio
@@ -2443,11 +2443,37 @@ async def get_slide_image(slide_id: str, week: int):
 async def get_custom_slides():
     try:
         coll = get_collection("weekly_tracker_custom_slides")
+        images_coll = get_collection("weekly_tracker_images")
+        
+        # Purge custom slides created prior to current week's Monday 00:00:00 (Sunday 23:59:59 cutoff)
+        now = datetime.now()
+        monday_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        
         cursor = coll.find({})
-        slides = await cursor.to_list(length=1000)
-        # Convert ObjectId to string
+        all_slides = await cursor.to_list(length=1000)
+        
+        expired_ids = []
+        valid_slides = []
+        for s in all_slides:
+            created_at = s.get("created_at")
+            if isinstance(created_at, str):
+                try:
+                    created_at = datetime.fromisoformat(created_at)
+                except Exception:
+                    created_at = None
+            
+            if created_at is None or not isinstance(created_at, datetime) or created_at < monday_start:
+                expired_ids.append(s["_id"])
+            else:
+                valid_slides.append(s)
+
+        if expired_ids:
+            await coll.delete_many({"_id": {"$in": expired_ids}})
+            str_ids = [str(_id) for _id in expired_ids]
+            await images_coll.delete_many({"slide_id": {"$in": str_ids}})
+
         result = []
-        for s in slides:
+        for s in valid_slides:
             s["id"] = str(s["_id"])
             del s["_id"]
             if "created_at" in s:

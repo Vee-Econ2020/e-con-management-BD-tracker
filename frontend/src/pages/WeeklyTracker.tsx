@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { Download, Loader2, Plus, Play, Eye, EyeOff, Pencil, Trash2, X, PartyPopper, Image as ImageIcon, Type } from 'lucide-react';
+import { Download, Loader2, Plus, Play, Eye, EyeOff, Pencil, Trash2, X, PartyPopper, Image as ImageIcon, Type, Folder, FolderOpen, ChevronDown, ChevronRight } from 'lucide-react';
 import { ConfettiSideCannons } from '../components/ConfettiSideCannons';
 import { useWeek } from '../context/WeekContext';
 import { ImageUploadSlide } from '../components/slides/ImageUploadSlide';
@@ -46,7 +46,6 @@ import Slide24 from '../components/slides/Slide24';
 import Slide25 from '../components/slides/Slide25';
 import Slide26 from '../components/slides/Slide26';
 import Slide27 from '../components/slides/Slide27';
-import Slide28 from '../components/slides/Slide28';
 import Slide9_2_2 from '../components/slides/Slide9_2_2';
 import Slide12_2_2 from '../components/slides/Slide12_2_2';
 import Slide15_2_2 from '../components/slides/Slide15_2_2';
@@ -109,15 +108,6 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     25: Slide25,
     26: Slide26,
     27: Slide27,
-    28: Slide28,
-    '6.1': Slide28,
-    '9.5': Slide28,
-    '12.5': Slide28,
-    '15.5': Slide28,
-    '18.5': Slide28,
-    '21.5': Slide28,
-    '24.5': Slide28,
-    '27.5': Slide28,
     '9.1': Slide9_1, '9.1.1': Slide9_1_1, '9.2': Slide9_2, '9.2.1': Slide9_2_1,
     '12.1': Slide12_1, '12.1.1': Slide12_1_1, '12.2': Slide12_2, '12.2.1': Slide12_2_1,
     '15.1': Slide15_1, '15.1.1': Slide15_1_1, '15.2': Slide15_2, '15.2.1': Slide15_2_1,
@@ -729,32 +719,31 @@ export default function WeeklyTracker() {
     const BASE_SLIDES = [
         2, 2.5,
         3, '3_services', '3_services_q1', 4, '4_services', 5, '5_services',
-        6, '6.1', 6.2, '6.2_services', 6.3, 6.4,
+        6, 6.2, '6.2_services', 6.3, 6.4,
         13, '13_services', '13_services_q1', 14, '14_services', 15, '15_services',
-        15.1, '15.1.1', 15.2, '15.2.1', '15.5',
+        15.1, '15.1.1', 15.2, '15.2.1',
         '15.2.2', '15.2.2_services', '15.2.3', '15.2.3_cy', '15.2.4', '15.2.5',
         7, '7_services', '7_services_q1', 8, '8_services', 9, '9_services',
-        9.1, '9.1.1', 9.2, '9.2.1', '9.5',
+        9.1, '9.1.1', 9.2, '9.2.1',
         '9.2.2', '9.2.2_services', '9.2.3', '9.2.3_cy', '9.2.4', '9.2.5',
         10, '10_services', '10_services_q1', 11, '11_services', 12, '12_services',
-        12.1, '12.1.1', 12.2, '12.2.1', '12.5',
+        12.1, '12.1.1', 12.2, '12.2.1',
         '12.2.2', '12.2.2_services', '12.2.3', '12.2.3_cy', '12.2.4', '12.2.5',
         16, '16_services', '16_services_q1', 17, '17_services', 18, '18_services',
-        18.1, '18.1.1', 18.2, '18.2.1', '18.5',
+        18.1, '18.1.1', 18.2, '18.2.1',
         '18.2.2', '18.2.2_services', '18.2.3', '18.2.3_cy', '18.2.4', '18.2.5',
         19, '19_services', '19_services_q1', 20, '20_services',
         21, '21_services',
-        21.1, '21.1.1', 21.2, '21.2.1', '21.5',
+        21.1, '21.1.1', 21.2, '21.2.1',
         '21.2.2', '21.2.2_services', '21.2.3', '21.2.3_cy', '21.2.4', '21.2.5',
         22, '22_services', '22_services_q1', 23, '23_services',
         24, '24_services',
-        24.1, '24.1.1', 24.2, '24.2.1', '24.5',
+        24.1, '24.1.1', 24.2, '24.2.1',
         '24.2.2', '24.2.2_services', '24.2.3', '24.2.3_cy', '24.2.4', '24.2.5',
         25, '25_services', '25_services_q1', 26, '26_services',
         27, '27_services',
-        27.1, '27.1.1', 27.2, '27.2.1', '27.5',
-        '27.2.2', '27.2.2_services', '27.2.3', '27.2.3_cy', '27.2.4', '27.2.5',
-        28
+        27.1, '27.1.1', 27.2, '27.2.1',
+        '27.2.2', '27.2.2_services', '27.2.3', '27.2.3_cy', '27.2.4', '27.2.5'
     ];
 
     // Helper to determine region
@@ -763,14 +752,13 @@ export default function WeeklyTracker() {
         const mainId = parseInt(idStr.split('.')[0]); // Get integer part
 
         if (mainId <= 6) return 'Overall';
-        if (mainId <= 9) return 'US West';
-        if (mainId <= 12) return 'Europe + Israel';
-        if (mainId <= 15) return 'US East';
-        if (mainId <= 18) return 'ASEAN';
+        if (mainId <= 9) return 'USA West';
+        if (mainId <= 12) return 'Europe';
+        if (mainId <= 15) return 'USA East';
+        if (mainId <= 18) return 'Asean';
         if (mainId <= 21) return 'Japan';
-        if (mainId <= 24) return 'KANZ';
-        if (mainId <= 27) return 'Management';
-        if (mainId === 28) return 'Power BI';
+        if (mainId <= 24) return 'Korea';
+        if (mainId <= 27) return 'Legacy';
         return 'Other';
     };
 
@@ -849,15 +837,6 @@ export default function WeeklyTracker() {
             '27.2.3': 'Gross Margin - Manufacturing',
             '27.2.3_cy': 'Gross Margin - Services (Current Year)',
             '27.2.4': 'Gross Margin - Services (Service from Start)',
-            '6.1': 'Payment Terms - Chart ARU (Power BI)',
-            '9.5': 'Payment Terms - Chart ARU (Power BI)',
-            '12.5': 'Payment Terms - Chart ARU (Power BI)',
-            '15.5': 'Payment Terms - Chart ARU (Power BI)',
-            '18.5': 'Payment Terms - Chart ARU (Power BI)',
-            '21.5': 'Payment Terms - Chart ARU (Power BI)',
-            '24.5': 'Payment Terms - Chart ARU (Power BI)',
-            '27.5': 'Payment Terms - Chart ARU (Power BI)',
-            '28': 'Payment Terms - Chart ARU (Power BI)',
         };
 
         // For nested pipeline slides like 9.1, 9.2, etc. (Activity lists)
@@ -891,6 +870,47 @@ export default function WeeklyTracker() {
         });
         return result;
     }, [customSlides]);
+
+    const REGION_CLUSTER_NAMES = useMemo(() => ['USA West', 'Europe', 'USA East', 'Asean', 'Japan', 'Korea', 'Legacy'], []);
+    const ALL_CLUSTERS = useMemo(() => ['Overall', ...REGION_CLUSTER_NAMES], [REGION_CLUSTER_NAMES]);
+
+    const [expandedClusters, setExpandedClusters] = useState<Set<string>>(() => new Set<string>());
+
+    const toggleCluster = (clusterName: string) => {
+        setExpandedClusters(prev => {
+            const next = new Set(prev);
+            if (next.has(clusterName)) {
+                next.delete(clusterName);
+            } else {
+                next.add(clusterName);
+            }
+            return next;
+        });
+    };
+
+    const expandAllClusters = () => {
+        setExpandedClusters(new Set(ALL_CLUSTERS));
+    };
+
+    const collapseAllClusters = () => {
+        setExpandedClusters(new Set());
+    };
+
+    const groupedSlides = useMemo(() => {
+        const groups: Record<string, { slideItem: SlideItem; slideIndex: number }[]> = {};
+        ALL_CLUSTERS.forEach(c => { groups[c] = []; });
+
+        displaySlides.forEach((slideItem, slideIndex) => {
+            const reg = getSlideRegion(slideItem.id);
+            if (groups[reg]) {
+                groups[reg].push({ slideItem, slideIndex });
+            } else {
+                if (!groups['Other']) groups['Other'] = [];
+                groups['Other'].push({ slideItem, slideIndex });
+            }
+        });
+        return groups;
+    }, [displaySlides, ALL_CLUSTERS]);
 
     const getDisplaySlideTitle = (slideItem: SlideItem) => {
         if (slideItem.isCustom) {
@@ -939,12 +959,6 @@ export default function WeeklyTracker() {
         }
 
         const gifState = getStandardSlideGif(slideItem.id);
-        const navigationProps = ['6.1', '9.5', '12.5', '15.5', '18.5', '21.5', '24.5', '27.5', '28'].includes(String(slideItem.id))
-            ? {
-                onNextSlide: handleNextSlide,
-                onPreviousSlide: handlePreviousSlide,
-            }
-            : {};
 
         return (
             <StandardSlideFrame
@@ -961,8 +975,337 @@ export default function WeeklyTracker() {
                 onDeleteText={(id) => deleteTextOverlay(slideItem.id, id)}
                 onDeleteImage={(id) => deleteImageOverlay(slideItem.id, id)}
                 quarter={getServicesQuarter(slideItem.id)}
-                {...navigationProps}
             />
+        );
+    };
+
+    const renderSlideGroupItems = (items: { slideItem: SlideItem; slideIndex: number }[]) => {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                {items.map(({ slideItem, slideIndex }) => {
+                    const slideId = slideItem.id;
+                    const isCustom = slideItem.isCustom;
+                    let isEditable = true;
+                    let title = `Slide ${slideId}`;
+                    const customSlideData = slideItem.data;
+
+                    if (isCustom) {
+                        isEditable = true;
+                        title = customSlideData?.title || "Custom Image";
+                    } else {
+                        isEditable = true;
+                    }
+
+                    const isCurrentlyEditing = editingSlide === slideId;
+                    const isHidden = hiddenSlides.has(String(slideId));
+                    const hasGif = isCustom
+                        ? (customSlideData?.gifEnabled ?? false)
+                        : getStandardSlideGif(slideId).enabled;
+                    const isHighlighted = highlightedSlides.has(String(slideId));
+
+                    return (
+                        <div
+                            key={String(slideId)}
+                            id={`slide-preview-${slideId}`}
+                            style={{
+                                paddingLeft: '1rem',
+                                paddingRight: '1rem',
+                                paddingTop: '1rem',
+                                borderRadius: '16px',
+                                transition: 'box-shadow 0.4s ease, background-color 0.4s ease',
+                                boxShadow: isHighlighted ? '0 0 0 4px #f59e0b, 0 10px 24px rgba(245,158,11,0.35)' : '0 2px 8px rgba(0,0,0,0.06)',
+                                backgroundColor: isHighlighted ? 'rgba(254, 243, 199, 0.55)' : '#ffffff',
+                                border: '1px solid #cbd5e1'
+                            }}
+                        >
+                            {/* Slide Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                                <div style={{ flex: 1 }}>
+                                    {isCustom && isCurrentlyEditing ? (
+                                        <input
+                                            value={editedTitle}
+                                            onChange={(e) => setEditedTitle(e.target.value)}
+                                            style={{ fontSize: '1.3rem', fontWeight: '800', fontFamily: 'inherit', border: 'none', borderBottom: '2px solid #5D9CEC', outline: 'none', width: '100%', color: '#4a4a55' }}
+                                            placeholder="Enter Slide Title"
+                                        />
+                                    ) : (
+                                        <h3 style={{ fontSize: '1.3rem', fontWeight: '800', color: isHidden ? '#9ca3af' : '#4a4a55', textDecoration: isHidden ? 'line-through' : 'none', margin: 0 }}>
+                                            {isCustom ? title : `Slide ${slideId} - ${getSlideRegion(slideId)} - ${getSlideTitle(slideId)}`} {isHidden && <span style={{ fontSize: '0.8rem', color: '#ef4444', textDecoration: 'none', marginLeft: '0.5rem' }}>(Hidden)</span>}
+                                        </h3>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                    {/* Quarter selector (Services snapshot slides only) */}
+                                    {String(slideId).endsWith('_services_q1') && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '20px', padding: '0.15rem' }}>
+                                            {(['Q1', 'Q2', 'Q3', 'Q4'] as const).map((q) => {
+                                                const isSelected = getServicesQuarter(slideId) === q;
+                                                return (
+                                                    <button
+                                                        key={q}
+                                                        onClick={() => setServicesQuarter(slideId, q)}
+                                                        style={{
+                                                            backgroundColor: isSelected ? '#5D9CEC' : 'transparent',
+                                                            border: 'none',
+                                                            padding: '0.25rem 0.7rem',
+                                                            borderRadius: '16px',
+                                                            color: isSelected ? 'white' : '#374151',
+                                                            fontWeight: 700,
+                                                            fontSize: '0.8rem',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s',
+                                                        }}
+                                                        title={`Show ${q} data`}
+                                                    >
+                                                        {q}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    {/* Start Slideshow From Here */}
+                                    <button
+                                        onClick={() => handleStartSlideshow(slideIndex)}
+                                        disabled={isHidden}
+                                        style={{
+                                            backgroundColor: isHidden ? '#e5e7eb' : '#5D9CEC',
+                                            border: 'none',
+                                            padding: '0.3rem 0.8rem',
+                                            borderRadius: '20px',
+                                            color: isHidden ? '#9ca3af' : 'white',
+                                            fontWeight: '700',
+                                            fontSize: '0.8rem',
+                                            cursor: isHidden ? 'not-allowed' : 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.3rem',
+                                            transition: 'all 0.2s',
+                                            boxShadow: isHidden ? 'none' : '0 2px 4px rgba(93, 156, 236, 0.35)'
+                                        }}
+                                        title={isHidden ? 'Unhide slide to start from here' : 'Start slideshow from this slide'}
+                                    >
+                                        <Play size={12} fill="currentColor" /> Start from here
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleExportSlideImage(slideItem)}
+                                        disabled={isExporting || exportingImageSlideId !== null}
+                                        style={{
+                                            backgroundColor: exportingImageSlideId === slideId ? '#94a3b8' : '#0f766e',
+                                            border: 'none',
+                                            padding: '0.3rem 0.8rem',
+                                            borderRadius: '20px',
+                                            color: 'white',
+                                            fontWeight: '700',
+                                            fontSize: '0.8rem',
+                                            cursor: isExporting || exportingImageSlideId !== null ? 'wait' : 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.3rem',
+                                            transition: 'all 0.2s',
+                                            boxShadow: exportingImageSlideId === slideId ? 'none' : '0 2px 4px rgba(15, 118, 110, 0.35)'
+                                        }}
+                                        title="Export this slide as a full-resolution PNG"
+                                    >
+                                        {exportingImageSlideId === slideId ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                                        {exportingImageSlideId === slideId ? 'Exporting...' : 'Export as Image'}
+                                    </button>
+
+                                    {/* Visibility Toggle */}
+                                    <button
+                                        onClick={() => toggleVisibility(slideId)}
+                                        style={{
+                                            backgroundColor: '#f3f4f6',
+                                            border: '1px solid #d1d5db',
+                                            padding: '0.3rem 0.6rem',
+                                            borderRadius: '20px',
+                                            color: isHidden ? '#6b7280' : '#374151',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        title={isHidden ? "Show in presentation" : "Hide from presentation"}
+                                    >
+                                        {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+
+                                    {/* Confetti Toggle */}
+                                    <button
+                                        onClick={() => toggleConfetti(slideId)}
+                                        style={{
+                                            backgroundColor: confettiSlides.has(String(slideId)) ? '#fef3c7' : '#f3f4f6',
+                                            border: `1px solid ${confettiSlides.has(String(slideId)) ? '#f59e0b' : '#d1d5db'}`,
+                                            padding: '0.3rem 0.6rem',
+                                            borderRadius: '20px',
+                                            color: confettiSlides.has(String(slideId)) ? '#d97706' : '#6b7280',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        title={confettiSlides.has(String(slideId)) ? "Disable confetti" : "Enable confetti"}
+                                    >
+                                        <PartyPopper size={16} />
+                                    </button>
+
+                                    <button
+                                        onClick={() => isCustom ? toggleCustomSlideGif(String(slideId)) : toggleStandardSlideGif(slideId)}
+                                        style={{
+                                            backgroundColor: hasGif ? '#dbeafe' : '#f3f4f6',
+                                            border: `1px solid ${hasGif ? '#3b82f6' : '#d1d5db'}`,
+                                            padding: '0.3rem 0.6rem',
+                                            borderRadius: '20px',
+                                            color: hasGif ? '#1d4ed8' : '#6b7280',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        title={hasGif ? 'Disable GIF overlay' : 'Enable GIF overlay'}
+                                    >
+                                        <ImageIcon size={16} />
+                                    </button>
+
+                                    {/* Add Text Overlay */}
+                                    <button
+                                        onClick={() => addTextOverlay(slideId)}
+                                        style={{
+                                            backgroundColor: '#f3f4f6',
+                                            border: '1px solid #d1d5db',
+                                            padding: '0.3rem 0.6rem',
+                                            borderRadius: '20px',
+                                            color: '#374151',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.25rem',
+                                            fontWeight: 700,
+                                            fontSize: '0.8rem',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        title="Add text overlay"
+                                    >
+                                        <Type size={14} /> Text
+                                    </button>
+
+                                    {/* Add Image Overlay */}
+                                    <button
+                                        onClick={() => handleAddImageOverlayClick(slideId)}
+                                        style={{
+                                            backgroundColor: '#f3f4f6',
+                                            border: '1px solid #d1d5db',
+                                            padding: '0.3rem 0.6rem',
+                                            borderRadius: '20px',
+                                            color: '#374151',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.25rem',
+                                            fontWeight: 700,
+                                            fontSize: '0.8rem',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        title="Add image overlay from your computer"
+                                    >
+                                        <Plus size={14} /> Image
+                                    </button>
+
+                                    {isCustom && (
+                                        <button
+                                            onClick={() => deleteCustomSlide(String(slideId))}
+                                            style={{
+                                                backgroundColor: '#fee2e2',
+                                                border: 'none',
+                                                padding: '0.3rem 0.6rem',
+                                                borderRadius: '20px',
+                                                color: '#dc2626',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center'
+                                            }}
+                                            title="Delete Custom Slide"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
+
+                                    {/* Standard Edit/Del Buttons */}
+                                    {isEditable ? (
+                                        <button
+                                            onClick={() => handleEditToggle(slideId, isCustom ? title : undefined)}
+                                            style={{
+                                                backgroundColor: isCurrentlyEditing ? '#10b981' : '#93c5fd',
+                                                border: 'none',
+                                                padding: '0.3rem 1rem',
+                                                borderRadius: '20px',
+                                                fontWeight: '700',
+                                                color: isCurrentlyEditing ? '#fff' : '#1e3a8a',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.3rem',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {isCurrentlyEditing ? (
+                                                <><X size={14} /> Done</>
+                                            ) : (
+                                                <><Pencil size={14} /> Edit</>
+                                            )}
+                                        </button>
+                                    ) : (
+                                        !isCustom && (
+                                            <>
+                                                <button disabled style={{ backgroundColor: '#93c5fd', border: 'none', padding: '0.3rem 1rem', borderRadius: '20px', fontWeight: '700', color: '#1e3a8a', cursor: 'not-allowed', opacity: 0.8 }}>
+                                                    Edit
+                                                </button>
+                                                <button disabled style={{ backgroundColor: '#fca5a5', border: 'none', padding: '0.3rem 1rem', borderRadius: '20px', fontWeight: '700', color: '#7f1d1d', cursor: 'not-allowed', opacity: 0.8 }}>
+                                                    Del
+                                                </button>
+                                            </>
+                                        )
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Slide Content (Lazy/Standard) */}
+                            <div style={{ marginBottom: '1rem' }}>
+                                {(isCustom || SLIDE_REGISTRY[slideId]) ? (
+                                    <LazySlideWrapper slideNum={slideId}>
+                                        {renderSlideContent(slideItem, isCurrentlyEditing)}
+                                    </LazySlideWrapper>
+                                ) : (
+                                    <div style={{ height: '300px', backgroundColor: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#991b1b', fontWeight: '600' }}>
+                                        Slide not found
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Add Button Row */}
+                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                                <button
+                                    onClick={() => addCustomSlide(isCustom ? customSlideData?.parentId ?? slideId : slideId)}
+                                    style={{
+                                        width: '40px', height: '40px',
+                                        borderRadius: '50%', backgroundColor: '#e2e8f0',
+                                        border: '1px solid #cbd5e1',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        color: '#64748b',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#dbeafe'; e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.color = '#2563eb'; }}
+                                    onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#64748b'; }}
+                                    title="Add Image Slide Here"
+                                >
+                                    <Plus size={24} />
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
         );
     };
 
@@ -1760,6 +2103,11 @@ export default function WeeklyTracker() {
         const ids = REGION_SLIDE_IDS[region] || [];
         if (ids.length === 0) return;
         setHighlightedSlides(new Set(ids));
+        setExpandedClusters(prev => {
+            const next = new Set(prev);
+            next.add(region);
+            return next;
+        });
         // Scroll to the first highlighted slide
         setTimeout(() => {
             const first = document.getElementById(`slide-preview-${ids[0]}`);
@@ -1778,6 +2126,11 @@ export default function WeeklyTracker() {
         const whaleId = ids[ids.length - 1];
         if (!whaleId) return;
         setHighlightedSlides(new Set([whaleId]));
+        setExpandedClusters(prev => {
+            const next = new Set(prev);
+            next.add(region);
+            return next;
+        });
         setTimeout(() => {
             const el = document.getElementById(`slide-preview-${whaleId}`);
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2175,330 +2528,230 @@ export default function WeeklyTracker() {
                 </div>
             </div>
 
-            {/* Slides List */}
-            <div style={{ maxWidth: '1000px', marginLeft: '1rem', position: 'relative' }}>
-                {/* Timeline Line */}
-                <div style={{ position: 'absolute', left: '-1rem', top: '0', bottom: '0', width: '6px', backgroundColor: '#5D9CEC', borderRadius: '4px' }}></div>
+            {/* Slide Clusters Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginLeft: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem', maxWidth: '1200px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#334155', margin: 0 }}>
+                        Slide Clusters / Folders
+                    </h3>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#475569', backgroundColor: '#e2e8f0', padding: '0.2rem 0.65rem', borderRadius: '12px' }}>
+                        {displaySlides.length} Total Slides
+                    </span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                        onClick={expandAllClusters}
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                            padding: '0.45rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1',
+                            backgroundColor: '#ffffff', color: '#1e293b', fontWeight: 700, fontSize: '0.85rem',
+                            cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                        }}
+                    >
+                        <FolderOpen size={16} color="#2563eb" /> Expand All Folders
+                    </button>
+                    <button
+                        onClick={collapseAllClusters}
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                            padding: '0.45rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1',
+                            backgroundColor: '#ffffff', color: '#1e293b', fontWeight: 700, fontSize: '0.85rem',
+                            cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                        }}
+                    >
+                        <Folder size={16} color="#64748b" /> Collapse All Folders
+                    </button>
+                </div>
+            </div>
 
-                {displaySlides.map((slideItem, slideIndex) => {
-                    const slideId = slideItem.id;
-                    const isCustom = slideItem.isCustom;
+            {/* 1. OVERALL CLUSTER (Featured Top Container) */}
+            {groupedSlides['Overall'] && groupedSlides['Overall'].length > 0 && (
+                <div
+                    id="cluster-folder-Overall"
+                    style={{
+                        marginLeft: '1rem',
+                        marginBottom: '2.5rem',
+                        maxWidth: '1200px',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '16px',
+                        border: '2px solid #3b82f6',
+                        boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.15)',
+                        overflow: 'hidden'
+                    }}
+                >
+                    <div
+                        onClick={() => toggleCluster('Overall')}
+                        style={{
+                            padding: '1.25rem 1.5rem',
+                            backgroundColor: '#eff6ff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            cursor: 'pointer',
+                            borderBottom: expandedClusters.has('Overall') ? '1px solid #bfdbfe' : 'none'
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            {expandedClusters.has('Overall') ? <FolderOpen size={28} color="#2563eb" /> : <Folder size={28} color="#2563eb" />}
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#1e3a8a' }}>
+                                    Overall Presentation Cluster
+                                </h3>
+                                <span style={{ fontSize: '0.85rem', color: '#3b82f6', fontWeight: 600 }}>
+                                    Executive Summary & Global Performance
+                                </span>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <span style={{
+                                backgroundColor: '#2563eb', color: '#ffffff', fontSize: '0.85rem',
+                                fontWeight: 700, padding: '0.25rem 0.75rem', borderRadius: '9999px'
+                            }}>
+                                {groupedSlides['Overall'].length} Slides
+                            </span>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const firstIdx = groupedSlides['Overall'][0]?.slideIndex ?? 0;
+                                    handleStartSlideshow(firstIdx);
+                                }}
+                                style={{
+                                    backgroundColor: '#1d4ed8', color: 'white', border: 'none',
+                                    padding: '0.4rem 0.9rem', borderRadius: '20px', fontWeight: 700,
+                                    fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem'
+                                }}
+                            >
+                                <Play size={12} fill="currentColor" /> Play Cluster
+                            </button>
+                            {expandedClusters.has('Overall') ? <ChevronDown size={22} color="#1e3a8a" /> : <ChevronRight size={22} color="#1e3a8a" />}
+                        </div>
+                    </div>
 
-                    let isEditable = false;
-                    let title = `Slide ${slideId}`;
-                    const customSlideData = slideItem.data;
+                    {expandedClusters.has('Overall') && (
+                        <div style={{ padding: '1.5rem', backgroundColor: '#f8fafc' }}>
+                            {renderSlideGroupItems(groupedSlides['Overall'])}
+                        </div>
+                    )}
+                </div>
+            )}
 
-                    if (isCustom) {
-                        isEditable = true;
-                        title = customSlideData?.title || "Custom Image";
-                    } else {
-                        isEditable = true;
-                    }
+            {/* 2. REGIONAL CLUSTERS (4 IN A ROW GRID) */}
+            <div style={{ marginLeft: '1rem', marginBottom: '3rem', maxWidth: '1200px' }}>
+                <div style={{ color: '#475569', fontSize: '1.1rem', fontWeight: '800', letterSpacing: '0.03em', textTransform: 'uppercase', marginBottom: '1rem' }}>
+                    Regional Clusters
+                </div>
 
-                    const isCurrentlyEditing = editingSlide === slideId;
-                    const isHidden = hiddenSlides.has(String(slideId));
-                    const hasGif = isCustom
-                        ? (customSlideData?.gifEnabled ?? false)
-                        : getStandardSlideGif(slideId).enabled;
-                    const isHighlighted = highlightedSlides.has(String(slideId));
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                    gap: '1.25rem'
+                }}>
+                    {REGION_CLUSTER_NAMES.map((regName) => {
+                        const slides = groupedSlides[regName] || [];
+                        const isExpanded = expandedClusters.has(regName);
+                        const firstIdx = slides[0]?.slideIndex;
+
+                        return (
+                            <div
+                                key={regName}
+                                id={`cluster-folder-${regName}`}
+                                style={{
+                                    backgroundColor: '#ffffff',
+                                    borderRadius: '14px',
+                                    border: isExpanded ? '2px solid #8b5cf6' : '1px solid #cbd5e1',
+                                    boxShadow: isExpanded ? '0 10px 20px -5px rgba(139, 92, 246, 0.2)' : '0 2px 4px rgba(0,0,0,0.04)',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'space-between'
+                                }}
+                            >
+                                <div
+                                    onClick={() => toggleCluster(regName)}
+                                    style={{
+                                        padding: '1.1rem',
+                                        cursor: 'pointer',
+                                        backgroundColor: isExpanded ? '#f5f3ff' : '#ffffff'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            {isExpanded ? <FolderOpen size={24} color="#7c3aed" /> : <Folder size={24} color="#6b7280" />}
+                                            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: isExpanded ? '#5b21b6' : '#1e293b' }}>
+                                                {regName}
+                                            </h4>
+                                        </div>
+                                        {isExpanded ? <ChevronDown size={18} color="#7c3aed" /> : <ChevronRight size={18} color="#9ca3af" />}
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.4rem' }}>
+                                        <span style={{
+                                            backgroundColor: isExpanded ? '#ddd6fe' : '#f1f5f9',
+                                            color: isExpanded ? '#5b21b6' : '#475569',
+                                            fontSize: '0.78rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '12px'
+                                        }}>
+                                            {slides.length} Slides
+                                        </span>
+                                        {firstIdx !== undefined && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleStartSlideshow(firstIdx);
+                                                }}
+                                                style={{
+                                                    backgroundColor: '#7c3aed', color: 'white', border: 'none',
+                                                    padding: '0.25rem 0.65rem', borderRadius: '14px', fontWeight: 700,
+                                                    fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem'
+                                                }}
+                                            >
+                                                <Play size={10} fill="currentColor" /> Play
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Expanded Slide Containers below 4-in-a-row grid */}
+                {REGION_CLUSTER_NAMES.map((regName) => {
+                    const slides = groupedSlides[regName] || [];
+                    const isExpanded = expandedClusters.has(regName);
+                    if (!isExpanded || slides.length === 0) return null;
 
                     return (
                         <div
-                            key={String(slideId)}
-                            id={`slide-preview-${slideId}`}
+                            key={`expanded-slides-${regName}`}
                             style={{
-                                paddingLeft: '2rem',
+                                marginTop: '1.5rem',
+                                marginBottom: '2.5rem',
+                                backgroundColor: '#fcfaff',
                                 borderRadius: '16px',
-                                transition: 'box-shadow 0.4s ease, background-color 0.4s ease',
-                                boxShadow: isHighlighted ? '0 0 0 4px #f59e0b, 0 10px 24px rgba(245,158,11,0.35)' : 'none',
-                                backgroundColor: isHighlighted ? 'rgba(254, 243, 199, 0.55)' : 'transparent',
-                                marginBottom: isHighlighted ? '1rem' : 0
+                                border: '2px solid #a78bfa',
+                                padding: '1.5rem',
+                                boxShadow: '0 8px 20px rgba(167, 139, 250, 0.15)'
                             }}
                         >
-                            {/* Slide Header */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', padding: '0 1rem' }}>
-                                <div style={{ flex: 1 }}>
-                                    {isCustom && isCurrentlyEditing ? (
-                                        <input
-                                            value={editedTitle}
-                                            onChange={(e) => setEditedTitle(e.target.value)}
-                                            style={{ fontSize: '1.5rem', fontWeight: '800', fontFamily: 'inherit', border: 'none', borderBottom: '2px solid #5D9CEC', outline: 'none', width: '100%', color: '#4a4a55' }}
-                                            placeholder="Enter Slide Title"
-                                        />
-                                    ) : (
-                                        <h3 style={{ fontSize: '1.5rem', fontWeight: '800', color: isHidden ? '#9ca3af' : '#4a4a55', textDecoration: isHidden ? 'line-through' : 'none' }}>
-                                            {isCustom ? title : `Slide ${slideId} - ${getSlideRegion(slideId)} - ${getSlideTitle(slideId)}`} {isHidden && <span style={{ fontSize: '0.8rem', color: '#ef4444', textDecoration: 'none', marginLeft: '0.5rem' }}>(Hidden)</span>}
-                                        </h3>
-                                    )}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', borderBottom: '1px solid #ddd6fe', paddingBottom: '0.75rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <FolderOpen size={22} color="#7c3aed" />
+                                    <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#5b21b6' }}>
+                                        {regName} Cluster Slides ({slides.length})
+                                    </h3>
                                 </div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                                    {/* Quarter selector (Services snapshot slides only) */}
-                                    {String(slideId).endsWith('_services_q1') && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '20px', padding: '0.15rem' }}>
-                                            {(['Q1', 'Q2', 'Q3', 'Q4'] as const).map((q) => {
-                                                const isSelected = getServicesQuarter(slideId) === q;
-                                                return (
-                                                    <button
-                                                        key={q}
-                                                        onClick={() => setServicesQuarter(slideId, q)}
-                                                        style={{
-                                                            backgroundColor: isSelected ? '#5D9CEC' : 'transparent',
-                                                            border: 'none',
-                                                            padding: '0.25rem 0.7rem',
-                                                            borderRadius: '16px',
-                                                            color: isSelected ? 'white' : '#374151',
-                                                            fontWeight: 700,
-                                                            fontSize: '0.8rem',
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s',
-                                                        }}
-                                                        title={`Show ${q} data`}
-                                                    >
-                                                        {q}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                    {/* Start Slideshow From Here */}
-                                    <button
-                                        onClick={() => handleStartSlideshow(slideIndex)}
-                                        disabled={isHidden}
-                                        style={{
-                                            backgroundColor: isHidden ? '#e5e7eb' : '#5D9CEC',
-                                            border: 'none',
-                                            padding: '0.3rem 0.8rem',
-                                            borderRadius: '20px',
-                                            color: isHidden ? '#9ca3af' : 'white',
-                                            fontWeight: '700',
-                                            fontSize: '0.8rem',
-                                            cursor: isHidden ? 'not-allowed' : 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.3rem',
-                                            transition: 'all 0.2s',
-                                            boxShadow: isHidden ? 'none' : '0 2px 4px rgba(93, 156, 236, 0.35)'
-                                        }}
-                                        title={isHidden ? 'Unhide slide to start from here' : 'Start slideshow from this slide'}
-                                    >
-                                        <Play size={12} fill="currentColor" /> Start from here
-                                    </button>
-
-                                    <button
-                                        onClick={() => handleExportSlideImage(slideItem)}
-                                        disabled={isExporting || exportingImageSlideId !== null}
-                                        style={{
-                                            backgroundColor: exportingImageSlideId === slideId ? '#94a3b8' : '#0f766e',
-                                            border: 'none',
-                                            padding: '0.3rem 0.8rem',
-                                            borderRadius: '20px',
-                                            color: 'white',
-                                            fontWeight: '700',
-                                            fontSize: '0.8rem',
-                                            cursor: isExporting || exportingImageSlideId !== null ? 'wait' : 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.3rem',
-                                            transition: 'all 0.2s',
-                                            boxShadow: exportingImageSlideId === slideId ? 'none' : '0 2px 4px rgba(15, 118, 110, 0.35)'
-                                        }}
-                                        title="Export this slide as a full-resolution PNG"
-                                    >
-                                        {exportingImageSlideId === slideId ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                                        {exportingImageSlideId === slideId ? 'Exporting...' : 'Export as Image'}
-                                    </button>
-
-                                    {/* Visibility Toggle */}
-                                    <button
-                                        onClick={() => toggleVisibility(slideId)}
-                                        style={{
-                                            backgroundColor: '#f3f4f6',
-                                            border: '1px solid #d1d5db',
-                                            padding: '0.3rem 0.6rem',
-                                            borderRadius: '20px',
-                                            color: isHidden ? '#6b7280' : '#374151',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        title={isHidden ? "Show in presentation" : "Hide from presentation"}
-                                    >
-                                        {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
-                                    </button>
-
-                                    {/* Confetti Toggle */}
-                                    <button
-                                        onClick={() => toggleConfetti(slideId)}
-                                        style={{
-                                            backgroundColor: confettiSlides.has(String(slideId)) ? '#fef3c7' : '#f3f4f6',
-                                            border: `1px solid ${confettiSlides.has(String(slideId)) ? '#f59e0b' : '#d1d5db'}`,
-                                            padding: '0.3rem 0.6rem',
-                                            borderRadius: '20px',
-                                            color: confettiSlides.has(String(slideId)) ? '#d97706' : '#6b7280',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        title={confettiSlides.has(String(slideId)) ? "Disable confetti" : "Enable confetti"}
-                                    >
-                                        <PartyPopper size={16} />
-                                    </button>
-
-                                    <button
-                                        onClick={() => isCustom ? toggleCustomSlideGif(String(slideId)) : toggleStandardSlideGif(slideId)}
-                                        style={{
-                                            backgroundColor: hasGif ? '#dbeafe' : '#f3f4f6',
-                                            border: `1px solid ${hasGif ? '#3b82f6' : '#d1d5db'}`,
-                                            padding: '0.3rem 0.6rem',
-                                            borderRadius: '20px',
-                                            color: hasGif ? '#1d4ed8' : '#6b7280',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        title={hasGif ? 'Disable GIF overlay' : 'Enable GIF overlay'}
-                                    >
-                                        <ImageIcon size={16} />
-                                    </button>
-
-                                    {/* Add Text Overlay */}
-                                    <button
-                                        onClick={() => addTextOverlay(slideId)}
-                                        style={{
-                                            backgroundColor: '#f3f4f6',
-                                            border: '1px solid #d1d5db',
-                                            padding: '0.3rem 0.6rem',
-                                            borderRadius: '20px',
-                                            color: '#374151',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.25rem',
-                                            fontWeight: 700,
-                                            fontSize: '0.8rem',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        title="Add text overlay"
-                                    >
-                                        <Type size={14} /> Text
-                                    </button>
-
-                                    {/* Add Image Overlay */}
-                                    <button
-                                        onClick={() => handleAddImageOverlayClick(slideId)}
-                                        style={{
-                                            backgroundColor: '#f3f4f6',
-                                            border: '1px solid #d1d5db',
-                                            padding: '0.3rem 0.6rem',
-                                            borderRadius: '20px',
-                                            color: '#374151',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.25rem',
-                                            fontWeight: 700,
-                                            fontSize: '0.8rem',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        title="Add image overlay from your computer"
-                                    >
-                                        <Plus size={14} /> Image
-                                    </button>
-
-                                    {isCustom && (
-                                        <button
-                                            onClick={() => deleteCustomSlide(String(slideId))}
-                                            style={{
-                                                backgroundColor: '#fee2e2',
-                                                border: 'none',
-                                                padding: '0.3rem 0.6rem',
-                                                borderRadius: '20px',
-                                                color: '#dc2626',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center'
-                                            }}
-                                            title="Delete Custom Slide"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    )}
-
-                                    {/* Standard Edit/Del Buttons */}
-                                    {isEditable ? (
-                                        <button
-                                            onClick={() => handleEditToggle(slideId, isCustom ? title : undefined)}
-                                            style={{
-                                                backgroundColor: isCurrentlyEditing ? '#10b981' : '#93c5fd',
-                                                border: 'none',
-                                                padding: '0.3rem 1rem',
-                                                borderRadius: '20px',
-                                                fontWeight: '700',
-                                                color: isCurrentlyEditing ? '#fff' : '#1e3a8a',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '0.3rem',
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            {isCurrentlyEditing ? (
-                                                <><X size={14} /> Done</>
-                                            ) : (
-                                                <><Pencil size={14} /> Edit</>
-                                            )}
-                                        </button>
-                                    ) : (
-                                        !isCustom && (
-                                            <>
-                                                <button disabled style={{ backgroundColor: '#93c5fd', border: 'none', padding: '0.3rem 1rem', borderRadius: '20px', fontWeight: '700', color: '#1e3a8a', cursor: 'not-allowed', opacity: 0.8 }}>
-                                                    Edit
-                                                </button>
-                                                <button disabled style={{ backgroundColor: '#fca5a5', border: 'none', padding: '0.3rem 1rem', borderRadius: '20px', fontWeight: '700', color: '#7f1d1d', cursor: 'not-allowed', opacity: 0.8 }}>
-                                                    Del
-                                                </button>
-                                            </>
-                                        )
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Slide Content (Lazy/Standard) */}
-                            <div style={{ marginBottom: '1rem' }}>
-                                {(isCustom || SLIDE_REGISTRY[slideId]) ? (
-                                    <LazySlideWrapper slideNum={slideId}>
-                                        {renderSlideContent(slideItem, isCurrentlyEditing)}
-                                    </LazySlideWrapper>
-                                ) : (
-                                    <div style={{ height: '300px', backgroundColor: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#991b1b', fontWeight: '600' }}>
-                                        Slide not found
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Add Button Row */}
-                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '3rem' }}>
                                 <button
-                                    onClick={() => addCustomSlide(isCustom ? customSlideData?.parentId ?? slideId : slideId)}
+                                    onClick={() => toggleCluster(regName)}
                                     style={{
-                                        width: '40px', height: '40px',
-                                        borderRadius: '50%', backgroundColor: '#e2e8f0',
-                                        border: '1px solid #cbd5e1',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        color: '#64748b',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
+                                        backgroundColor: '#ede9fe', border: 'none', padding: '0.35rem 0.8rem',
+                                        borderRadius: '8px', color: '#6d28d9', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer'
                                     }}
-                                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#dbeafe'; e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.color = '#2563eb'; }}
-                                    onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#64748b'; }}
-                                    title="Add Image Slide Here"
                                 >
-                                    <Plus size={24} />
+                                    Close Folder
                                 </button>
                             </div>
+                            {renderSlideGroupItems(slides)}
                         </div>
                     );
                 })}
