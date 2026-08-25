@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import { Download, Loader2, Plus, Play, Eye, EyeOff, Pencil, Trash2, X, PartyPopper, Image as ImageIcon, Type, Folder, FolderOpen, ChevronDown, ChevronRight } from 'lucide-react';
 import { ConfettiSideCannons } from '../components/ConfettiSideCannons';
 import { useWeek } from '../context/WeekContext';
+import { useAuth } from '../context/AuthContext';
 import { ImageUploadSlide } from '../components/slides/ImageUploadSlide';
 import { DEFAULT_GIF_POSITION, DEFAULT_GIF_URL, GifOverlay, type GifPosition } from '../components/slides/GifOverlay';
 import {
@@ -712,6 +713,8 @@ const StatusCard = ({ title, filled = 0, total = 0, onView, onViewWhale, missing
 export default function WeeklyTracker() {
     const navigate = useNavigate();
     const { selectedWeek: currentWeek, availableWeeks, setSelectedWeek } = useWeek();
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'Admin';
     const [isSlideshowOpen, setIsSlideshowOpen] = useState(false);
     const [activeSlideIndex, setActiveSlideIndex] = useState(0);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -737,8 +740,7 @@ export default function WeeklyTracker() {
     const [exportSlide, setExportSlide] = useState<SlideItem | null>(null);
     const [exportingImageSlideId, setExportingImageSlideId] = useState<SlideId | null>(null);
     const exportContainerRef = useRef<HTMLDivElement>(null);
-    const [exportStartSlide, setExportStartSlide] = useState<number | ''>('');
-    const [exportEndSlide, setExportEndSlide] = useState<number | ''>('');
+    const [selectedExportRegions, setSelectedExportRegions] = useState<Set<string>>(new Set());
 
     // Selected fiscal quarter (Q1-Q4) per Services snapshot slide preview.
     const [servicesQuarterBySlide, setServicesQuarterBySlide] = useState<Record<string, string>>({});
@@ -1900,6 +1902,10 @@ export default function WeeklyTracker() {
             height: EXPORT_SLIDE_HEIGHT,
             windowWidth: EXPORT_SLIDE_WIDTH,
             windowHeight: EXPORT_SLIDE_HEIGHT,
+            x: 0,
+            y: 0,
+            scrollX: 0,
+            scrollY: 0,
         });
 
         return canvas.toDataURL('image/png', 1.0);
@@ -1950,12 +1956,15 @@ export default function WeeklyTracker() {
 
         let exportSlides = displaySlides.filter(s => !hiddenSlides.has(String(s.id)));
         
-        if (exportStartSlide !== '' && exportEndSlide !== '') {
-            exportSlides = exportSlides.slice(Number(exportStartSlide), Number(exportEndSlide) + 1);
+        if (selectedExportRegions.size > 0) {
+            exportSlides = exportSlides.filter(s => {
+                const region = getSlideRegion(s.id);
+                return selectedExportRegions.has(region);
+            });
         }
 
         if (exportSlides.length === 0) {
-            showToast('No slides in selected range to export');
+            showToast('No slides in selected regions to export');
             return;
         }
 
@@ -1972,8 +1981,7 @@ export default function WeeklyTracker() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     week: currentWeek,
-                    start_slide: exportStartSlide !== '' ? Number(exportStartSlide) : null,
-                    end_slide: exportEndSlide !== '' ? Number(exportEndSlide) : null,
+                    regions: selectedExportRegions.size > 0 ? Array.from(selectedExportRegions) : null,
                     frontend_url: window.location.origin
                 })
             });
@@ -2311,6 +2319,49 @@ export default function WeeklyTracker() {
             exportSlides = exportSlides.slice(Number(startParam), Number(endParam) + 1);
         }
 
+        // Expose the total count so the export worker can capture slides one at a time.
+        (window as unknown as { __WEEKLY_TRACKER_SLIDE_COUNT?: number }).__WEEKLY_TRACKER_SLIDE_COUNT = exportSlides.length;
+
+        // Single-slide capture mode: render exactly one slide at 1920x1080.
+        // The worker navigates once per slide, which keeps each page light and
+        // avoids overloading the backend with 150+ simultaneous requests.
+        const slideParam = new URLSearchParams(window.location.search).get('slide');
+        if (slideParam !== null && slideParam !== '') {
+            const slideIndex = Number(slideParam);
+            const singleSlide = exportSlides[slideIndex];
+
+            return (
+                <div
+                    id="export-single-slide"
+                    style={{
+                        width: '1920px',
+                        height: '1080px',
+                        backgroundColor: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                        boxSizing: 'border-box',
+                        padding: '1rem',
+                        overflow: 'visible',
+                        margin: 0,
+                    }}
+                >
+                    {singleSlide ? (
+                        <div style={{ width: '100%', height: '100%', maxWidth: '100%' }}>
+                            {renderSlideContent(singleSlide, false)}
+                        </div>
+                    ) : (
+                        <div data-export-empty="true" style={{ color: '#94a3b8', fontWeight: 700 }}>No slide</div>
+                    )}
+                    <style>{`
+                        html, body { width: 1920px !important; min-height: 1080px !important; margin: 0 !important; padding: 0 !important; background: #ffffff !important; overflow-x: hidden !important; }
+                        * { box-sizing: border-box; }
+                    `}</style>
+                </div>
+            );
+        }
+
         return (
             <div style={{ backgroundColor: '#ffffff', width: '1920px', margin: 0, padding: 0 }}>
                 {exportSlides.map((slideItem) => (
@@ -2470,79 +2521,88 @@ export default function WeeklyTracker() {
                         Start SlideShow
                     </button>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <div style={{ color: '#0f766e', fontSize: '1rem', fontWeight: '800', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-                            Export Range
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                            <select
-                                value={exportStartSlide}
-                                onChange={(e) => setExportStartSlide(e.target.value === '' ? '' : Number(e.target.value))}
+                    {isAdmin && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: '600px' }}>
+                            <div style={{ color: '#0f766e', fontSize: '1rem', fontWeight: '800', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+                                Export PDF by Region
+                            </div>
+                            <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: '600', marginBottom: '0.25rem' }}>
+                                Select regions to include (leave all unchecked to export all slides)
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem 0.75rem', marginBottom: '0.5rem' }}>
+                                {ALL_CLUSTERS.map(region => {
+                                    const checked = selectedExportRegions.has(region);
+                                    return (
+                                        <label
+                                            key={region}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '0.35rem',
+                                                padding: '0.3rem 0.75rem',
+                                                borderRadius: '9999px',
+                                                border: `2px solid ${checked ? '#0f766e' : '#cbd5e1'}`,
+                                                backgroundColor: checked ? '#f0fdf4' : '#f8fafc',
+                                                color: checked ? '#0f766e' : '#475569',
+                                                fontWeight: '700',
+                                                fontSize: '0.85rem',
+                                                cursor: 'pointer',
+                                                userSelect: 'none',
+                                                transition: 'all 0.15s',
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={() => {
+                                                    setSelectedExportRegions(prev => {
+                                                        const next = new Set(prev);
+                                                        if (next.has(region)) {
+                                                            next.delete(region);
+                                                        } else {
+                                                            next.add(region);
+                                                        }
+                                                        return next;
+                                                    });
+                                                }}
+                                                style={{ accentColor: '#0f766e', width: '14px', height: '14px', cursor: 'pointer' }}
+                                            />
+                                            {region}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                            <button
+                                onClick={handleExportPdf}
+                                disabled={isExporting || exportingImageSlideId !== null}
                                 style={{
-                                    padding: '0.4rem',
-                                    borderRadius: '6px',
-                                    border: '1px solid #cbd5e1',
-                                    fontSize: '0.9rem',
-                                    outline: 'none',
-                                    cursor: 'pointer'
+                                    backgroundColor: isExporting || exportingImageSlideId !== null ? '#94a3b8' : '#0f766e',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '0.8rem 2rem',
+                                    borderRadius: '9999px',
+                                    fontWeight: '700',
+                                    fontSize: '1rem',
+                                    cursor: isExporting || exportingImageSlideId !== null ? 'wait' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    boxShadow: isExporting || exportingImageSlideId !== null ? 'none' : '0 4px 6px rgba(15, 118, 110, 0.35)',
+                                    width: 'fit-content',
                                 }}
                             >
-                                <option value="">Start Slide</option>
-                                {displaySlides.filter(s => !hiddenSlides.has(String(s.id))).map((s, idx) => (
-                                    <option key={s.id} value={idx}>Slide {idx + 1}</option>
-                                ))}
-                            </select>
-                            <select
-                                value={exportEndSlide}
-                                onChange={(e) => setExportEndSlide(e.target.value === '' ? '' : Number(e.target.value))}
-                                style={{
-                                    padding: '0.4rem',
-                                    borderRadius: '6px',
-                                    border: '1px solid #cbd5e1',
-                                    fontSize: '0.9rem',
-                                    outline: 'none',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <option value="">End Slide</option>
-                                {displaySlides.filter(s => !hiddenSlides.has(String(s.id))).map((s, idx) => (
-                                    <option 
-                                        key={s.id} 
-                                        value={idx} 
-                                        disabled={exportStartSlide !== '' && idx < Number(exportStartSlide)}
-                                    >
-                                        Slide {idx + 1}
-                                    </option>
-                                ))}
-                            </select>
+                                {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+                                {isExporting ? 'Exporting PDF...' : 'Export PDF'}
+                            </button>
+                            <div style={{ color: '#64748b', fontSize: '0.95rem', fontWeight: '600', minHeight: '1.5rem' }}>
+                                {exportProgress
+                                    ? `Exporting ${exportProgress.current}/${exportProgress.total}: ${exportProgress.title}`
+                                    : selectedExportRegions.size > 0
+                                        ? `Will export: ${Array.from(selectedExportRegions).join(', ')}`
+                                        : 'All regions selected (full export)'}
+                            </div>
                         </div>
-                        <button
-                            onClick={handleExportPdf}
-                            disabled={isExporting || exportingImageSlideId !== null || exportStartSlide === '' || exportEndSlide === ''}
-                            style={{
-                                backgroundColor: isExporting || exportingImageSlideId !== null || exportStartSlide === '' || exportEndSlide === '' ? '#94a3b8' : '#0f766e',
-                                color: 'white',
-                                border: 'none',
-                                padding: '0.8rem 2rem',
-                                borderRadius: '9999px',
-                                fontWeight: '700',
-                                fontSize: '1rem',
-                                cursor: isExporting || exportingImageSlideId !== null ? 'wait' : (exportStartSlide === '' || exportEndSlide === '' ? 'not-allowed' : 'pointer'),
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                boxShadow: isExporting || exportingImageSlideId !== null || exportStartSlide === '' || exportEndSlide === '' ? 'none' : '0 4px 6px rgba(15, 118, 110, 0.35)'
-                            }}
-                        >
-                            {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
-                            {isExporting ? 'Exporting PDF...' : 'Export PDF'}
-                        </button>
-                        <div style={{ color: '#64748b', fontSize: '0.95rem', fontWeight: '600', minHeight: '1.5rem' }}>
-                            {exportProgress
-                                ? `Exporting ${exportProgress.current}/${exportProgress.total}: ${exportProgress.title}`
-                                : 'Select a start and end slide to export as PDF'}
-                        </div>
-                    </div>
+                    )}
                 </div>
             </div>
 
@@ -2823,10 +2883,10 @@ export default function WeeklyTracker() {
             )}
 
             {(isExporting || exportingImageSlideId !== null) && exportSlide && (
-                <div style={{ position: 'fixed', left: '-10000px', top: 0, width: `${EXPORT_SLIDE_WIDTH}px`, height: `${EXPORT_SLIDE_HEIGHT}px`, pointerEvents: 'none', overflow: 'hidden', backgroundColor: '#ffffff', zIndex: -1 }}>
+                <div style={{ position: 'fixed', left: 0, top: 0, width: `${EXPORT_SLIDE_WIDTH}px`, height: `${EXPORT_SLIDE_HEIGHT}px`, pointerEvents: 'none', overflow: 'hidden', backgroundColor: '#ffffff', zIndex: -9999, transform: 'translateX(-10000px)' }}>
                     <div
                         ref={exportContainerRef}
-                        style={{ width: `${EXPORT_SLIDE_WIDTH}px`, height: `${EXPORT_SLIDE_HEIGHT}px`, backgroundColor: '#ffffff', overflow: 'hidden' }}
+                        style={{ width: `${EXPORT_SLIDE_WIDTH}px`, minWidth: `${EXPORT_SLIDE_WIDTH}px`, maxWidth: `${EXPORT_SLIDE_WIDTH}px`, height: `${EXPORT_SLIDE_HEIGHT}px`, minHeight: `${EXPORT_SLIDE_HEIGHT}px`, maxHeight: `${EXPORT_SLIDE_HEIGHT}px`, backgroundColor: '#ffffff', overflow: 'hidden', position: 'relative' }}
                     >
                         {renderSlideContent(exportSlide, false)}
                     </div>

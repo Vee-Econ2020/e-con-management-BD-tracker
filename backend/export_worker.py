@@ -2,6 +2,8 @@ import sys
 import os
 import json
 import time
+import tempfile
+import shutil
 import traceback
 
 def update_status(status_file: str, data: dict):
@@ -58,8 +60,17 @@ def run_export():
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=True,
-                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-gpu',
+                    '--hide-scrollbars',
+                    '--force-device-scale-factor=1',
+                ]
             )
+            # Match the exact fullscreen presentation resolution (1920x1080).
+            # --hide-scrollbars prevents scrollbars from eating into this space,
+            # so vw/vh CSS units in slides compute identically to the live fullscreen.
             context = browser.new_context(viewport={"width": 1920, "height": 1080}, device_scale_factor=1)
             page = context.new_page()
             page.emulate_media(media="screen")
@@ -108,114 +119,116 @@ def run_export():
                 });
             }""")
 
+            base_url = f"{target_url}&slide="
+
             job_data["progress"] = 40
-            job_data["message"] = "Loading presentation slides..."
+            job_data["message"] = "Loading presentation..."
             update_status(status_file, job_data)
+
+            # Load the first slide so we can read the total slide count.
+            try:
+                page.goto(f"{base_url}0", wait_until="domcontentloaded", timeout=60000)
+            except Exception as e:
+                print(f"[Worker] Warning: first navigation slow {e}. Proceeding anyway.")
+
+            total_slides = 0
+            for _ in range(30):
+                total_slides = page.evaluate("() => window.__WEEKLY_TRACKER_SLIDE_COUNT || 0")
+                if total_slides and total_slides > 0:
+                    break
+                page.wait_for_timeout(500)
+
+            if not total_slides or total_slides <= 0:
+                raise RuntimeError("NO_SLIDES: could not determine how many slides to export")
+
+            job_data["total_slides"] = total_slides
+
+            # Capture each slide on its own page load. One slide at a time keeps
+            # every page light and avoids overloading the backend with 150+
+            # simultaneous data requests, which is what stalled the old exporter.
+            temp_dir = tempfile.mkdtemp(prefix="wt_export_")
+            png_paths = []
+            per_slide_timeout_ms = 90000
+
+            single_slide_ready = """() => {
+                const state = window.__weeklyTrackerExportState;
+                const root = document.getElementById('export-single-slide');
+                if (!root) return false;
+                if (state && state.pendingRequests > 0) return false;
+                if (state && Date.now() - state.lastActivity < 500) return false;
+                const text = root.innerText.toLowerCase();
+                if (text.includes('computing') || text.includes('loading') || text.includes('fetching')) return false;
+                if (root.querySelector('.animate-spin, .animate-pulse')) return false;
+                const imagesReady = Array.from(root.querySelectorAll('img')).every(i => i.complete);
+                if (!imagesReady) return false;
+                return Array.from(root.querySelectorAll('.js-plotly-plot')).every(plot => {
+                    const rect = plot.getBoundingClientRect();
+                    return rect.width > 0 && rect.height > 0
+                        && !!plot.querySelector('.main-svg, .svg-container, canvas, .gl-container');
+                });
+            }"""
 
             try:
-                page.goto(target_url, wait_until="networkidle", timeout=120000)
-            except Exception as e:
-                print(f"[Worker] Warning: networkidle timeout {e}. Proceeding to DOM wait.")
+                for index in range(total_slides):
+                    if index > 0:
+                        try:
+                            page.goto(f"{base_url}{index}", wait_until="domcontentloaded", timeout=60000)
+                        except Exception as nav_err:
+                            print(f"[Worker] Slide {index} navigation slow: {nav_err}")
 
-            job_data["progress"] = 60
-            job_data["message"] = "Waiting for every slide's data and visuals to render..."
-            update_status(status_file, job_data)
+                    # Ensure the slide mounted and its data fetch has a chance to
+                    # start (so the readiness check doesn't fire before loading).
+                    try:
+                        page.wait_for_selector("#export-single-slide", timeout=30000)
+                    except Exception as mount_err:
+                        print(f"[Worker] Slide {index} container missing: {mount_err}")
+                    page.wait_for_timeout(700)
 
-            # Wait for every slide independently so a large deck reports useful
-            # progress while its slower charts and 3D visuals finish rendering.
-            render_timeout_seconds = 600
-            render_deadline = time.monotonic() + render_timeout_seconds
-            last_reported_ready = -1
-            last_status_update = 0.0
-            render_status = None
+                    try:
+                        page.wait_for_function(single_slide_ready, timeout=per_slide_timeout_ms)
+                    except Exception as ready_err:
+                        # Best-effort: capture whatever rendered rather than aborting
+                        # the whole deck because of one slow slide.
+                        print(f"[Worker] Slide {index} readiness timed out, capturing as-is: {ready_err}")
 
-            while time.monotonic() < render_deadline:
-                render_status = page.evaluate("""() => {
-                    const state = window.__weeklyTrackerExportState;
-                    const now = Date.now();
-                    const slides = Array.from(document.querySelectorAll('.export-slide-item'));
+                    # Small settle for final chart/WebGL paint.
+                    page.wait_for_timeout(500)
 
-                    const isSlideReady = (slide) => {
-                        const text = slide.innerText.toLowerCase();
-                        const hasLoading = text.includes('computing')
-                            || text.includes('loading')
-                            || text.includes('fetching')
-                            || !!slide.querySelector('.animate-spin, .animate-pulse');
-                        if (hasLoading) return false;
+                    png_path = os.path.join(temp_dir, f"slide_{index:04d}.png")
+                    slide_el = page.query_selector("#export-single-slide")
+                    if slide_el:
+                        # Capture the element directly — always gets the full 1920x1080
+                        # div regardless of viewport scroll or scrollbar width.
+                        slide_el.screenshot(path=png_path)
+                    else:
+                        # Fallback: viewport clip
+                        page.screenshot(path=png_path, clip={"x": 0, "y": 0, "width": 1920, "height": 1080})
+                    png_paths.append(png_path)
 
-                        const imagesReady = Array.from(slide.querySelectorAll('img'))
-                            .every(image => image.complete);
-                        if (!imagesReady) return false;
-
-                        return Array.from(slide.querySelectorAll('.js-plotly-plot')).every(plot => {
-                            const rect = plot.getBoundingClientRect();
-                            return rect.width > 0
-                                && rect.height > 0
-                                && !!plot.querySelector('.main-svg, .svg-container, canvas, .gl-container');
-                        });
-                    };
-
-                    const readySlides = slides.filter(isSlideReady).length;
-                    return {
-                        totalSlides: slides.length,
-                        readySlides,
-                        pendingRequests: state?.pendingRequests ?? 0,
-                        isReady: slides.length > 0
-                            && readySlides === slides.length,
-                    };
-                }""")
-
-                now = time.monotonic()
-                ready_slides = render_status["readySlides"]
-                total_slides = render_status["totalSlides"]
-                if ready_slides != last_reported_ready or now - last_status_update >= 5:
-                    job_data["progress"] = 60 + int(20 * ready_slides / max(total_slides, 1))
-                    job_data["rendered_slides"] = ready_slides
+                    captured = index + 1
+                    job_data["progress"] = 40 + int(50 * captured / total_slides)
+                    job_data["rendered_slides"] = captured
                     job_data["total_slides"] = total_slides
-                    job_data["message"] = (
-                        f"Rendering slides: {ready_slides}/{total_slides} ready "
-                        f"({render_status['pendingRequests']} data requests remaining)..."
-                    )
+                    job_data["message"] = f"Capturing slides: {captured}/{total_slides}..."
                     update_status(status_file, job_data)
-                    last_reported_ready = ready_slides
-                    last_status_update = now
 
-                if render_status["isReady"]:
-                    break
+                browser.close()
 
-                page.wait_for_timeout(1000)
+                job_data["progress"] = 92
+                job_data["message"] = f"Assembling {len(png_paths)}-page PDF..."
+                update_status(status_file, job_data)
 
-            if not render_status or not render_status["isReady"]:
-                ready_slides = render_status["readySlides"] if render_status else 0
-                total_slides = render_status["totalSlides"] if render_status else 0
-                raise RuntimeError(
-                    f"RENDER_NOT_READY: {ready_slides}/{total_slides} slides finished rendering after "
-                    f"{render_timeout_seconds // 60} minutes"
-                )
+                from PIL import Image
 
-            job_data["progress"] = 80
-            job_data["rendered_slides"] = render_status["readySlides"]
-            job_data["total_slides"] = render_status["totalSlides"]
-            job_data["message"] = "All slides rendered. Starting PDF capture..."
-            update_status(status_file, job_data)
-            page.wait_for_timeout(2200)
+                if not png_paths:
+                    raise RuntimeError("NO_SLIDES: no slides were captured")
 
-            job_data["progress"] = 85
-            job_data["message"] = "Generating 1080p presentation PDF..."
-            update_status(status_file, job_data)
-
-            # Fast single-pass 1080p PDF generation
-            page.pdf(
-                path=output_pdf,
-                width="1920px",
-                height="1080px",
-                print_background=True,
-                prefer_css_page_size=True,
-                margin={"top": "0mm", "right": "0mm", "bottom": "0mm", "left": "0mm"},
-                scale=1
-            )
-
-            browser.close()
+                frames = [Image.open(path).convert("RGB") for path in png_paths]
+                frames[0].save(output_pdf, save_all=True, append_images=frames[1:])
+                for frame in frames:
+                    frame.close()
+            finally:
+                shutil.rmtree(temp_dir, ignore_errors=True)
 
         job_data["status"] = "completed"
         job_data["progress"] = 100

@@ -4,7 +4,7 @@ import uuid
 import json
 import subprocess
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -19,6 +19,7 @@ class ExportRequest(BaseModel):
     week: Optional[int] = None
     start_slide: Optional[int] = None
     end_slide: Optional[int] = None
+    regions: Optional[List[str]] = None
     frontend_url: Optional[str] = None
 
 
