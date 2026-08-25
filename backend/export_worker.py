@@ -7,12 +7,17 @@ import shutil
 import traceback
 
 def update_status(status_file: str, data: dict):
-    """Write progress and status to job JSON file atomically"""
+    """Write progress and status to job JSON file atomically with retry for Windows file locks"""
+    tmp_file = f"{status_file}.tmp"
     try:
-        tmp_file = f"{status_file}.tmp"
         with open(tmp_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
-        os.replace(tmp_file, status_file)
+        for _ in range(5):
+            try:
+                os.replace(tmp_file, status_file)
+                break
+            except Exception:
+                time.sleep(0.05)
     except Exception as e:
         print(f"[Worker] Error writing status file: {e}")
 
@@ -28,6 +33,7 @@ def run_export():
     start_slide = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] != "None" else ""
     end_slide = sys.argv[5] if len(sys.argv) > 5 and sys.argv[5] != "None" else ""
     frontend_url = sys.argv[6] if len(sys.argv) > 6 and sys.argv[6] != "None" else "http://localhost:5173"
+    regions = sys.argv[7] if len(sys.argv) > 7 and sys.argv[7] != "None" else ""
 
     job_data = {
         "status": "processing",
@@ -47,6 +53,8 @@ def run_export():
         query_params.append(f"start={start_slide}")
     if end_slide:
         query_params.append(f"end={end_slide}")
+    if regions:
+        query_params.append(f"regions={regions}")
 
     target_url = f"{frontend_url.rstrip('/')}/weekly?{'&'.join(query_params)}"
 

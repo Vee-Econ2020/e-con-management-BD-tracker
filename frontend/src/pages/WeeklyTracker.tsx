@@ -1995,16 +1995,23 @@ export default function WeeklyTracker() {
                 let finished = false;
                 const pollStartedAt = Date.now();
                 const pollTimeoutMs = 14 * 60 * 1000;
+                let consecutiveFailures = 0;
 
                 while (!finished && Date.now() - pollStartedAt < pollTimeoutMs) {
                     await wait(2000);
 
-                    const statusRes = await fetch(`/api/admin/export-pdf-status/${jobId}`);
-                    if (!statusRes.ok) {
-                        throw new Error('Unable to retrieve the server export status');
-                    }
+                    try {
+                        const statusRes = await fetch(`/api/admin/export-pdf-status/${jobId}`);
+                        if (!statusRes.ok) {
+                            consecutiveFailures += 1;
+                            if (consecutiveFailures >= 5) {
+                                throw new Error('Unable to retrieve the server export status');
+                            }
+                            continue;
+                        }
+                        consecutiveFailures = 0;
 
-                    const statusData = await statusRes.json();
+                        const statusData = await statusRes.json();
                     const allSlidesRendered = String(statusData.message || '').startsWith('All slides rendered.');
                     setExportProgress({
                         current: typeof statusData.rendered_slides === 'number'
@@ -2037,6 +2044,11 @@ export default function WeeklyTracker() {
                         setExportProgress(null);
                         showToast(statusData.error || 'The server PDF export failed before the file could be created.');
                         return;
+                    } catch (pollErr) {
+                        consecutiveFailures += 1;
+                        if (consecutiveFailures >= 5) {
+                            throw pollErr;
+                        }
                     }
                 }
 
@@ -2314,6 +2326,15 @@ export default function WeeklyTracker() {
         let exportSlides = displaySlides.filter(s => !hiddenSlides.has(String(s.id)));
         const startParam = new URLSearchParams(window.location.search).get('start');
         const endParam = new URLSearchParams(window.location.search).get('end');
+        const regionsParam = new URLSearchParams(window.location.search).get('regions');
+
+        if (regionsParam && regionsParam !== '' && regionsParam !== 'None') {
+            const selectedRegions = new Set(regionsParam.split(','));
+            exportSlides = exportSlides.filter(s => {
+                const region = getSlideRegion(s.id);
+                return selectedRegions.has(region);
+            });
+        }
 
         if (startParam && endParam && startParam !== '' && endParam !== '') {
             exportSlides = exportSlides.slice(Number(startParam), Number(endParam) + 1);

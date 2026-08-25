@@ -2,6 +2,7 @@ import sys
 import os
 import uuid
 import json
+import time
 import subprocess
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
@@ -40,7 +41,7 @@ def cleanup_old_exports():
         print(f"[PDF Export Cleanup] Error cleaning exports: {e}")
 
 
-def spawn_pdf_worker(job_id: str, week: Optional[int], start_slide: Optional[int], end_slide: Optional[int], frontend_url: Optional[str]):
+def spawn_pdf_worker(job_id: str, week: Optional[int], start_slide: Optional[int], end_slide: Optional[int], frontend_url: Optional[str], regions: Optional[List[str]] = None):
     """Launch export_worker.py as an independent background process"""
     status_file = os.path.join(EXPORTS_DIR, f"{job_id}.json")
     pdf_filename = f"weekly-tracker-week-{week or 'current'}-{job_id[:8]}.pdf"
@@ -49,15 +50,18 @@ def spawn_pdf_worker(job_id: str, week: Optional[int], start_slide: Optional[int
     worker_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), "export_worker.py")
     python_exe = sys.executable
 
+    regions_str = ",".join(regions) if regions else "None"
+
     cmd = [
         python_exe,
         worker_script,
         status_file,
         output_pdf,
         str(week) if week is not None else "None",
-            str(start_slide) if start_slide is not None else "None",
+        str(start_slide) if start_slide is not None else "None",
         str(end_slide) if end_slide is not None else "None",
-        frontend_url or "http://localhost:5173"
+        frontend_url or "http://localhost:5173",
+        regions_str
     ]
 
     try:
@@ -94,7 +98,8 @@ async def start_pdf_export_job(req: ExportRequest, background_tasks: BackgroundT
         week=req.week,
         start_slide=req.start_slide,
         end_slide=req.end_slide,
-        frontend_url=req.frontend_url
+        frontend_url=req.frontend_url,
+        regions=req.regions
     )
 
     return {
@@ -106,17 +111,23 @@ async def start_pdf_export_job(req: ExportRequest, background_tasks: BackgroundT
 
 @router.get("/export-pdf-status/{job_id}")
 async def get_pdf_export_status(job_id: str):
-    """Get progress and status of background PDF export job"""
+    """Get progress and status of background PDF export job with retry resilience for Windows file locks"""
     status_file = os.path.join(EXPORTS_DIR, f"{job_id}.json")
     if not os.path.exists(status_file):
         raise HTTPException(status_code=404, detail="Job not found")
 
-    try:
-        with open(status_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data
-    except Exception:
-        raise HTTPException(status_code=500, detail="Error reading job status")
+    last_err = None
+    for attempt in range(5):
+        try:
+            with open(status_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data
+        except Exception as e:
+            last_err = e
+            time.sleep(0.1)
+
+    print(f"[PDF Export Status Error] Could not read status file {job_id} after 5 attempts: {last_err}")
+    raise HTTPException(status_code=500, detail="Error reading job status")
 
 
 @router.get("/export-pdf-download/{job_id}")
