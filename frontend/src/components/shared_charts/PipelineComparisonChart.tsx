@@ -18,7 +18,36 @@ interface SlideInput {
     row_index?: number;
     week_recorded?: number;
     date_updated?: string;
+    region?: string;
+    service_type?: string;
 }
+
+const REGION_OPTIONS = [
+    'Overall',
+    'US West',
+    'Europe',
+    'US East',
+    'ASEAN',
+    'Japan',
+    'KANZ',
+    'Management',
+    'APAC'
+];
+
+const SERVICE_OPTIONS = ['ALL', 'Services'];
+
+const getInitialRegionForSlide = (sNo?: number): string => {
+    if (!sNo) return 'Overall';
+    if (sNo === 9 || sNo === 9001) return 'US West';
+    if (sNo === 12 || sNo === 12001) return 'Europe';
+    if (sNo === 15 || sNo === 15001) return 'US East';
+    if (sNo === 18 || sNo === 18001) return 'ASEAN';
+    if (sNo === 21 || sNo === 21001) return 'Japan';
+    if (sNo === 24 || sNo === 24001) return 'KANZ';
+    if (sNo === 27 || sNo === 27001) return 'Management';
+    if (sNo === 30 || sNo === 30001) return 'APAC';
+    return 'Overall';
+};
 
 export function PipelineComparisonChart({ data, title, slideNo, isEditing = false, hideTargets = false }: PipelineChartProps) {
     const plotRef = useRef<any>(null);
@@ -32,9 +61,15 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
     const [newPipelineItems, setNewPipelineItems] = useState<SlideInput[]>([]);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
+    const [editRegion, setEditRegion] = useState('Overall');
+    const [editServiceType, setEditServiceType] = useState('ALL');
+
     const [newPipelineText, setNewPipelineText] = useState('');
     const [newPipelineLostText, setNewPipelineLostText] = useState('');
     const [newNewPipelineText, setNewNewPipelineText] = useState('');
+
+    const [newRegionMap, setNewRegionMap] = useState<Record<string, string>>({});
+    const [newServiceTypeMap, setNewServiceTypeMap] = useState<Record<string, string>>({});
 
     // Week validation state
     const [currentSystemWeek, setCurrentSystemWeek] = useState<number | null>(null);
@@ -72,6 +107,9 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
         const text = tableName === 'pipeline_to_po' ? newPipelineText : tableName === 'pipeline_lost' ? newPipelineLostText : newNewPipelineText;
         if (!text.trim()) return;
 
+        const reg = newRegionMap[tableName] || getInitialRegionForSlide(slideNo);
+        const stype = newServiceTypeMap[tableName] || (slideNo > 1000 ? 'Services' : 'ALL');
+
         try {
             const res = await fetch('/api/admin/slide-inputs', {
                 method: 'POST',
@@ -80,7 +118,9 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
                     slide_no: slideNo,
                     table_name: tableName,
                     freeform_text: text.trim(),
-                    week_recorded: currentSystemWeek // Explicitly pass current week if known
+                    week_recorded: currentSystemWeek,
+                    region: reg,
+                    service_type: stype
                 })
             });
             if (res.ok) {
@@ -105,7 +145,9 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
                     table_name: item.table_name,
                     freeform_text: editText,
                     row_index: item.row_index,
-                    week_recorded: currentSystemWeek // Update week recorded on edit
+                    week_recorded: currentSystemWeek,
+                    region: editRegion,
+                    service_type: editServiceType
                 })
             });
             if (res.ok) {
@@ -257,58 +299,255 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
         headerColor: string,
         newText: string,
         setNewText: (v: string) => void
-    ) => (
-        <div style={{
-            border: `2px solid ${headerColor}`,
-            borderRadius: '6px',
-            overflow: 'hidden',
-            marginBottom: '0.5rem',
-            fontSize: '0.75rem',
-            minWidth: '200px'
-        }}>
-            {/* Header */}
-            <div style={{
-                backgroundColor: headerColor,
-                color: '#fff',
-                fontWeight: '700',
-                padding: '6px 10px',
-                fontSize: '0.8rem',
-                textAlign: 'center'
-            }}>
-                {label}
-            </div>
+    ) => {
+        const currentNewRegion = newRegionMap[tableName] || getInitialRegionForSlide(slideNo);
+        const currentNewServiceType = newServiceTypeMap[tableName] || (slideNo && slideNo > 1000 ? 'Services' : 'ALL');
 
-            {/* Rows */}
-            {items.map((item, idx) => (
-                <div key={item.id || idx} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    borderBottom: '1px solid #e5e7eb',
-                    padding: '4px 8px',
-                    gap: '4px',
-                    minHeight: '28px'
+        return (
+            <div style={{
+                border: `2px solid ${headerColor}`,
+                borderRadius: '6px',
+                overflow: 'hidden',
+                marginBottom: '0.5rem',
+                fontSize: '0.75rem',
+                minWidth: '220px'
+            }}>
+                {/* Header */}
+                <div style={{
+                    backgroundColor: headerColor,
+                    color: '#fff',
+                    fontWeight: '700',
+                    padding: '6px 10px',
+                    fontSize: '0.8rem',
+                    textAlign: 'center'
                 }}>
-                    <span style={{ color: headerColor, fontWeight: '700', marginRight: '4px' }}>•</span>
-                    {editingId === item.id ? (
-                        <>
-                            <input
-                                value={editText}
-                                onChange={e => setEditText(e.target.value)}
+                    {label}
+                </div>
+
+                {/* Rows */}
+                {items.map((item, idx) => (
+                    <div key={item.id || idx} style={{
+                        display: 'flex',
+                        flexDirection: editingId === item.id ? 'column' : 'row',
+                        alignItems: editingId === item.id ? 'stretch' : 'center',
+                        borderBottom: '1px solid #e5e7eb',
+                        padding: '4px 8px',
+                        gap: '4px',
+                        minHeight: '28px'
+                    }}>
+                        {editingId === item.id ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+                                <input
+                                    value={editText}
+                                    onChange={e => setEditText(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        border: '1px solid #93c5fd',
+                                        borderRadius: '4px',
+                                        padding: '2px 6px',
+                                        fontSize: '0.75rem',
+                                        outline: 'none'
+                                    }}
+                                    autoFocus
+                                    onKeyDown={e => { if (e.key === 'Enter') handleUpdateRow(item); }}
+                                />
+                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                    <select
+                                        value={editRegion}
+                                        onChange={e => setEditRegion(e.target.value)}
+                                        style={{
+                                            flex: 1,
+                                            fontSize: '0.65rem',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '4px',
+                                            padding: '2px'
+                                        }}
+                                    >
+                                        {REGION_OPTIONS.map(r => (
+                                            <option key={r} value={r}>{r}</option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={editServiceType}
+                                        onChange={e => setEditServiceType(e.target.value)}
+                                        style={{
+                                            fontSize: '0.65rem',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '4px',
+                                            padding: '2px'
+                                        }}
+                                    >
+                                        {SERVICE_OPTIONS.map(s => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={() => handleUpdateRow(item)}
+                                        style={{
+                                            backgroundColor: '#10b981',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            padding: '2px 6px',
+                                            fontSize: '0.65rem',
+                                            fontWeight: '700',
+                                            cursor: 'pointer'
+                                        }}
+                                    >Save</button>
+                                    <button
+                                        onClick={() => { setEditingId(null); setEditText(''); }}
+                                        style={{
+                                            backgroundColor: '#9ca3af',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            padding: '2px 6px',
+                                            fontSize: '0.65rem',
+                                            fontWeight: '700',
+                                            cursor: 'pointer'
+                                        }}
+                                    >✕</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <span style={{ color: headerColor, fontWeight: '700', marginRight: '2px' }}>•</span>
+                                <span style={{ flex: 1, overflowWrap: 'anywhere' }}>{item.freeform_text}</span>
+                                {item.region && item.region !== 'Overall' && item.region !== 'ALL' && (
+                                    <span style={{
+                                        fontSize: '0.6rem',
+                                        backgroundColor: '#e0f2fe',
+                                        color: '#0369a1',
+                                        padding: '1px 4px',
+                                        borderRadius: '3px',
+                                        fontWeight: 600,
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        {item.region}
+                                    </span>
+                                )}
+                                {item.service_type === 'Services' && (
+                                    <span style={{
+                                        fontSize: '0.6rem',
+                                        backgroundColor: '#fef3c7',
+                                        color: '#92400e',
+                                        padding: '1px 4px',
+                                        borderRadius: '3px',
+                                        fontWeight: 600,
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        Svc
+                                    </span>
+                                )}
+                                {isEditing && (
+                                    <div style={{ display: 'flex', gap: '2px', marginLeft: 'auto' }}>
+                                        <button
+                                            onClick={() => {
+                                                setEditingId(item.id!);
+                                                setEditText(item.freeform_text);
+                                                setEditRegion(item.region || getInitialRegionForSlide(slideNo));
+                                                setEditServiceType(item.service_type || 'ALL');
+                                            }}
+                                            style={{
+                                                backgroundColor: '#93c5fd',
+                                                color: '#1e3a8a',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '1px 5px',
+                                                fontSize: '0.6rem',
+                                                fontWeight: '700',
+                                                cursor: 'pointer'
+                                            }}
+                                        >✎</button>
+                                        <button
+                                            onClick={() => handleDeleteRow(item.id!)}
+                                            style={{
+                                                backgroundColor: '#fca5a5',
+                                                color: '#7f1d1d',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '1px 5px',
+                                                fontSize: '0.6rem',
+                                                fontWeight: '700',
+                                                cursor: 'pointer'
+                                            }}
+                                        >✕</button>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                ))}
+
+                {/* Empty rows for visual padding */}
+                {items.length < 4 && !isEditing && Array.from({ length: 4 - items.length }).map((_, i) => (
+                    <div key={`empty-${i}`} style={{
+                        borderBottom: '1px solid #e5e7eb',
+                        padding: '4px 8px',
+                        minHeight: '28px'
+                    }}>&nbsp;</div>
+                ))}
+
+                {/* Add new row (only in edit mode) */}
+                {isEditing && (
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        padding: '6px 8px',
+                        gap: '4px',
+                        borderTop: '1px solid #e5e7eb',
+                        backgroundColor: '#f9fafb'
+                    }}>
+                        <input
+                            value={newText}
+                            onChange={e => setNewText(e.target.value)}
+                            placeholder="Add new entry..."
+                            style={{
+                                width: '100%',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                padding: '3px 6px',
+                                fontSize: '0.7rem',
+                                outline: 'none'
+                            }}
+                            onKeyDown={e => { if (e.key === 'Enter') handleAddRow(tableName); }}
+                        />
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                            <select
+                                value={currentNewRegion}
+                                onChange={e => setNewRegionMap(prev => ({ ...prev, [tableName]: e.target.value }))}
                                 style={{
                                     flex: 1,
-                                    border: '1px solid #93c5fd',
+                                    fontSize: '0.65rem',
+                                    border: '1px solid #d1d5db',
                                     borderRadius: '4px',
-                                    padding: '2px 6px',
-                                    fontSize: '0.75rem',
-                                    outline: 'none'
+                                    padding: '2px'
                                 }}
-                                autoFocus
-                                onKeyDown={e => { if (e.key === 'Enter') handleUpdateRow(item); }}
-                            />
-                            <button
-                                onClick={() => handleUpdateRow(item)}
+                                title="Region Selection"
+                            >
+                                {REGION_OPTIONS.map(r => (
+                                    <option key={r} value={r}>{r}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={currentNewServiceType}
+                                onChange={e => setNewServiceTypeMap(prev => ({ ...prev, [tableName]: e.target.value }))}
                                 style={{
-                                    backgroundColor: '#10b981',
+                                    fontSize: '0.65rem',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '4px',
+                                    padding: '2px'
+                                }}
+                                title="Services or ALL"
+                            >
+                                {SERVICE_OPTIONS.map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={() => handleAddRow(tableName)}
+                                style={{
+                                    backgroundColor: '#3b82f6',
                                     color: '#fff',
                                     border: 'none',
                                     borderRadius: '4px',
@@ -317,108 +556,13 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
                                     fontWeight: '700',
                                     cursor: 'pointer'
                                 }}
-                            >Save</button>
-                            <button
-                                onClick={() => { setEditingId(null); setEditText(''); }}
-                                style={{
-                                    backgroundColor: '#9ca3af',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    padding: '2px 6px',
-                                    fontSize: '0.65rem',
-                                    fontWeight: '700',
-                                    cursor: 'pointer'
-                                }}
-                            >✕</button>
-                        </>
-                    ) : (
-                        <>
-                            <span style={{ flex: 1 }}>{item.freeform_text}</span>
-                            {isEditing && (
-                                <div style={{ display: 'flex', gap: '2px' }}>
-                                    <button
-                                        onClick={() => { setEditingId(item.id!); setEditText(item.freeform_text); }}
-                                        style={{
-                                            backgroundColor: '#93c5fd',
-                                            color: '#1e3a8a',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            padding: '1px 6px',
-                                            fontSize: '0.6rem',
-                                            fontWeight: '700',
-                                            cursor: 'pointer'
-                                        }}
-                                    >✎</button>
-                                    <button
-                                        onClick={() => handleDeleteRow(item.id!)}
-                                        style={{
-                                            backgroundColor: '#fca5a5',
-                                            color: '#7f1d1d',
-                                            border: 'none',
-                                            borderRadius: '4px',
-                                            padding: '1px 6px',
-                                            fontSize: '0.6rem',
-                                            fontWeight: '700',
-                                            cursor: 'pointer'
-                                        }}
-                                    >✕</button>
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-            ))}
-
-            {/* Empty rows for visual padding */}
-            {items.length < 4 && !isEditing && Array.from({ length: 4 - items.length }).map((_, i) => (
-                <div key={`empty-${i}`} style={{
-                    borderBottom: '1px solid #e5e7eb',
-                    padding: '4px 8px',
-                    minHeight: '28px'
-                }}>&nbsp;</div>
-            ))}
-
-            {/* Add new row (only in edit mode) */}
-            {isEditing && (
-                <div style={{
-                    display: 'flex',
-                    padding: '4px 8px',
-                    gap: '4px',
-                    borderTop: '1px solid #e5e7eb',
-                    backgroundColor: '#f9fafb'
-                }}>
-                    <input
-                        value={newText}
-                        onChange={e => setNewText(e.target.value)}
-                        placeholder="Add new entry..."
-                        style={{
-                            flex: 1,
-                            border: '1px solid #d1d5db',
-                            borderRadius: '4px',
-                            padding: '3px 6px',
-                            fontSize: '0.7rem',
-                            outline: 'none'
-                        }}
-                        onKeyDown={e => { if (e.key === 'Enter') handleAddRow(tableName); }}
-                    />
-                    <button
-                        onClick={() => handleAddRow(tableName)}
-                        style={{
-                            backgroundColor: '#3b82f6',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '2px 10px',
-                            fontSize: '0.65rem',
-                            fontWeight: '700',
-                            cursor: 'pointer'
-                        }}
-                    >+ Add</button>
-                </div>
-            )}
-        </div>
-    );
+                            >+ Add</button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     // Warning logic
     const showWarning = isEditing && currentSystemWeek !== null && chartDataWeek !== null && chartDataWeek < currentSystemWeek;
@@ -477,7 +621,7 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
                 {/* Side panels: Pipeline to PO + Pushout */}
                 {slideNo && (
                     <div style={{
-                        width: '220px',
+                        width: '260px',
                         flexShrink: 0,
                         display: 'flex',
                         flexDirection: 'column',

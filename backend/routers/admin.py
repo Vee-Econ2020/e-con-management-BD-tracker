@@ -2174,35 +2174,96 @@ class SlideInputEntry(BaseModel):
     freeform_text: str
     row_index: Optional[int] = None
     week_recorded: Optional[int] = None # Week when this data was entered
+    region: Optional[str] = None
+    service_type: Optional[str] = "ALL"
+
+SLIDE_REGION_MAP = {
+    5: "Overall",
+    9: "US West",
+    12: "Europe",
+    15: "US East",
+    18: "ASEAN",
+    21: "Japan",
+    24: "KANZ",
+    27: "Management",
+    30: "APAC",
+}
 
 @router.get("/slide-inputs/{slide_identifier}")
 async def get_slide_inputs(slide_identifier: str, table_name: Optional[str] = None):
     """
-    Get all manual inputs for a specific slide.
+    Get all manual inputs for a specific slide with cross-slide region and service propagation.
     slide_identifier can be an integer (old slide_no) or string (new slide_id).
     Optionally filter by table_name.
     """
     try:
         coll = get_collection("weekly_tracker_user_input")
         
-        # Try to parse as int for backward compatibility
+        target_slide_no = None
+        target_slide_id = slide_identifier
+        target_region = None
+        is_services = False
+
         try:
             s_no = int(slide_identifier)
-            # Check if it's likely a slide number (e.g. < 100) or maybe the user passed "5"
-            # But "9.1" will fail int conversion.
-            query = {"slide_no": s_no}
+            target_slide_no = s_no
+            if s_no in SLIDE_REGION_MAP:
+                target_region = SLIDE_REGION_MAP[s_no]
+            elif s_no > 1000:
+                parent_no = s_no // 1000
+                is_services = True
+                if parent_no in SLIDE_REGION_MAP:
+                    target_region = SLIDE_REGION_MAP[parent_no]
         except ValueError:
-            query = {"slide_id": slide_identifier}
-            
+            target_slide_id = slide_identifier
+            if "_services" in slide_identifier:
+                is_services = True
+                try:
+                    p_no = int(slide_identifier.split("_")[0])
+                    if p_no in SLIDE_REGION_MAP:
+                        target_region = SLIDE_REGION_MAP[p_no]
+                except ValueError:
+                    pass
+
+        or_conditions = []
+
+        # 1. Direct match on slide_no or slide_id
+        if target_slide_no is not None:
+            or_conditions.append({"slide_no": target_slide_no})
+        if target_slide_id:
+            or_conditions.append({"slide_id": target_slide_id})
+
+        # 2. Cross-slide propagation logic:
+        # If this is a Region slide (e.g. US West slide 9):
+        if target_region and target_region != "Overall" and not is_services:
+            or_conditions.append({"region": target_region})
+
+        # If this is Overall Services slide (5001 or 5_services):
+        if is_services and (target_region == "Overall" or target_slide_no == 5001):
+            or_conditions.append({"service_type": "Services"})
+
+        # If this is Region Services slide (e.g. 9001 / US West Services):
+        if is_services and target_region and target_region != "Overall":
+            or_conditions.append({"region": target_region, "service_type": "Services"})
+
+        query = {"$or": or_conditions} if or_conditions else {}
+
         if table_name:
-            query["table_name"] = table_name
-            
+            if "$or" in query:
+                query = {"$and": [query, {"table_name": table_name}]}
+            else:
+                query["table_name"] = table_name
+
         cursor = coll.find(query).sort("row_index", 1)
         entries = []
+        seen_ids = set()
         async for doc in cursor:
-            doc["id"] = str(doc["_id"])
-            del doc["_id"]
-            entries.append(doc)
+            doc_id = str(doc["_id"])
+            if doc_id not in seen_ids:
+                seen_ids.add(doc_id)
+                doc["id"] = doc_id
+                del doc["_id"]
+                entries.append(doc)
         return entries
     except Exception as e:
         print(f"Error fetching slide inputs: {e}")
@@ -2220,19 +2281,16 @@ async def add_slide_input(entry: SlideInputEntry):
         
         # Calculate current week if not provided
         if entry_dict.get("week_recorded") is None:
-            # Simple ISO week calculation
             entry_dict["week_recorded"] = datetime.now().isocalendar()[1]
         
         # Auto-assign row_index if not provided
         if entry_dict.get("row_index") is None:
-            # Construct query based on what ID is provided
             query = {"table_name": entry.table_name}
             if entry.slide_id:
                 query["slide_id"] = entry.slide_id
             elif entry.slide_no is not None:
                 query["slide_no"] = entry.slide_no
             else:
-                # Should not happen if validation works, but good to handle
                 query["slide_id"] = "unknown"
 
             last = await coll.find_one(
@@ -2265,7 +2323,6 @@ async def update_slide_input(input_id: str, entry: SlideInputEntry):
         update_dict = entry.dict()
         update_dict["date_updated"] = datetime.now()
         
-        # Update week recorded on edit as well
         if update_dict.get("week_recorded") is None:
              update_dict["week_recorded"] = datetime.now().isocalendar()[1]
              
