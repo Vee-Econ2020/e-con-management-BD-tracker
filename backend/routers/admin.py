@@ -2405,6 +2405,25 @@ async def toggle_hidden_slide(payload: dict = Body(...)):
         print(f"Error toggling hidden slide: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/hidden-slides/set")
+async def set_hidden_slides(payload: dict = Body(...)):
+    slides = payload.get("slides")
+    if not isinstance(slides, list):
+        raise HTTPException(status_code=400, detail="Missing or invalid slides list")
+    s_ids = [str(s) for s in slides]
+    try:
+        coll = get_collection("weekly_tracker_settings")
+        await coll.update_one(
+            {"type": "hidden_slides"},
+            {"$set": {"slides": s_ids}},
+            upsert=True
+        )
+        return {"current_hidden": s_ids, "status": "success"}
+    except Exception as e:
+        print(f"Error setting hidden slides: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # --- Confetti Slides API ---
 @router.get("/confetti-slides")
 async def get_confetti_slides():

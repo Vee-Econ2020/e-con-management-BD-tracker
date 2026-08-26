@@ -66,7 +66,7 @@ import {
     Slide21_1, Slide21_1_1,
     Slide24_1, Slide24_1_1,
     Slide27_1, Slide27_2, Slide27_1_1, Slide27_2_1,
-    Slide30_1, Slide30_1_1
+    Slide30_1, Slide30_1_1, Slide30_2, Slide30_2_1, Slide30_3, Slide30_3_1
 } from '../components/slides/RegionActivitySlides';
 import {
     Slide9_2_3, Slide12_2_3, Slide15_2_3, Slide18_2_3,
@@ -126,6 +126,8 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '24.1': Slide24_1, '24.1.1': Slide24_1_1,
     '27.1': Slide27_1, '27.1.1': Slide27_1_1, '27.2': Slide27_2, '27.2.1': Slide27_2_1,
     '30.1': Slide30_1, '30.1.1': Slide30_1_1,
+    '30.2': Slide30_2, '30.2.1': Slide30_2_1,
+    '30.3': Slide30_3, '30.3.1': Slide30_3_1,
     '9.2.2': Slide9_2_2,
     '12.2.2': Slide12_2_2,
     '15.2.2': Slide15_2_2,
@@ -749,35 +751,36 @@ export default function WeeklyTracker() {
         setServicesQuarterBySlide(prev => ({ ...prev, [String(slideId)]: quarter }));
 
     // Base slides configuration
+    // Base slides configuration
     const BASE_SLIDES = [
         2, 2.5,
-        3, '3_invoice', '3_services', '3_services_q1', 4, '4_services', 5, '5_services',
-        6, 6.2, '6.2_services', 6.3, 6.4,
-        13, '13_invoice', '13_services', '13_services_q1', 14, '14_services', 15, '15_services',
+        3, '3_services', '3_services_q1', 4, '4_services', 5, '5_services',
+        6, 6.2, '6.2_services', '3_invoice', 6.3, 6.4,
+        13, '13_services', '13_services_q1', 14, '14_services', 15, '15_services',
         15.1, '15.1.1', 15.2, '15.2.1',
-        '15.2.2', '15.2.2_services', '15.2.3', '15.2.3_cy', '15.2.4', '15.2.5',
-        7, '7_invoice', '7_services', '7_services_q1', 8, '8_services', 9, '9_services',
+        '15.2.2', '15.2.2_services', '13_invoice', '15.2.3', '15.2.3_cy', '15.2.4', '15.2.5',
+        7, '7_services', '7_services_q1', 8, '8_services', 9, '9_services',
         9.1, '9.1.1', 9.2, '9.2.1',
-        '9.2.2', '9.2.2_services', '9.2.3', '9.2.3_cy', '9.2.4', '9.2.5',
-        10, '10_invoice', '10_services', '10_services_q1', 11, '11_services', 12, '12_services',
+        '9.2.2', '9.2.2_services', '7_invoice', '9.2.3', '9.2.3_cy', '9.2.4', '9.2.5',
+        10, '10_services', '10_services_q1', 11, '11_services', 12, '12_services',
         12.1, '12.1.1', 12.2, '12.2.1',
-        '12.2.2', '12.2.2_services', '12.2.3', '12.2.3_cy', '12.2.4', '12.2.5',
-        28, '28_invoice', '28_services', '28_services_q1', 29, '29_services', 30, '30_services',
-        30.1, '30.1.1',
-        '30.2.2', '30.2.2_services', '30.2.3', '30.2.3_cy', '30.2.4', '30.2.5',
-        16, '16_invoice', '16_services', '16_services_q1', 17, '17_services', 18, '18_services',
+        '12.2.2', '12.2.2_services', '10_invoice', '12.2.3', '12.2.3_cy', '12.2.4', '12.2.5',
+        28, '28_services', '28_services_q1', 29, '29_services', 30, '30_services',
+        30.1, '30.1.1', 30.2, '30.2.1', 30.3, '30.3.1',
+        '30.2.2', '30.2.2_services', '28_invoice', '30.2.3', '30.2.3_cy', '30.2.4', '30.2.5',
+        16, '16_services', '16_services_q1', 17, '17_services', 18, '18_services',
         18.1, '18.1.1',
-        '18.2.2', '18.2.2_services', '18.2.3', '18.2.3_cy', '18.2.4', '18.2.5',
-        19, '19_invoice', '19_services', '19_services_q1', 20, '20_services', 21, '21_services',
+        '18.2.2', '18.2.2_services', '16_invoice', '18.2.3', '18.2.3_cy', '18.2.4', '18.2.5',
+        19, '19_services', '19_services_q1', 20, '20_services', 21, '21_services',
         21.1, '21.1.1',
-        '21.2.2', '21.2.2_services', '21.2.3', '21.2.3_cy', '21.2.4', '21.2.5',
-        22, '22_invoice', '22_services', '22_services_q1', 23, '23_services', 24, '24_services',
+        '21.2.2', '21.2.2_services', '19_invoice', '21.2.3', '21.2.3_cy', '21.2.4', '21.2.5',
+        22, '22_services', '22_services_q1', 23, '23_services', 24, '24_services',
         24.1, '24.1.1',
-        '24.2.2', '24.2.2_services', '24.2.3', '24.2.3_cy', '24.2.4', '24.2.5',
-        25, '25_invoice', '25_services', '25_services_q1', 26, '26_services',
+        '24.2.2', '24.2.2_services', '22_invoice', '24.2.3', '24.2.3_cy', '24.2.4', '24.2.5',
+        25, '25_services', '25_services_q1', 26, '26_services',
         27, '27_services',
         27.1, '27.1.1', 27.2, '27.2.1',
-        '27.2.2', '27.2.2_services', '27.2.3', '27.2.3_cy', '27.2.4', '27.2.5'
+        '27.2.2', '27.2.2_services', '25_invoice', '27.2.3', '27.2.3_cy', '27.2.4', '27.2.5'
     ];
 
     // Helper to determine region
@@ -895,8 +898,10 @@ export default function WeeklyTracker() {
             if (idStr.endsWith('.2.5')) return 'Whale accounts';
             if (idStr.endsWith('.1.1')) return 'Action Points';
             if (idStr.endsWith('.2.1')) return 'New Business - Action Points';
+            if (idStr.endsWith('.3.1')) return 'Action Points';
             if (idStr.endsWith('.1')) return 'Account / New Business Summary';
             if (idStr.endsWith('.2')) return 'New Business Summary';
+            if (idStr.endsWith('.3')) return 'Account / New Business Summary';
         }
 
         return 'Activity & Details';
@@ -918,6 +923,150 @@ export default function WeeklyTracker() {
         });
         return result;
     }, [customSlides]);
+
+    const BULK_SLIDE_CATEGORIES = useMemo(() => [
+        {
+            id: 'cumulative',
+            name: 'Cumulative Performance Charts',
+            slideIds: [
+                2, 2.5, 3, '3_services', '3_services_q1',
+                7, '7_services', '7_services_q1',
+                10, '10_services', '10_services_q1',
+                13, '13_services', '13_services_q1',
+                16, '16_services', '16_services_q1',
+                19, '19_services', '19_services_q1',
+                22, '22_services', '22_services_q1',
+                25, '25_services', '25_services_q1',
+                28, '28_services', '28_services_q1'
+            ]
+        },
+        {
+            id: 'trend',
+            name: '8-Week Historical Trend Charts',
+            slideIds: [
+                4, '4_services',
+                8, '8_services',
+                11, '11_services',
+                14, '14_services',
+                17, '17_services',
+                20, '20_services',
+                23, '23_services',
+                26, '26_services',
+                29, '29_services'
+            ]
+        },
+        {
+            id: 'pipeline',
+            name: 'Actual vs Weighted Pipeline Charts',
+            slideIds: [
+                5, '5_services', 6,
+                9, '9_services',
+                12, '12_services',
+                15, '15_services',
+                18, '18_services',
+                21, '21_services',
+                24, '24_services',
+                27, '27_services',
+                30, '30_services'
+            ]
+        },
+        {
+            id: 'order_backlog',
+            name: 'Order Backlog Charts',
+            slideIds: [
+                6.2, '6.2_services',
+                '9.2.2', '9.2.2_services',
+                '12.2.2', '12.2.2_services',
+                '15.2.2', '15.2.2_services',
+                '18.2.2', '18.2.2_services',
+                '21.2.2', '21.2.2_services',
+                '24.2.2', '24.2.2_services',
+                '27.2.2', '27.2.2_services',
+                '30.2.2', '30.2.2_services'
+            ]
+        },
+        {
+            id: 'invoice_trend',
+            name: 'Invoiced Amount Trend Charts',
+            slideIds: [
+                '3_invoice', '7_invoice', '10_invoice', '13_invoice',
+                '16_invoice', '19_invoice', '22_invoice', '25_invoice', '28_invoice'
+            ]
+        },
+        {
+            id: 'gross_margin',
+            name: 'Gross Margin Charts & Summary',
+            slideIds: [
+                6.3, 6.4,
+                '9.2.3', '9.2.3_cy', '9.2.4',
+                '12.2.3', '12.2.3_cy', '12.2.4',
+                '15.2.3', '15.2.3_cy', '15.2.4',
+                '18.2.3', '18.2.3_cy', '18.2.4',
+                '21.2.3', '21.2.3_cy', '21.2.4',
+                '24.2.3', '24.2.3_cy', '24.2.4',
+                '27.2.3', '27.2.3_cy', '27.2.4',
+                '30.2.3', '30.2.3_cy', '30.2.4'
+            ]
+        },
+        {
+            id: 'activity_summary',
+            name: 'Account & New Business Summaries',
+            slideIds: [
+                '9.1', '9.1.1', '9.2', '9.2.1',
+                '12.1', '12.1.1', '12.2', '12.2.1',
+                '15.1', '15.1.1', '15.2', '15.2.1',
+                '18.1', '18.1.1',
+                '21.1', '21.1.1',
+                '24.1', '24.1.1',
+                '27.1', '27.1.1', '27.2', '27.2.1',
+                '30.1', '30.1.1', '30.2', '30.2.1', '30.3', '30.3.1'
+            ]
+        },
+        {
+            id: 'whales',
+            name: 'Whale Account Slides',
+            slideIds: [
+                '9.2.5', '12.2.5', '15.2.5', '18.2.5', '21.2.5', '24.2.5', '27.2.5', '30.2.5'
+            ]
+        }
+    ], []);
+
+    const handleBulkVisibilityChange = async (targetIds: (string | number)[], hide: boolean) => {
+        const strIds = targetIds.map(String);
+        const nextHidden = new Set(hiddenSlides);
+        if (hide) {
+            strIds.forEach(id => nextHidden.add(id));
+        } else {
+            strIds.forEach(id => nextHidden.delete(id));
+        }
+        setHiddenSlides(nextHidden);
+
+        try {
+            await fetch('/api/admin/hidden-slides/set', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slides: Array.from(nextHidden) })
+            });
+            showToast(hide ? `Hidden ${strIds.length} slides` : `Unhidden ${strIds.length} slides`);
+        } catch (err) {
+            console.error('Failed to update bulk hidden slides', err);
+            showToast('Failed to update slide visibility');
+        }
+    };
+
+    const handleHideAllSlides = () => {
+        const allIds = displaySlides.map(s => String(s.id));
+        handleBulkVisibilityChange(allIds, true);
+    };
+
+    const handleUnhideAllSlides = async () => {
+        const currentlyHidden = Array.from(hiddenSlides);
+        if (currentlyHidden.length === 0) {
+            showToast('No slides are currently hidden');
+            return;
+        }
+        await handleBulkVisibilityChange(currentlyHidden, false);
+    };
 
     const REGION_CLUSTER_NAMES = useMemo(() => ['USA West', 'Europe', 'APAC', 'USA East', 'Asean', 'Japan', 'Korea', 'Legacy'], []);
     const ALL_CLUSTERS = useMemo(() => ['Overall', ...REGION_CLUSTER_NAMES], [REGION_CLUSTER_NAMES]);
@@ -2167,7 +2316,11 @@ export default function WeeklyTracker() {
         'USA West': ['us_west_acc_mgmt', 'us_west_acc_mgmt_actions', 'us_west_new_biz', 'us_west_new_biz_actions'],
         'Europe': ['europe_acc_mgmt', 'europe_acc_mgmt_actions', 'europe_new_biz', 'europe_new_biz_actions'],
         'USA East': ['us_east_acc_mgmt', 'us_east_acc_mgmt_actions', 'us_east_new_biz', 'us_east_new_biz_actions'],
-        'APAC': ['apac_acc_new_biz', 'apac_acc_new_biz_actions'],
+        'APAC': [
+            'apac_asean_korea_acc_mgmt', 'apac_asean_korea_acc_mgmt_actions',
+            'apac_asean_korea_new_biz', 'apac_asean_korea_new_biz_actions',
+            'apac_japan_acc_new_biz', 'apac_japan_acc_new_biz_actions'
+        ],
         'Asean': ['asean_acc_new_biz', 'asean_acc_new_biz_actions'],
         'Japan': ['japan_acc_new_biz', 'japan_acc_new_biz_actions'],
         'Korea': ['kanz_acc_new_biz', 'kanz_acc_new_biz_actions'],
@@ -2181,7 +2334,7 @@ export default function WeeklyTracker() {
         'USA West': ['9.1', '9.1.1', '9.2', '9.2.1', '9.2.5'],
         'Europe': ['12.1', '12.1.1', '12.2', '12.2.1', '12.2.5'],
         'USA East': ['15.1', '15.1.1', '15.2', '15.2.1', '15.2.5'],
-        'APAC': ['30.1', '30.1.1', '30.2.5'],
+        'APAC': ['30.1', '30.1.1', '30.2', '30.2.1', '30.3', '30.3.1', '30.2.5'],
         'Asean': ['18.1', '18.1.1', '18.2.5'],
         'Japan': ['21.1', '21.1.1', '21.2.5'],
         'Korea': ['24.1', '24.1.1', '24.2.5'],
@@ -2627,6 +2780,137 @@ export default function WeeklyTracker() {
                     )}
                 </div>
             </div>
+
+            {/* Bulk Hide / Unhide Controls Panel (Admin Only) */}
+            {isAdmin && (
+                <div style={{
+                    marginLeft: '1rem',
+                    marginBottom: '2.5rem',
+                    maxWidth: '1200px',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '16px',
+                    border: '2px solid #cbd5e1',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+                    padding: '1.5rem'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                        <div>
+                            <h3 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <EyeOff size={22} color="#475569" /> Bulk Hide / Unhide Section
+                            </h3>
+                            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: '500' }}>
+                                Hide or unhide specific slide groups in bulk before exporting PDF or viewing presentation.
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                                onClick={handleHideAllSlides}
+                                style={{
+                                    backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5',
+                                    padding: '0.45rem 1rem', borderRadius: '8px', fontWeight: '700', fontSize: '0.85rem',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem'
+                                }}
+                                title="Hide all slides in presentation"
+                            >
+                                <EyeOff size={15} /> Hide All Slides
+                            </button>
+                            <button
+                                onClick={handleUnhideAllSlides}
+                                style={{
+                                    backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac',
+                                    padding: '0.45rem 1rem', borderRadius: '8px', fontWeight: '700', fontSize: '0.85rem',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem'
+                                }}
+                                title="Unhide all slides in presentation"
+                            >
+                                <Eye size={15} /> Unhide All Slides
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                        gap: '1rem'
+                    }}>
+                        {BULK_SLIDE_CATEGORIES.map(cat => {
+                            const strIds = cat.slideIds.map(String);
+                            const hiddenCount = strIds.filter(id => hiddenSlides.has(id)).length;
+                            const isAllHidden = strIds.length > 0 && hiddenCount === strIds.length;
+                            const isNoneHidden = hiddenCount === 0;
+
+                            return (
+                                <div
+                                    key={cat.id}
+                                    style={{
+                                        backgroundColor: '#f8fafc',
+                                        borderRadius: '12px',
+                                        border: '1px solid #cbd5e1',
+                                        padding: '1rem',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'space-between',
+                                        gap: '0.75rem'
+                                    }}
+                                >
+                                    <div>
+                                        <div style={{ fontWeight: '800', fontSize: '0.95rem', color: '#1e293b', marginBottom: '0.25rem' }}>
+                                            {cat.name}
+                                        </div>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: '600', color: hiddenCount > 0 ? '#dc2626' : '#16a34a' }}>
+                                            {hiddenCount} of {strIds.length} hidden
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                        <button
+                                            onClick={() => handleBulkVisibilityChange(cat.slideIds, true)}
+                                            disabled={isAllHidden}
+                                            style={{
+                                                flex: 1,
+                                                backgroundColor: isAllHidden ? '#e2e8f0' : '#fee2e2',
+                                                color: isAllHidden ? '#94a3b8' : '#b91c1c',
+                                                border: 'none',
+                                                padding: '0.35rem 0.6rem',
+                                                borderRadius: '6px',
+                                                fontWeight: '700',
+                                                fontSize: '0.78rem',
+                                                cursor: isAllHidden ? 'default' : 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '0.25rem'
+                                            }}
+                                        >
+                                            <EyeOff size={13} /> Hide Group
+                                        </button>
+                                        <button
+                                            onClick={() => handleBulkVisibilityChange(cat.slideIds, false)}
+                                            disabled={isNoneHidden}
+                                            style={{
+                                                flex: 1,
+                                                backgroundColor: isNoneHidden ? '#e2e8f0' : '#dcfce7',
+                                                color: isNoneHidden ? '#94a3b8' : '#15803d',
+                                                border: 'none',
+                                                padding: '0.35rem 0.6rem',
+                                                borderRadius: '6px',
+                                                fontWeight: '700',
+                                                fontSize: '0.78rem',
+                                                cursor: isNoneHidden ? 'default' : 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '0.25rem'
+                                            }}
+                                        >
+                                            <Eye size={13} /> Unhide Group
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Slide Clusters Controls */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginLeft: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem', maxWidth: '1200px' }}>

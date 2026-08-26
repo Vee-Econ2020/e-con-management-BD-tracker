@@ -65,6 +65,17 @@ export const Slide27_2_1 = (props: { isEditing: boolean }) =>
 
 // APAC (Anchor: Slide 30)
 export const Slide30_1 = (props: { isEditing: boolean }) =>
-    <RegionInputTableSlide title="APAC - Account / New Business" slideId="apac_acc_new_biz" {...props} />;
+    <RegionInputTableSlide title="APAC - Asean & Korea Account summary" slideId="apac_asean_korea_acc_mgmt" {...props} />;
 export const Slide30_1_1 = (props: { isEditing: boolean }) =>
-    <ActionItemsSlide title="APAC - Account / New Business" slideId="apac_acc_new_biz_actions" {...props} />;
+    <ActionItemsSlide title="APAC - Asean & Korea Account Action Items" slideId="apac_asean_korea_acc_mgmt_actions" {...props} />;
+
+export const Slide30_2 = (props: { isEditing: boolean }) =>
+    <RegionInputTableSlide title="APAC - Asean & Korea New business summary" slideId="apac_asean_korea_new_biz" {...props} />;
+export const Slide30_2_1 = (props: { isEditing: boolean }) =>
+    <ActionItemsSlide title="APAC - Asean & Korea New Business Action Items" slideId="apac_asean_korea_new_biz_actions" {...props} />;
+
+export const Slide30_3 = (props: { isEditing: boolean }) =>
+    <RegionInputTableSlide title="APAC - Japan - Account / New business summary" slideId="apac_japan_acc_new_biz" {...props} />;
+export const Slide30_3_1 = (props: { isEditing: boolean }) =>
+    <ActionItemsSlide title="APAC - Japan - Account / New Business Action Items" slideId="apac_japan_acc_new_biz_actions" {...props} />;
+
