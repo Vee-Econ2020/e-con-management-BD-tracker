@@ -761,7 +761,7 @@ export function CrmDataUpload() {
                                 : activeTab === 'services_trend'
                                     ? 'Services Trend data is automatically generated every time a Weekly Tracker CSV is uploaded. Click below to manually re-sync.'
                                     : activeTab === 'symb_reference'
-                                        ? 'Upload SYMB SO Numbers and Jabil Production List Price reference CSV files below (uploaded once, updated anytime).'
+                                        ? 'Upload ERP MECH Excel reference file below (uploaded once, updated anytime).'
                                         : activeTab === 'symb_tracker'
                                             ? 'Upload daily SYMB Mass Orders CSV. Duplicate uploads are restricted per DATE (file_date), allowing daily uploads.'
                                             : `file name format: "${getUploadPrefix()}_dd-mm-yyyy.csv"`
@@ -769,50 +769,10 @@ export function CrmDataUpload() {
                     </div>
 
                     {activeTab === 'symb_reference' ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', width: '100%', maxWidth: '950px', backgroundColor: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '8px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', color: 'white' }}>
-                                <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>1. SYMB SO Numbers (.csv)</label>
-                                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Contains column "SO NUMBER"</span>
-                                <input type="file" accept=".csv" onChange={handleSymbSoUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
-                                {refLogs['symb_ref_so'] ? (
-                                    <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '0.75rem', color: '#86efac' }}>
-                                        <div><strong>Last Uploaded:</strong> {refLogs['symb_ref_so'].file_name}</div>
-                                        <div><strong>Date:</strong> {refLogs['symb_ref_so'].file_date || (refLogs['symb_ref_so'].created_at ? new Date(refLogs['symb_ref_so'].created_at).toLocaleDateString() : '')}</div>
-                                    </div>
-                                ) : (
-                                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.3rem' }}>No upload history recorded yet</span>
-                                )}
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', color: 'white' }}>
-                                <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>2. Jabil Production (.csv)</label>
-                                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Contains columns "SO Number", "Total"</span>
-                                <input type="file" accept=".csv" onChange={handleJabilUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
-                                {refLogs['symb_ref_jabil'] ? (
-                                    <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '0.75rem', color: '#86efac' }}>
-                                        <div><strong>Last Uploaded:</strong> {refLogs['symb_ref_jabil'].file_name}</div>
-                                        <div><strong>Date:</strong> {refLogs['symb_ref_jabil'].file_date || (refLogs['symb_ref_jabil'].created_at ? new Date(refLogs['symb_ref_jabil'].created_at).toLocaleDateString() : '')}</div>
-                                    </div>
-                                ) : (
-                                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.3rem' }}>No upload history recorded yet</span>
-                                )}
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', color: 'white' }}>
-                                <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>4. SYMB Plan (.csv)</label>
-                                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>Detailed plan data</span>
-                                <input type="file" accept=".csv" onChange={handleSymbPlanUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
-                                {refLogs['symb_ref_plan'] ? (
-                                    <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '0.75rem', color: '#86efac' }}>
-                                        <div><strong>Last Uploaded:</strong> {refLogs['symb_ref_plan'].file_name}</div>
-                                        <div><strong>Date:</strong> {refLogs['symb_ref_plan'].file_date || (refLogs['symb_ref_plan'].created_at ? new Date(refLogs['symb_ref_plan'].created_at).toLocaleDateString() : '')}</div>
-                                    </div>
-                                ) : (
-                                    <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.3rem' }}>No upload history recorded yet</span>
-                                )}
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', color: 'white' }}>
-                                <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>5. ERP MECH (.xlsx)</label>
-                                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>CTB Tracker Excel</span>
+                        <div style={{ display: 'flex', justifyContent: 'center', width: '100%', maxWidth: '500px', backgroundColor: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', color: 'white', width: '100%' }}>
+                                <label style={{ fontWeight: '700', fontSize: '0.95rem' }}>ERP MECH (.xlsx)</label>
+                                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>CTB Tracker Excel file</span>
                                 <input type="file" accept=".xlsx,.xls" onChange={handleErpMechUpload} style={{ marginTop: '0.4rem', color: 'white' }} />
                                 {refLogs['symb_ref_erp'] ? (
                                     <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.3)', fontSize: '0.75rem', color: '#86efac' }}>
@@ -823,7 +783,6 @@ export function CrmDataUpload() {
                                     <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.3rem' }}>No upload history recorded yet</span>
                                 )}
                             </div>
-
                         </div>
                     ) : activeTab === 'services_trend' ? (
                         <div style={{ textAlign: 'center', padding: '1rem' }}>

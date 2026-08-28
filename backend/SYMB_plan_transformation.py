@@ -2,64 +2,63 @@ import pandas as pd
 import numpy as np
 import datetime
 
+def get_qty(df, product_keyword, qty_col):
+    matched = df[df['Product Code'].astype(str).str.contains(product_keyword, na=False)]
+    return matched[qty_col].sum()
+
 def process_erp_mech(df_erp):
     if df_erp.empty:
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame([
+            {'Varient': 'Varient 1', 'MBOM': 0, 'EBOM': 0},
+            {'Varient': 'Varient 2', 'MBOM': 0, 'EBOM': 0}
+        ])
     
-    # Filter and select columns
-    ERP_MECH = df_erp[df_erp["SO Owner Name"] != 'Forecast']
-    
-    # Check if all required columns exist, if not, fill missing with NaN
-    required_cols = ["SO Number","Product Code","Ordered Qty","MOA ID","Stage","CTB Status","CRD Date","CDD Date","EBOM Date","EBOM%","CTB Date","CTB%"]
+    required_cols = ['Product Code', 'Ordered Qty', 'Min Build Qty', 'EBOM Min Build Qty']
     for col in required_cols:
-        if col not in ERP_MECH.columns:
-            ERP_MECH[col] = np.nan
+        if col not in df_erp.columns:
+            df_erp[col] = np.nan
             
-    ERP_MECH = ERP_MECH[required_cols].copy()
+    ERP_MECH = df_erp[required_cols].copy()
+    ERP_MECH['Min Build Qty'] = pd.to_numeric(ERP_MECH['Min Build Qty'], errors='coerce').fillna(0)
+    ERP_MECH['EBOM Min Build Qty'] = pd.to_numeric(ERP_MECH['EBOM Min Build Qty'], errors='coerce').fillna(0)
     
-    # Convert percentages
-    ERP_MECH["EBOM%"] = ERP_MECH["EBOM%"].replace("Nil", 1).replace("0%", 0).replace(np.nan, 0)
-    ERP_MECH["CTB%"] = ERP_MECH["CTB%"].replace("Nil", 1).replace("0%", 0).replace(np.nan, 0)
-    
-    # Force to float
-    ERP_MECH["EBOM%"] = pd.to_numeric(ERP_MECH["EBOM%"], errors="coerce").fillna(0)
-    ERP_MECH["CTB%"] = pd.to_numeric(ERP_MECH["CTB%"], errors="coerce").fillna(0)
-    ERP_MECH["Ordered Qty"] = pd.to_numeric(ERP_MECH["Ordered Qty"], errors="coerce").fillna(0)
+    # 1. Calculate buildable units for Varient 1 & Varient 2 under MBOM ('Min Build Qty')
+    mbom_h08 = get_qty(ERP_MECH, 'H08', 'Min Build Qty')
+    mbom_h13 = get_qty(ERP_MECH, 'H13', 'Min Build Qty')
+    mbom_h15 = get_qty(ERP_MECH, 'H15', 'Min Build Qty')
 
-    # Calculate covered quantities
-    ERP_MECH["EBOM Covered QTY"] = np.ceil(ERP_MECH["Ordered Qty"] * ERP_MECH["EBOM%"])
-    ERP_MECH["CTB Covered QTY"] = np.ceil(ERP_MECH["Ordered Qty"] * ERP_MECH["CTB%"])
+    mbom_h09 = get_qty(ERP_MECH, 'H09', 'Min Build Qty')
+    mbom_h10 = get_qty(ERP_MECH, 'H10', 'Min Build Qty')
+
+    mbom_varient_1 = min(mbom_h08 // 2, mbom_h13, mbom_h15)
+    mbom_varient_2 = min(mbom_h09, mbom_h10)
+
+    # 2. Calculate buildable units for Varient 1 & Varient 2 under EBOM ('EBOM Min Build Qty')
+    ebom_h08 = get_qty(ERP_MECH, 'H08', 'EBOM Min Build Qty')
+    ebom_h13 = get_qty(ERP_MECH, 'H13', 'EBOM Min Build Qty')
+    ebom_h15 = get_qty(ERP_MECH, 'H15', 'EBOM Min Build Qty')
+
+    ebom_h09 = get_qty(ERP_MECH, 'H09', 'EBOM Min Build Qty')
+    ebom_h10 = get_qty(ERP_MECH, 'H10', 'EBOM Min Build Qty')
+
+    ebom_varient_1 = min(ebom_h08 // 2, ebom_h13, ebom_h15)
+    ebom_varient_2 = min(ebom_h09, ebom_h10)
+
+    # 3. Create ERP_final DataFrame
+    ERP_final = pd.DataFrame([
+        {
+            'Varient': 'Varient 1',
+            'MBOM': int(mbom_varient_1),
+            'EBOM': int(ebom_varient_1)
+        },
+        {
+            'Varient': 'Varient 2',
+            'MBOM': int(mbom_varient_2),
+            'EBOM': int(ebom_varient_2)
+        }
+    ])
     
-    VARIANT_1_CODES = [
-        "NeduCAM25_CHLC_IP67_H08R3",
-        "NeduCAM25_CHLC_IP67_H13R3",
-        "NeduCAM25_CHLC_IP67_H15R3"
-    ]
-    
-    # Assign Variant
-    ERP_MECH["Varient"] = np.where(
-        ERP_MECH["Product Code"].isin(VARIANT_1_CODES),
-        "Varient 1",
-        "Varient 2"
-    )
-    ERP_MECH["Varient"] = ERP_MECH["Varient"].fillna("unknown")
-    
-    # Aggregation
-    erp_mech_agg = ERP_MECH.groupby(["CDD Date","Varient"]).agg({"Ordered Qty": "sum", "EBOM Covered QTY": "sum", "CTB Covered QTY": "sum"}).reset_index()
-    
-    erp_mech_agg["Materials Covered"] = np.where(
-        (erp_mech_agg["Ordered Qty"] == erp_mech_agg["EBOM Covered QTY"]) & (erp_mech_agg["Ordered Qty"] == erp_mech_agg["CTB Covered QTY"]),
-        "Yes",
-        "No"
-    )
-    
-    erp_mech_agg["Remaining EBOM QTY"] = erp_mech_agg["Ordered Qty"] - erp_mech_agg["EBOM Covered QTY"]
-    erp_mech_agg["Remaining CTB QTY"] = erp_mech_agg["Ordered Qty"] - erp_mech_agg["CTB Covered QTY"]
-    
-    erp_mech_agg_covered = erp_mech_agg[erp_mech_agg["Materials Covered"]=="Yes"]
-    erp_mech_agg_varient = erp_mech_agg_covered.groupby(["Varient"]).agg({"Ordered Qty": "sum", "EBOM Covered QTY": "sum", "CTB Covered QTY": "sum"}).reset_index()
-    
-    return ERP_MECH, erp_mech_agg, erp_mech_agg_varient
+    return ERP_final
 
 
 def process_tracker_progress(df_tracker):
@@ -92,7 +91,7 @@ def process_tracker_progress(df_tracker):
     return progress_summary, df_tracker
 
 
-def process_symb_plan(df_plan, progress_summary_agg, erp_mech_agg_varient, df_tracker):
+def process_symb_plan(df_plan, progress_summary_agg, erp_final, df_tracker):
     if df_plan.empty:
         return pd.DataFrame()
         
@@ -211,14 +210,13 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_mech_agg_varient, df_tr
             if cat == "PCBA Ready":
                 completed_pool[("PCBA covered", var)] = qty
 
-    if not erp_mech_agg_varient.empty and "Varient" in erp_mech_agg_varient.columns:
-        ebom_pool = erp_mech_agg_varient.set_index("Varient")["EBOM Covered QTY"].to_dict()
-        for variant_name, qty in ebom_pool.items():
-            completed_pool[("EBOM covered", variant_name)] = qty
-            
-        ctb_pool = erp_mech_agg_varient.set_index("Varient")["CTB Covered QTY"].to_dict()
-        for variant_name, qty in ctb_pool.items():
-            completed_pool[("All Material Available", variant_name)] = qty
+    if not erp_final.empty and "Varient" in erp_final.columns:
+        for _, r in erp_final.iterrows():
+            variant_name = r["Varient"]
+            mbom_val = r.get("MBOM", 0)
+            ebom_val = r.get("EBOM", 0)
+            completed_pool[("EBOM covered", variant_name)] = ebom_val
+            completed_pool[("All Material Available", variant_name)] = mbom_val
 
     def waterfall_allocate(group):
         if group.empty:
@@ -402,13 +400,6 @@ async def run_symb_plan_pipeline(db):
     """
     import math
     print("\n--- Starting SYMB Detailed Tracker Pipeline ---")
-    
-    def fetch_df(coll_name):
-        cursor = db[coll_name].find({})
-        import asyncio
-        loop = asyncio.get_event_loop()
-        # Since db is async motor, we need to await cursor.to_list()
-        return cursor
 
     async def get_df_async(coll_name):
         cursor = db[coll_name].find({})
@@ -431,9 +422,9 @@ async def run_symb_plan_pipeline(db):
         
     # Process
     try:
-        ERP_MECH, erp_mech_agg, erp_mech_agg_varient = process_erp_mech(df_erp)
+        ERP_final = process_erp_mech(df_erp)
         Progress_summary_agg, tracker_df = process_tracker_progress(df_tracker)
-        SYMB_PLAN = process_symb_plan(df_plan, Progress_summary_agg, erp_mech_agg_varient, tracker_df)
+        SYMB_PLAN = process_symb_plan(df_plan, Progress_summary_agg, ERP_final, tracker_df)
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -461,8 +452,8 @@ async def run_symb_plan_pipeline(db):
 
     if not SYMB_PLAN.empty: await save_coll("symb_plan_transformed", SYMB_PLAN)
     if not Progress_summary_agg.empty: await save_coll("symb_progress_summary_agg", Progress_summary_agg)
-    if not erp_mech_agg_varient.empty: await save_coll("symb_erp_mech_agg_varient", erp_mech_agg_varient)
-    if not erp_mech_agg.empty: await save_coll("symb_erp_mech_agg", erp_mech_agg)
+    if not ERP_final.empty: await save_coll("symb_erp_mech_agg_varient", ERP_final)
     
     print("--- Completed SYMB Detailed Tracker Pipeline ---\n")
     return True
+

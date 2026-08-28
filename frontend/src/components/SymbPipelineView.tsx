@@ -103,6 +103,8 @@ const SymbPipelineView: React.FC = () => {
     const [selectedVariant, setSelectedVariant] = useState<string>('All');
 
     const MILESTONE_STAGES = useMemo(() => [
+        { key: 'EBOM covered', title: 'EBOM covered', eventMatch: ['EBOM covered'], color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe' },
+        { key: 'All Material Available', title: 'All Material Available', eventMatch: ['All Material Available'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
         { key: 'PCBA', title: 'PCBA', eventMatch: ['PCBA covered', 'PCBA Ready'], color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
         { key: 'Materials Issued', title: 'Materials Issued', eventMatch: ['Materials Issued'], color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' },
         { key: 'Active Alignment', title: 'Active Alignment', eventMatch: ['Active alignment'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
@@ -340,6 +342,26 @@ const SymbPipelineView: React.FC = () => {
 
     const overallSummaryCards = useMemo(() => {
         const STAGES = [
+            { 
+                key: 'EBOM covered', 
+                title: 'EBOM covered', 
+                eventMatch: ['EBOM covered'],
+                bgColor: '#eef2ff',
+                borderColor: '#c7d2fe',
+                titleColor: '#3730a3',
+                numColor: '#4338ca',
+                subTextColor: '#6366f1'
+            },
+            { 
+                key: 'All Material Available', 
+                title: 'All Material Available', 
+                eventMatch: ['All Material Available'],
+                bgColor: '#fffbeb',
+                borderColor: '#fde68a',
+                titleColor: '#92400e',
+                numColor: '#b45309',
+                subTextColor: '#d97706'
+            },
             { 
                 key: 'PCBA', 
                 title: 'PCBA', 
@@ -817,22 +839,18 @@ const SymbPipelineView: React.FC = () => {
                             transition: 'all 0.2s ease'
                         }}>
                             <div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: card.titleColor, textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: card.titleColor, textTransform: 'uppercase', marginBottom: '0.6rem' }}>
                                     {card.title}
                                 </div>
-                                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: card.numColor, display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
-                                    {card.total.toLocaleString()}
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 600, color: card.subTextColor }}>Total Completed</span>
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', marginTop: '0.5rem', borderTop: `1px solid ${card.borderColor}`, fontSize: '0.78rem' }}>
-                                <div>
-                                    <span style={{ color: card.titleColor, opacity: 0.85 }}>Variant 1: </span>
-                                    <strong style={{ color: card.numColor }}>{card.v1.toLocaleString()}</strong>
-                                </div>
-                                <div>
-                                    <span style={{ color: card.titleColor, opacity: 0.85 }}>Variant 2: </span>
-                                    <strong style={{ color: card.numColor }}>{card.v2.toLocaleString()}</strong>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.5rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.92rem' }}>
+                                        <span style={{ color: card.titleColor, fontWeight: 600 }}>Variant 1:</span>
+                                        <strong style={{ fontSize: '1.15rem', fontWeight: 800, color: card.numColor }}>{card.v1.toLocaleString()}</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.92rem' }}>
+                                        <span style={{ color: card.titleColor, fontWeight: 600 }}>Variant 2:</span>
+                                        <strong style={{ fontSize: '1.15rem', fontWeight: 800, color: card.numColor }}>{card.v2.toLocaleString()}</strong>
+                                    </div>
                                 </div>
                             </div>
 
