@@ -21,7 +21,7 @@ interface RawInput {
     week_recorded: number;
 }
 
-export function ActionItemsSlide({ title, slideId, isEditing }: ActionItemsSlideProps) {
+export function ActionItemsSlide({ title, slideId, isEditing, fy = "FY2027" }: ActionItemsSlideProps & { fy?: string }) {
     const [currentWeek, setCurrentWeek] = useState<number | null>(null);
     const [rows, setRows] = useState<any[]>([]); // Array of row objects { index, lastWeekItem, status, currentItem, statusId, currentItemId }
     const [, setLoading] = useState(false);
@@ -37,13 +37,13 @@ export function ActionItemsSlide({ title, slideId, isEditing }: ActionItemsSlide
         if (currentWeek !== null) {
             fetchData();
         }
-    }, [currentWeek, slideId]);
+    }, [currentWeek, slideId, fy]);
 
     const fetchData = async () => {
         if (currentWeek === null) return;
         setLoading(true);
         try {
-            const res = await fetch(`/api/admin/slide-inputs/${slideId}`);
+            const res = await fetch(`/api/admin/slide-inputs/${slideId}?fy=${fy}`);
             if (!res.ok) throw new Error("Failed to fetch inputs");
             const allInputs: RawInput[] = await res.json();
 
@@ -97,6 +97,12 @@ export function ActionItemsSlide({ title, slideId, isEditing }: ActionItemsSlide
         }
     };
 
+    useEffect(() => {
+        const handleRefresh = () => fetchData();
+        window.addEventListener('tracker_refresh_slides', handleRefresh);
+        return () => window.removeEventListener('tracker_refresh_slides', handleRefresh);
+    }, [currentWeek, slideId, fy]);
+
     const handleSave = async (rowIndex: number, type: 'status' | 'action_item', value: string, existingId?: string) => {
         if (currentWeek === null) return;
 
@@ -105,7 +111,8 @@ export function ActionItemsSlide({ title, slideId, isEditing }: ActionItemsSlide
             table_name: type,
             freeform_text: value,
             row_index: rowIndex, // Important for row mapping
-            week_recorded: currentWeek
+            week_recorded: currentWeek,
+            fy: fy
         };
 
         try {
@@ -133,6 +140,8 @@ export function ActionItemsSlide({ title, slideId, isEditing }: ActionItemsSlide
                     }));
                 }
             }
+            await fetchData();
+            window.dispatchEvent(new CustomEvent('tracker_refresh_checklist'));
         } catch (err) {
             console.error(err);
         }

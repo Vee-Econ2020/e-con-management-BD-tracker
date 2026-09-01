@@ -27,7 +27,7 @@ interface OverallGrossMarginRegionSummaryData {
     error?: string;
 }
 
-export default function Slide6_4() {
+export default function Slide6_4({ fy = "FY2027" }: { fy?: string }) {
     const plotRef = useRef<any>(null);
     const [data, setData] = useState<OverallGrossMarginRegionSummaryData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -38,7 +38,7 @@ export default function Slide6_4() {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const response = await fetch('/api/admin/slides/overall-gross-margin-region-summary');
+                const response = await fetch(`/api/admin/slides/overall-gross-margin-region-summary?fy=${fy}`);
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }

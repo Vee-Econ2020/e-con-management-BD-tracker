@@ -10,7 +10,7 @@ export const Slide18_2_3 = () => <RegionManufacturingGMSlide region="ASEAN" />;
 export const Slide21_2_3 = () => <RegionManufacturingGMSlide region="Japan" />;
 export const Slide24_2_3 = () => <RegionManufacturingGMSlide region="Korea" />;
 export const Slide27_2_3 = () => <RegionManufacturingGMSlide region="Management" />;
-export const Slide30_2_3 = () => <RegionManufacturingGMSlide region="APAC" />;
+export const Slide30_2_3 = () => <RegionManufacturingGMSlide region="ROW" />;
 
 // Services Current Year (Slide B) — placed as X.2.3_cy
 export const Slide9_2_3_cy  = () => <RegionServicesCYGMSlide region="US West" />;
@@ -20,7 +20,7 @@ export const Slide18_2_3_cy = () => <RegionServicesCYGMSlide region="ASEAN" />;
 export const Slide21_2_3_cy = () => <RegionServicesCYGMSlide region="Japan" />;
 export const Slide24_2_3_cy = () => <RegionServicesCYGMSlide region="Korea" />;
 export const Slide27_2_3_cy = () => <RegionServicesCYGMSlide region="Management" />;
-export const Slide30_2_3_cy = () => <RegionServicesCYGMSlide region="APAC" />;
+export const Slide30_2_3_cy = () => <RegionServicesCYGMSlide region="ROW" />;
 
 // Services Service_from_Start (Slide C) — placed as X.2.4
 export const Slide9_2_4  = () => <RegionServicesGMSlide region="US West" />;
@@ -30,4 +30,4 @@ export const Slide18_2_4 = () => <RegionServicesGMSlide region="ASEAN" />;
 export const Slide21_2_4 = () => <RegionServicesGMSlide region="Japan" />;
 export const Slide24_2_4 = () => <RegionServicesGMSlide region="Korea" />;
 export const Slide27_2_4 = () => <RegionServicesGMSlide region="Management" />;
-export const Slide30_2_4 = () => <RegionServicesGMSlide region="APAC" />;
+export const Slide30_2_4 = () => <RegionServicesGMSlide region="ROW" />;

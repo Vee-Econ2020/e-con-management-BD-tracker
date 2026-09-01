@@ -15,7 +15,7 @@ interface ServicesBacklogSlideProps {
  * so the chart shows zeroes for any week where Services-tagged backlog has
  * not yet been ingested.
  */
-export default function ServicesBacklogSlide({ region }: ServicesBacklogSlideProps) {
+export default function ServicesBacklogSlide({ region, fy = "FY2027" }: ServicesBacklogSlideProps & { fy?: string }) {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export default function ServicesBacklogSlide({ region }: ServicesBacklogSlidePro
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const url = `/api/admin/slides/order-backlog?region=${encodeURIComponent(region)}&services=true`;
+                const url = `/api/admin/slides/order-backlog?region=${encodeURIComponent(region)}&services=true&fy=${fy}`;
                 const response = await fetch(url);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const result = await response.json();
@@ -47,7 +47,7 @@ export default function ServicesBacklogSlide({ region }: ServicesBacklogSlidePro
         return () => {
             cancelled = true;
         };
-    }, [region]);
+    }, [region, fy]);
 
     if (loading) {
         return (

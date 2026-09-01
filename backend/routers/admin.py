@@ -1636,7 +1636,7 @@ async def get_invoice_slide_data(region: str = "Overall"):
         raise HTTPException(status_code=500, detail=f"Failed to compute invoice slide data: {str(e)}")
 
 @router.get("/slides/slide1")
-async def get_slide1_data():
+async def get_slide1_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 1 of the presentation.
     
@@ -1647,14 +1647,14 @@ async def get_slide1_data():
         - total_w_forecast: Total weighted forecast (Pipeline weighted amount)
     """
     try:
-        result = await compute_slide1_data(db)
+        result = await compute_slide1_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide data: {str(e)}")
 
 
 @router.get("/slides/slide2")
-async def get_slide2_data():
+async def get_slide2_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 2 of the presentation.
     
@@ -1664,357 +1664,357 @@ async def get_slide2_data():
         - current_week_stretch: Current week stretch target pie chart
     """
     try:
-        result = await compute_slide2_data(db)
+        result = await compute_slide2_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 2 data: {str(e)}")
 
 @router.get("/slides/slide3")
-async def get_slide3_data():
+async def get_slide3_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 3 of the presentation.
     
     Returns data for the cumulative performance vs targets chart.
     """
     try:
-        result = await compute_slide3_data(db)
+        result = await compute_slide3_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 3 data: {str(e)}")
 
 @router.get("/slides/slide4")
-async def get_slide4_data():
+async def get_slide4_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 4 of the presentation.
     
     Returns data for the 8-week historical trend chart.
     """
     try:
-        result = await compute_slide4_data(db)
+        result = await compute_slide4_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 4 data: {str(e)}")
 
 @router.get("/slides/slide5")
-async def get_slide5_data():
+async def get_slide5_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 5 of the presentation.
     
     Returns data for the Actual vs Weighted Pipeline bar chart.
     """
     try:
-        result = await compute_slide5_data(db)
+        result = await compute_slide5_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 5 data: {str(e)}")
 
 @router.get("/slides/slide6")
-async def get_slide6_data():
+async def get_slide6_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 6 of the presentation.
     
     Returns data for the Region-wise PO Breakdown table.
     """
     try:
-        result = await compute_slide6_data(db)
+        result = await compute_slide6_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 6 data: {str(e)}")
 
 @router.get("/slides/slide7")
-async def get_slide7_data():
+async def get_slide7_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 7 of the presentation.
     
     Returns data for US West cumulative performance vs targets chart.
     """
     try:
-        result = await compute_slide7_data(db)
+        result = await compute_slide7_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 7 data: {str(e)}")
 
 @router.get("/slides/slide8")
-async def get_slide8_data():
+async def get_slide8_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 8 of the presentation.
     
     Returns data for US West pipeline tracking over time chart.
     """
     try:
-        result = await compute_slide8_data(db)
+        result = await compute_slide8_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 8 data: {str(e)}")
 
 @router.get("/slides/slide9")
-async def get_slide9_data():
+async def get_slide9_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 9 of the presentation.
     
     Returns data for US West actuals vs pipeline weekly bars chart.
     """
     try:
-        result = await compute_slide9_data(db)
+        result = await compute_slide9_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 9 data: {str(e)}")
 
 @router.get("/slides/slide10")
-async def get_slide10_data():
+async def get_slide10_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 10 of the presentation.
     Europe Cumulative Performance
     """
     try:
-        result = await compute_slide10_data(db)
+        result = await compute_slide10_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 10 data: {str(e)}")
 
 @router.get("/slides/slide11")
-async def get_slide11_data():
+async def get_slide11_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 11 of the presentation.
     Europe Trend
     """
     try:
-        result = await compute_slide11_data(db)
+        result = await compute_slide11_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 11 data: {str(e)}")
 
 @router.get("/slides/slide12")
-async def get_slide12_data():
+async def get_slide12_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 12 of the presentation.
     Europe Pipeline
     """
     try:
-        result = await compute_slide12_data(db)
+        result = await compute_slide12_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 12 data: {str(e)}")
 
 @router.get("/slides/slide13")
-async def get_slide13_data():
+async def get_slide13_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 13 of the presentation.
     US East Cumulative Performance
     """
     try:
-        result = await compute_slide13_data(db)
+        result = await compute_slide13_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 13 data: {str(e)}")
 
 @router.get("/slides/slide14")
-async def get_slide14_data():
+async def get_slide14_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 14 of the presentation.
     US East Trend
     """
     try:
-        result = await compute_slide14_data(db)
+        result = await compute_slide14_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 14 data: {str(e)}")
 
 @router.get("/slides/slide15")
-async def get_slide15_data():
+async def get_slide15_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 15 of the presentation.
     US East Pipeline
     """
     try:
-        result = await compute_slide15_data(db)
+        result = await compute_slide15_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 15 data: {str(e)}")
 
 @router.get("/slides/slide16")
-async def get_slide16_data():
+async def get_slide16_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 16 of the presentation.
     Asean Cumulative Performance
     """
     try:
-        result = await compute_slide16_data(db)
+        result = await compute_slide16_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 16 data: {str(e)}")
 
 @router.get("/slides/slide17")
-async def get_slide17_data():
+async def get_slide17_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 17 of the presentation.
     Asean Trend
     """
     try:
-        result = await compute_slide17_data(db)
+        result = await compute_slide17_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 17 data: {str(e)}")
 
 @router.get("/slides/slide18")
-async def get_slide18_data():
+async def get_slide18_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 18 of the presentation.
     Asean Pipeline
     """
     try:
-        result = await compute_slide18_data(db)
+        result = await compute_slide18_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 18 data: {str(e)}")
 
 @router.get("/slides/slide19")
-async def get_slide19_data():
+async def get_slide19_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 19 of the presentation.
     Japan Cumulative Performance
     """
     try:
-        result = await compute_slide19_data(db)
+        result = await compute_slide19_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 19 data: {str(e)}")
 
 @router.get("/slides/slide20")
-async def get_slide20_data():
+async def get_slide20_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 20 of the presentation.
     Japan Trend
     """
     try:
-        result = await compute_slide20_data(db)
+        result = await compute_slide20_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 20 data: {str(e)}")
 
 @router.get("/slides/slide21")
-async def get_slide21_data():
+async def get_slide21_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 21 of the presentation.
     Japan Pipeline
     """
     try:
-        result = await compute_slide21_data(db)
+        result = await compute_slide21_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 21 data: {str(e)}")
 
 @router.get("/slides/slide22")
-async def get_slide22_data():
+async def get_slide22_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 22 of the presentation.
     KANZ Cumulative Performance
     """
     try:
-        result = await compute_slide22_data(db)
+        result = await compute_slide22_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 22 data: {str(e)}")
 
 @router.get("/slides/slide23")
-async def get_slide23_data():
+async def get_slide23_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 23 of the presentation.
     KANZ Trend
     """
     try:
-        result = await compute_slide23_data(db)
+        result = await compute_slide23_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 23 data: {str(e)}")
 
 @router.get("/slides/slide24")
-async def get_slide24_data():
+async def get_slide24_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 24 of the presentation.
     KANZ Pipeline
     """
     try:
-        result = await compute_slide24_data(db)
+        result = await compute_slide24_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 24 data: {str(e)}")
 
 @router.get("/slides/slide25")
-async def get_slide25_data():
+async def get_slide25_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 25 of the presentation.
     Legacy Cumulative Performance
     """
     try:
-        result = await compute_slide25_data(db)
+        result = await compute_slide25_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 25 data: {str(e)}")
 
 @router.get("/slides/slide26")
-async def get_slide26_data():
+async def get_slide26_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 26 of the presentation.
     Legacy Trend
     """
     try:
-        result = await compute_slide26_data(db)
+        result = await compute_slide26_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 26 data: {str(e)}")
 
 @router.get("/slides/slide27")
-async def get_slide27_data():
+async def get_slide27_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 27 of the presentation.
     Legacy Actuals vs Pipeline Weekly Bars
     """
     try:
-        result = await compute_slide27_data(db)
+        result = await compute_slide27_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 27 data: {str(e)}")
 
 @router.get("/slides/slide28")
-async def get_slide28_data():
+async def get_slide28_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 28 of the presentation.
     APAC Cumulative Performance
     """
     try:
-        result = await compute_slide28_data(db)
+        result = await compute_slide28_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 28 data: {str(e)}")
 
 @router.get("/slides/slide29")
-async def get_slide29_data():
+async def get_slide29_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 29 of the presentation.
     APAC Trend
     """
     try:
-        result = await compute_slide29_data(db)
+        result = await compute_slide29_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 29 data: {str(e)}")
 
 @router.get("/slides/slide30")
-async def get_slide30_data():
+async def get_slide30_data(fy: str = "FY2027"):
     """
     Get computed data for Slide 30 of the presentation.
     APAC Pipeline
     """
     try:
-        result = await compute_slide30_data(db)
+        result = await compute_slide30_data(db, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute slide 30 data: {str(e)}")
 
 
 @router.get("/slides/services/{slide_no}")
-async def get_slide_services_data(slide_no: int):
+async def get_slide_services_data(slide_no: int, fy: str = "FY2027"):
     """
     Get Services-only computed data for any chart slide that has a Services mirror.
 
@@ -2023,14 +2023,14 @@ async def get_slide_services_data(slide_no: int):
     revenue. Targets are not produced for Services and are omitted on the frontend.
     """
     try:
-        result = await compute_slide_services_data(db, slide_no)
+        result = await compute_slide_services_data(db, slide_no, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute services slide {slide_no} data: {str(e)}")
 
 
 @router.get("/slides/services-q1-snapshot")
-async def get_services_q1_snapshot_data(region: str = "Overall", quarter: str = "Q2"):
+async def get_services_q1_snapshot_data(region: str = "Overall", quarter: str = "Q2", fy: str = "FY2027"):
     """Get the latest Services weekly snapshot chart data for the selected quarter."""
     try:
         # DEBUG: Log what data is being selected
@@ -2042,7 +2042,7 @@ async def get_services_q1_snapshot_data(region: str = "Overall", quarter: str = 
         if latest_doc:
             print(f"[DEBUG] Services Snapshot ({quarter}) - Using upload_week: {latest_doc.get('upload_week')}, created_at: {latest_doc.get('created_at')}")
 
-        result = await compute_services_q1_snapshot_data(db, region, quarter)
+        result = await compute_services_q1_snapshot_data(db, region, quarter, target_fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute Services snapshot data: {str(e)}")
@@ -2089,15 +2089,16 @@ async def debug_services_uploads():
 
 
 @router.get("/slides/order-backlog")
-async def get_order_backlog_data(region: str = "Overall", services: bool = False):
+async def get_order_backlog_data(region: str = "Overall", services: bool = False, fy: str = "FY2027"):
     """
     Get computed data for the Order Backlog slide.
     Pass ?region=Overall or specific region names to filter.
     Pass ?services=true to filter by OPP_Type='Service' (Services-only backlog).
+    Pass ?fy=FY2028 to filter by fiscal year.
     """
     try:
         opp_type_filter = "Service" if services else None
-        result = await compute_order_backlog_data(db, region, opp_type_filter=opp_type_filter)
+        result = await compute_order_backlog_data(db, region, opp_type_filter=opp_type_filter, fy=fy)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compute order backlog data: {str(e)}")
@@ -2176,6 +2177,7 @@ class SlideInputEntry(BaseModel):
     week_recorded: Optional[int] = None # Week when this data was entered
     region: Optional[str] = None
     service_type: Optional[str] = "ALL"
+    fy: Optional[str] = "FY2027"
 
 SLIDE_REGION_MAP = {
     5: "Overall",
@@ -2186,15 +2188,15 @@ SLIDE_REGION_MAP = {
     21: "Japan",
     24: "KANZ",
     27: "Management",
-    30: "APAC",
+    30: "ROW",
 }
 
 @router.get("/slide-inputs/{slide_identifier}")
-async def get_slide_inputs(slide_identifier: str, table_name: Optional[str] = None):
+async def get_slide_inputs(slide_identifier: str, table_name: Optional[str] = None, fy: str = "FY2027"):
     """
     Get all manual inputs for a specific slide with cross-slide region and service propagation.
     slide_identifier can be an integer (old slide_no) or string (new slide_id).
-    Optionally filter by table_name.
+    Optionally filter by table_name and fy.
     """
     try:
         coll = get_collection("weekly_tracker_user_input")
@@ -2254,6 +2256,13 @@ async def get_slide_inputs(slide_identifier: str, table_name: Optional[str] = No
             else:
                 query["table_name"] = table_name
 
+        # Apply FY filter: legacy documents without 'fy' are defaulted to FY2027
+        fy_condition = {"$or": [{"fy": fy}, {"fy": {"$exists": False}}]} if fy == "FY2027" else {"fy": fy}
+        if query:
+            query = {"$and": [query, fy_condition]}
+        else:
+            query = fy_condition
+
         cursor = coll.find(query).sort("row_index", 1)
         entries = []
         seen_ids = set()
@@ -2272,12 +2281,13 @@ async def get_slide_inputs(slide_identifier: str, table_name: Optional[str] = No
 @router.post("/slide-inputs")
 async def add_slide_input(entry: SlideInputEntry):
     """
-    Add a new manual input row for a slide.
+    Add a new manual input row for a slide with FY metadata.
     """
     try:
         coll = get_collection("weekly_tracker_user_input")
         entry_dict = entry.dict()
         entry_dict["date_updated"] = datetime.now()
+        entry_dict["fy"] = entry.fy or "FY2027"
         
         # Calculate current week if not provided
         if entry_dict.get("week_recorded") is None:
@@ -2285,7 +2295,7 @@ async def add_slide_input(entry: SlideInputEntry):
         
         # Auto-assign row_index if not provided
         if entry_dict.get("row_index") is None:
-            query = {"table_name": entry.table_name}
+            query = {"table_name": entry.table_name, "fy": entry_dict["fy"]}
             if entry.slide_id:
                 query["slide_id"] = entry.slide_id
             elif entry.slide_no is not None:
@@ -2322,6 +2332,7 @@ async def update_slide_input(input_id: str, entry: SlideInputEntry):
         coll = get_collection("weekly_tracker_user_input")
         update_dict = entry.dict()
         update_dict["date_updated"] = datetime.now()
+        update_dict["fy"] = entry.fy or "FY2027"
         
         if update_dict.get("week_recorded") is None:
              update_dict["week_recorded"] = datetime.now().isocalendar()[1]
@@ -2832,24 +2843,30 @@ class WhaleAccountEntry(BaseModel):
     text_data: str
     region: Optional[str] = None
     is_old_data: Optional[bool] = False
+    fy: Optional[str] = "FY2027"
 
 @router.get("/whale-accounts/names")
-async def get_whale_account_names(region: Optional[str] = None):
+async def get_whale_account_names(region: Optional[str] = None, fy: str = "FY2027"):
     try:
         coll = get_collection("whale_accounts")
-        query = {}
-        if region:
-            query["region"] = region
+        fy_condition = {"$or": [{"fy": fy}, {"fy": {"$exists": False}}]} if fy == "FY2027" else {"fy": fy}
+        query = {"region": region} if region else {}
+        if query:
+            query = {"$and": [query, fy_condition]}
+        else:
+            query = fy_condition
         names = await coll.distinct("account_name", query)
         return [n for n in names if n]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/whale-accounts/{account_name}")
-async def get_whale_account_entries(account_name: str):
+async def get_whale_account_entries(account_name: str, fy: str = "FY2027"):
     try:
         coll = get_collection("whale_accounts")
-        cursor = coll.find({"account_name": account_name}).sort("date_updated", -1)
+        fy_condition = {"$or": [{"fy": fy}, {"fy": {"$exists": False}}]} if fy == "FY2027" else {"fy": fy}
+        query = {"$and": [{"account_name": account_name}, fy_condition]}
+        cursor = coll.find(query).sort("date_updated", -1)
         entries = []
         async for doc in cursor:
             doc["_id"] = str(doc["_id"])
@@ -2870,9 +2887,11 @@ async def get_whale_account_entries(account_name: str):
 async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry):
     try:
         coll = get_collection("whale_accounts")
+        fy_val = payload.fy or "FY2027"
         doc = await coll.find_one({
             "account_name": account_name,
-            "date_updated": payload.date_updated
+            "date_updated": payload.date_updated,
+            "fy": fy_val
         })
         
         now = datetime.utcnow()
@@ -2905,7 +2924,8 @@ async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry
                         "week_updated": payload.week_updated,
                         "updated_at": now,
                         "region": payload.region,
-                        "is_old_data": payload.is_old_data
+                        "is_old_data": payload.is_old_data,
+                        "fy": fy_val
                     },
                     "$push": {
                         "variants": new_variant
@@ -2922,6 +2942,7 @@ async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry
                 "updated_at": now,
                 "region": payload.region,
                 "is_old_data": payload.is_old_data,
+                "fy": fy_val,
                 "variants": [new_variant]
             })
         
@@ -2930,11 +2951,12 @@ async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/whale-accounts/stats/{region}/{week}")
-async def get_whale_account_stats(region: str, week: int):
+async def get_whale_account_stats(region: str, week: int, fy: str = "FY2027"):
     try:
         coll = get_collection("whale_accounts")
+        fy_condition = {"$or": [{"fy": fy}, {"fy": {"$exists": False}}]} if fy == "FY2027" else {"fy": fy}
         pipeline = [
-            {"$match": {"region": region, "week_updated": week}},
+            {"$match": {"$and": [{"region": region, "week_updated": week}, fy_condition]}},
             {"$group": {"_id": "$account_name"}}
         ]
         cursor = coll.aggregate(pipeline)

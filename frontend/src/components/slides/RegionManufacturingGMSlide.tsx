@@ -44,7 +44,7 @@ const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 0 
 type SortColumn = 'account_name' | 'revenue' | 'gross_margin' | 'gross_margin_pct';
 type SortDirection = 'asc' | 'desc';
 
-export default function RegionManufacturingGMSlide({ region }: { region: string }) {
+export default function RegionManufacturingGMSlide({ region, fy = "FY2027" }: { region: string; fy?: string }) {
     const plotRef = useRef<any>(null);
     const [data, setData] = useState<SlideData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -59,7 +59,7 @@ export default function RegionManufacturingGMSlide({ region }: { region: string 
             try {
                 setLoading(true);
                 const response = await fetch(
-                    `/api/admin/slides/region-manufacturing-gross-margin?region=${encodeURIComponent(region)}`
+                    `/api/admin/slides/region-manufacturing-gross-margin?region=${encodeURIComponent(region)}&fy=${fy}`
                 );
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const result: SlideData = await response.json();
@@ -73,7 +73,7 @@ export default function RegionManufacturingGMSlide({ region }: { region: string 
                 setLoading(false);
             }
         })();
-    }, [region]);
+    }, [region, fy]);
 
     // ── Summary row values ──────────────────────────────────────────
     const activeSummary = useMemo<RegionSummary>(() => {

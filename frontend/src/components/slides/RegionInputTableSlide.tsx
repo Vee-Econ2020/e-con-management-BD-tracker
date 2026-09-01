@@ -27,7 +27,7 @@ const ROW_CONFIG = [
     { id: 'pending_opps_value', label: "Total Pending Opportunities Values", icon: '💰' },
 ];
 
-export function RegionInputTableSlide({ title, slideId, isEditing }: RegionInputTableProps) {
+export function RegionInputTableSlide({ title, slideId, isEditing, fy = "FY2027" }: RegionInputTableProps & { fy?: string }) {
     const [currentWeek, setCurrentWeek] = useState<number | null>(null);
     const [lastWeekData, setLastWeekData] = useState<Record<string, string>>({});
     const [currentWeekData, setCurrentWeekData] = useState<Record<string, string>>({});
@@ -45,13 +45,13 @@ export function RegionInputTableSlide({ title, slideId, isEditing }: RegionInput
         if (currentWeek !== null) {
             fetchData();
         }
-    }, [currentWeek, slideId]);
+    }, [currentWeek, slideId, fy]);
 
     const fetchData = async () => {
         if (currentWeek === null) return;
         setLoading(true);
         try {
-            const res = await fetch(`/api/admin/slide-inputs/${slideId}`);
+            const res = await fetch(`/api/admin/slide-inputs/${slideId}?fy=${fy}`);
             if (!res.ok) throw new Error("Failed to fetch inputs");
             const allInputs: ActivityInput[] = await res.json();
 
@@ -82,7 +82,7 @@ export function RegionInputTableSlide({ title, slideId, isEditing }: RegionInput
 
     const refetchIds = async () => {
         if (currentWeek === null) return;
-        const res = await fetch(`/api/admin/slide-inputs/${slideId}`);
+        const res = await fetch(`/api/admin/slide-inputs/${slideId}?fy=${fy}`);
         const allInputs: ActivityInput[] = await res.json();
         const idMap: Record<string, string> = {};
         const lastWeek = currentWeek - 1;
@@ -102,6 +102,12 @@ export function RegionInputTableSlide({ title, slideId, isEditing }: RegionInput
         setCurrentWeekIds(idMap);
     };
 
+    useEffect(() => {
+        const handleRefresh = () => refetchIds();
+        window.addEventListener('tracker_refresh_slides', handleRefresh);
+        return () => window.removeEventListener('tracker_refresh_slides', handleRefresh);
+    }, [currentWeek, slideId, fy]);
+
     const handleBlur = async (tableName: string, value: string) => {
         if (currentWeek === null) return;
         const entryId = currentWeekIds[tableName];
@@ -109,7 +115,8 @@ export function RegionInputTableSlide({ title, slideId, isEditing }: RegionInput
             slide_id: slideId,
             table_name: tableName,
             freeform_text: value,
-            week_recorded: currentWeek
+            week_recorded: currentWeek,
+            fy: fy
         };
         try {
             if (entryId) {
@@ -119,13 +126,14 @@ export function RegionInputTableSlide({ title, slideId, isEditing }: RegionInput
                     body: JSON.stringify(payload)
                 });
             } else {
-                const res = await fetch('/api/admin/slide-inputs', {
+                await fetch('/api/admin/slide-inputs', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                if (res.ok) refetchIds();
             }
+            await refetchIds();
+            window.dispatchEvent(new CustomEvent('tracker_refresh_checklist'));
         } catch (err) {
             console.error("Failed to save input:", err);
         }

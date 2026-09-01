@@ -34,6 +34,7 @@ def run_export():
     end_slide = sys.argv[5] if len(sys.argv) > 5 and sys.argv[5] != "None" else ""
     frontend_url = sys.argv[6] if len(sys.argv) > 6 and sys.argv[6] != "None" else "http://localhost:5173"
     regions = sys.argv[7] if len(sys.argv) > 7 and sys.argv[7] != "None" else ""
+    fy = sys.argv[8] if len(sys.argv) > 8 and sys.argv[8] != "None" else ""
 
     job_data = {
         "status": "processing",
@@ -55,6 +56,8 @@ def run_export():
         query_params.append(f"end={end_slide}")
     if regions:
         query_params.append(f"regions={regions}")
+    if fy:
+        query_params.append(f"fy={fy}")
 
     target_url = f"{frontend_url.rstrip('/')}/weekly?{'&'.join(query_params)}"
 

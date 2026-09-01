@@ -37,7 +37,7 @@ const getWeekNumber = (dateStr: string) => {
     return 1 + Math.ceil(dayDiff / 7);
 };
 
-export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps) {
+export function WhaleAccountSlide({ isEditing, region, fy = "FY2027" }: WhaleAccountSlideProps & { fy?: string }) {
     const [accountNames, setAccountNames] = useState<string[]>([]);
     const [selectedAccount, setSelectedAccount] = useState<string>('');
     const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -70,7 +70,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
 
     const fetchAccountNames = async () => {
         try {
-            const url = region ? `/api/admin/whale-accounts/names?region=${encodeURIComponent(region)}` : '/api/admin/whale-accounts/names';
+            const url = region ? `/api/admin/whale-accounts/names?region=${encodeURIComponent(region)}&fy=${fy}` : `/api/admin/whale-accounts/names?fy=${fy}`;
             const res = await fetch(url);
             const data = await res.json();
             const sortedNames = data.sort((a: string, b: string) => a.localeCompare(b));
@@ -92,12 +92,12 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
             .catch(err => console.error(err));
             
         fetchAccountNames();
-    }, []);
+    }, [region, fy]);
 
     const fetchEntries = async (account: string) => {
         if (!account) return;
         try {
-            const res = await fetch(`/api/admin/whale-accounts/${encodeURIComponent(account)}`);
+            const res = await fetch(`/api/admin/whale-accounts/${encodeURIComponent(account)}?fy=${fy}`);
             const data = await res.json();
             
             
@@ -252,17 +252,28 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
         }));
     };
 
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        const handleRefresh = () => {
+            if (selectedAccount) fetchEntries(selectedAccount);
+        };
+        window.addEventListener('tracker_refresh_slides', handleRefresh);
+        return () => window.removeEventListener('tracker_refresh_slides', handleRefresh);
+    }, [selectedAccount, fy]);
+
     const handleSave = async () => {
         if (!selectedAccount || !entries[selectedIndex]) return;
         
         const textToSave = latestTextRef.current || editableText;
         
-        const payload: WhaleAccountEntry = {
+        const payload: WhaleAccountEntry & { fy?: string } = {
             account_name: selectedAccount,
             date_updated: editableDate,
             week_updated: getWeekNumber(editableDate) || currentWeek || 0,
             text_data: textToSave,
-            region: region
+            region: region,
+            fy: fy
         };
         
         const existingEntry = entries[selectedIndex];
@@ -271,6 +282,7 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
             return;
         }
 
+        setIsSaving(true);
         try {
             await fetch(`/api/admin/whale-accounts/${encodeURIComponent(selectedAccount)}`, {
                 method: 'POST',
@@ -278,25 +290,28 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                 body: JSON.stringify(payload)
             });
             window.dispatchEvent(new Event('tracker_refresh_checklist'));
-            fetchEntries(selectedAccount);
+            await fetchEntries(selectedAccount);
             if (!accountNames.includes(selectedAccount)) {
-                fetchAccountNames();
+                await fetchAccountNames();
             }
         } catch (e) {
             console.error('Failed to save', e);
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleSaveOldData = async () => {
         if (!selectedAccount || currentWeek === null || !oldDataDate.trim() || !oldDataText.trim()) return;
         
-        const payload: WhaleAccountEntry = {
+        const payload: WhaleAccountEntry & { fy?: string } = {
             account_name: selectedAccount,
             date_updated: oldDataDate,
             week_updated: getWeekNumber(oldDataDate) || currentWeek,
             text_data: oldDataText,
             region: region,
-            is_old_data: true
+            is_old_data: true,
+            fy: fy
         };
         
         try {
@@ -732,19 +747,21 @@ export function WhaleAccountSlide({ isEditing, region }: WhaleAccountSlideProps)
                                     />
                                     <button 
                                         onClick={handleSave} 
+                                        disabled={isSaving}
                                         style={{ 
                                             padding: '0.4rem 1.2rem', 
-                                            backgroundColor: '#22c55e', 
+                                            backgroundColor: isSaving ? '#86efac' : '#22c55e', 
                                             color: 'white', 
                                             border: 'none', 
                                             borderRadius: '6px', 
-                                            cursor: 'pointer', 
+                                            cursor: isSaving ? 'wait' : 'pointer', 
                                             fontWeight: 'bold',
                                             fontSize: '1rem',
-                                            boxShadow: '0 2px 4px rgba(34, 197, 94, 0.2)'
+                                            boxShadow: '0 2px 4px rgba(34, 197, 94, 0.2)',
+                                            opacity: isSaving ? 0.8 : 1
                                         }}
                                     >
-                                        Done
+                                        {isSaving ? 'Saving...' : 'Done'}
                                     </button>
                                 </div>
                             ) : (

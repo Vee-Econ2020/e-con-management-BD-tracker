@@ -12,7 +12,7 @@ const formatCurrency = (value: number) => {
     return `$${(value / 1e6).toFixed(2)}M`;
 };
 
-export default function ServicesQ1SnapshotSlide({ region }: ServicesQ1SnapshotSlideProps) {
+export default function ServicesQ1SnapshotSlide({ region, fy = "FY2027" }: ServicesQ1SnapshotSlideProps & { fy?: string }) {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -24,7 +24,7 @@ export default function ServicesQ1SnapshotSlide({ region }: ServicesQ1SnapshotSl
                 setLoading(true);
                 // Add cache-busting to prevent stale data
                 const cacheBuster = new Date().getTime();
-                const response = await fetch(`/api/admin/slides/services-q1-snapshot?region=${encodeURIComponent(region)}&_cb=${cacheBuster}`, {
+                const response = await fetch(`/api/admin/slides/services-q1-snapshot?region=${encodeURIComponent(region)}&fy=${fy}&_cb=${cacheBuster}`, {
                     cache: 'no-store',
                     headers: {
                         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -52,7 +52,7 @@ export default function ServicesQ1SnapshotSlide({ region }: ServicesQ1SnapshotSl
         return () => {
             cancelled = true;
         };
-    }, [region]);
+    }, [region, fy]);
 
     const auditedPlotData = useMemo(() => {
         if (!data?.series) return [];

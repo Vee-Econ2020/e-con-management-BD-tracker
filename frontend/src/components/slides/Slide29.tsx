@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import { WeeklyTrendChart } from '../shared_charts/WeeklyTrendChart';
 
-export default function Slide29() {
+export default function Slide29({ fy = "FY2027" }: { fy?: string }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fy]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide29');
+            const response = await fetch(`/api/admin/slides/slide29?fy=${fy}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             if (result.error) throw new Error(result.error);
@@ -33,7 +33,7 @@ export default function Slide29() {
     return (
         <WeeklyTrendChart 
             data={data} 
-            title="Weekly Comparison - APAC Tracking" 
+            title="Weekly Comparison - ROW Tracking" 
         />
     );
 }

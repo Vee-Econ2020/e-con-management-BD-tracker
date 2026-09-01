@@ -1,4 +1,4 @@
-import React, { Component, ReactNode, useEffect, useState } from 'react';
+import { Component, type ReactNode, useEffect, useState } from 'react';
 import { WeeklyTrendChart } from '../shared_charts/WeeklyTrendChart';
 
 interface InvoiceChartSlideProps {
@@ -46,10 +46,9 @@ class ChartErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
  * Slide component for displaying 8-Week Invoiced Amount Trend
  * across Overall or individual regions.
  */
-export default function InvoiceChartSlide({
-    regionLabel,
+export default function InvoiceChartSlide({ regionLabel,
     region,
-}: InvoiceChartSlideProps) {
+    fy = "FY2027" }: InvoiceChartSlideProps & { fy?: string }) {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -59,7 +58,7 @@ export default function InvoiceChartSlide({
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`/api/admin/slides/invoice?region=${encodeURIComponent(region)}`);
+                const response = await fetch(`/api/admin/slides/invoice?region=${encodeURIComponent(region)}&fy=${fy}`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const result = await response.json();
                 if (result.error) throw new Error(result.error);

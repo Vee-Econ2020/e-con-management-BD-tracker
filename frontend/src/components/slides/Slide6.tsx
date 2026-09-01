@@ -23,19 +23,19 @@ interface Slide6Data {
     enable_animation?: boolean;
 }
 
-export default function Slide6() {
+export default function Slide6({ fy = "FY2027" }: { fy?: string }) {
     const [data, setData] = useState<Slide6Data | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchSlide6Data();
-    }, []);
+    }, [fy]);
 
     const fetchSlide6Data = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide6');
+            const response = await fetch(`/api/admin/slides/slide6?fy=${fy}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }

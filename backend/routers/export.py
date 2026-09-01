@@ -22,26 +22,24 @@ class ExportRequest(BaseModel):
     end_slide: Optional[int] = None
     regions: Optional[List[str]] = None
     frontend_url: Optional[str] = None
+    fy: Optional[str] = "FY2027"
 
 
 def cleanup_old_exports():
     """Remove PDF and status files older than 1 hour"""
     try:
         now = datetime.now()
-        for filename in os.listdir(EXPORTS_DIR):
-            file_path = os.path.join(EXPORTS_DIR, filename)
-            if os.path.isfile(file_path):
-                creation_time = datetime.fromtimestamp(os.path.getctime(file_path))
-                if now - creation_time > timedelta(hours=1):
-                    try:
-                        os.remove(file_path)
-                    except Exception:
-                        pass
+        for f in os.listdir(EXPORTS_DIR):
+            fp = os.path.join(EXPORTS_DIR, f)
+            if os.path.isfile(fp):
+                mtime = datetime.fromtimestamp(os.path.getmtime(fp))
+                if now - mtime > timedelta(hours=1):
+                    os.remove(fp)
     except Exception as e:
         print(f"[PDF Export Cleanup] Error cleaning exports: {e}")
 
 
-def spawn_pdf_worker(job_id: str, week: Optional[int], start_slide: Optional[int], end_slide: Optional[int], frontend_url: Optional[str], regions: Optional[List[str]] = None):
+def spawn_pdf_worker(job_id: str, week: Optional[int], start_slide: Optional[int], end_slide: Optional[int], frontend_url: Optional[str], regions: Optional[List[str]] = None, fy: str = "FY2027"):
     """Launch export_worker.py as an independent background process"""
     status_file = os.path.join(EXPORTS_DIR, f"{job_id}.json")
     pdf_filename = f"weekly-tracker-week-{week or 'current'}-{job_id[:8]}.pdf"
@@ -61,7 +59,8 @@ def spawn_pdf_worker(job_id: str, week: Optional[int], start_slide: Optional[int
         str(start_slide) if start_slide is not None else "None",
         str(end_slide) if end_slide is not None else "None",
         frontend_url or "http://localhost:5173",
-        regions_str
+        regions_str,
+        fy
     ]
 
     try:
@@ -99,7 +98,8 @@ async def start_pdf_export_job(req: ExportRequest, background_tasks: BackgroundT
         start_slide=req.start_slide,
         end_slide=req.end_slide,
         frontend_url=req.frontend_url,
-        regions=req.regions
+        regions=req.regions,
+        fy=req.fy
     )
 
     return {

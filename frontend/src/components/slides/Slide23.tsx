@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import { WeeklyTrendChart } from '../shared_charts/WeeklyTrendChart';
 
-export default function Slide23() {
+export default function Slide23({ fy = "FY2027" }: { fy?: string }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fy]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide23');
+            const response = await fetch(`/api/admin/slides/slide23?fy=${fy}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             if (result.error) throw new Error(result.error);

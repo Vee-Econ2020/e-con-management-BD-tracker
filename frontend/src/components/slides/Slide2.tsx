@@ -195,19 +195,19 @@ const TargetCard = ({ title, value, color, borderColor, prevValue }: { title: st
     );
 };
 
-export default function Slide2() {
+export default function Slide2({ fy = "FY2027" }: { fy?: string }) {
     const [data, setData] = useState<Slide2Data | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchSlide2Data();
-    }, []);
+    }, [fy]);
 
     const fetchSlide2Data = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide2');
+            const response = await fetch(`/api/admin/slides/slide2?fy=${fy}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             if (result.error) throw new Error(result.error);
@@ -284,8 +284,7 @@ export default function Slide2() {
                         fontWeight: 'bold',
                         color: '#9ca3af',
                         margin: '0'
-                    }}>
-                        FY2027 - week {data.current_week}
+                    }}>{fy} - week {data.current_week}
                     </h2>
                 </div>
 

@@ -582,14 +582,14 @@ async def transform_weekly_data(df, week, upload_date, db):
     
     # STEP 2: Fetch Zoho Forecast Changes (with MongoDB caching)
     print("\n[STEP 2/9] Fetching Zoho forecast timeline data...")
-    # Only fetch for April 1, 2026 Closed Won deals (as per business logic)
-    dataset_test_FY2027 = dataset[dataset['Closing Date'] == '2026-04-01']
-    dataset_test_FY2027 = dataset_test_FY2027[dataset_test_FY2027["Stage"] == "Closed Won"]
-    dataset_records_split = dataset_test_FY2027["Record Id"].str.split("_").str[1]
+    # Only fetch for April 1 Closed Won deals (FY2027 & FY2028 as per business logic)
+    dataset_test_fys = dataset[dataset['Closing Date'].isin(['2026-04-01', '2027-04-01'])]
+    dataset_test_fys = dataset_test_fys[dataset_test_fys["Stage"] == "Closed Won"]
+    dataset_records_split = dataset_test_fys["Record Id"].str.split("_").str[1]
     dataset_records_split = dataset_records_split.drop_duplicates()
     
     record_ids = dataset_records_split.dropna().tolist()
-    print(f"  → Processing {len(record_ids)} unique Record IDs (April 1 FY2027 Closed Won)...")
+    print(f"  → Processing {len(record_ids)} unique Record IDs (April 1 FY2027/FY2028 Closed Won)...")
     df_forecast_changes = await fetch_and_process_forecast_changes(record_ids, db, today)
     df_forecast_changes['Record Id'] = 'zcrm_' + df_forecast_changes['Record Id']
     print(f"  ✓ Forecast data ready: {len(df_forecast_changes)} records")
@@ -698,12 +698,12 @@ async def transform_weekly_data(df, week, upload_date, db):
     mapped_count = dataset_filtered['mRegion'].ne(dataset_filtered['nRegion']).sum()
     print(f"  → {mapped_count} records have mapped regions different from nRegion")
     
-    # STEP 8: Filter for FY2027 and Aggregate
-    print("\n[STEP 8/10] Filtering for FY2027 and aggregating...")
-    datasetFY27 = dataset_filtered[dataset_filtered['closing date Fy'] == 'FY2027']
-    print(f"  → FY2027 records: {len(datasetFY27)}")
+    # STEP 8: Filter for FY2027 and FY2028 and Aggregate
+    print("\n[STEP 8/10] Filtering for target FYs and aggregating...")
+    dataset_target_fys = dataset_filtered[dataset_filtered['closing date Fy'].isin(['FY2027', 'FY2028'])]
+    print(f"  → Target FY records: {len(dataset_target_fys)}")
     print("  → Grouping by: FY, Quarters, Category, mRegion (mapped region), OPP_Type...")
-    dataset_agg = datasetFY27.groupby(['closing date Fy', 'granular_QTR', 'closing date QTR', 'projection - category', 'mRegion', 'OPP_Type']).agg({'Weighted Amount': 'sum', 'Amount': 'sum'}).reset_index()
+    dataset_agg = dataset_target_fys.groupby(['closing date Fy', 'granular_QTR', 'closing date QTR', 'projection - category', 'mRegion', 'OPP_Type']).agg({'Weighted Amount': 'sum', 'Amount': 'sum'}).reset_index()
     print(f"  ✓ Aggregated to {len(dataset_agg)} distinct groups")
     
     # STEP 9: Add Metadata

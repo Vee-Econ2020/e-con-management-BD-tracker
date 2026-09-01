@@ -5,19 +5,19 @@ interface Slide27Props {
     isEditing?: boolean;
 }
 
-export default function Slide27({ isEditing = false }: Slide27Props) {
+export default function Slide27({ isEditing = false , fy = "FY2027" }: Slide27Props & { fy?: string }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fy]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide27');
+            const response = await fetch(`/api/admin/slides/slide27?fy=${fy}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             if (result.error) throw new Error(result.error);
@@ -40,6 +40,7 @@ export default function Slide27({ isEditing = false }: Slide27Props) {
             title="Management - Actuals vs Weighted Pipeline"
             slideNo={27}
             isEditing={isEditing}
+            fy={fy}
         />
     );
 }

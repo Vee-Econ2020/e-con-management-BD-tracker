@@ -1,26 +1,26 @@
 import { useEffect, useState } from 'react';
 import { OrderBacklogChart } from '../shared_charts/OrderBacklogChart';
 
-export default function Slide30_2_2() {
+export default function Slide30_2_2({ fy = "FY2027" }: { fy?: string }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fy]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/order-backlog?region=APAC');
+            const response = await fetch(`/api/admin/slides/order-backlog?region=ROW&fy=${fy}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             if (result.error) throw new Error(result.error);
             setData(result);
             setError(null);
         } catch (err) {
-            console.error('Failed to fetch APAC order backlog data:', err);
+            console.error('Failed to fetch ROW order backlog data:', err);
             setError(err instanceof Error ? err.message : 'Failed to load data');
         } finally {
             setLoading(false);
@@ -48,5 +48,5 @@ export default function Slide30_2_2() {
         );
     }
 
-    return <OrderBacklogChart data={data} title="Order Backlog APAC" />;
+    return <OrderBacklogChart data={data} title="Order Backlog ROW" />;
 }

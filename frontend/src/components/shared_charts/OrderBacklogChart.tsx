@@ -17,12 +17,12 @@ function getBacklogTarget(data: any, title: string): number {
     const isServices = data?.is_services || titleUpper.includes('SERVICE');
 
     if (isServices) {
-        if (titleUpper.includes('APAC') || regionUpper.includes('APAC') ||
+        if (titleUpper.includes('APAC') || titleUpper.includes('ROW') || regionUpper.includes('APAC') || regionUpper.includes('ROW') ||
             titleUpper.includes('ASEAN') || regionUpper.includes('ASEAN') ||
             titleUpper.includes('JAPAN') || regionUpper.includes('JAPAN') ||
             titleUpper.includes('KANZ') || regionUpper.includes('KANZ') ||
             titleUpper.includes('KOREA') || regionUpper.includes('KOREA')) {
-            return 0; // No target for Service order backlog for APAC, ASEAN, Japan, Korea
+            return 0; // No target for Service order backlog for APAC, ROW, ASEAN, Japan, Korea
         }
         if (titleUpper.includes('WEST') || regionUpper.includes('WEST')) return 2750000 * 1.30;
         if (titleUpper.includes('EUROPE') || regionUpper.includes('EUROPE')) return 1500000 * 1.30;
@@ -33,7 +33,7 @@ function getBacklogTarget(data: any, title: string): number {
     if (titleUpper.includes('WEST') || regionUpper.includes('WEST')) return 18000000 * 1.30; // $23.40M (Stretch)
     if (titleUpper.includes('EUROPE') || regionUpper.includes('EUROPE')) return 16000000 * 1.30; // $20.80M (Stretch)
     if (titleUpper.includes('EAST') || regionUpper.includes('EAST')) return 24000000 * 1.30; // $31.20M (Stretch)
-    if (titleUpper.includes('APAC') || regionUpper.includes('APAC')) return 8300000 * 1.30; // $10.79M (Base sum Japan+ASEAN+KANZ)
+    if (titleUpper.includes('APAC') || titleUpper.includes('ROW') || regionUpper.includes('APAC') || regionUpper.includes('ROW')) return 8300000 * 1.30; // $10.79M (Base sum Japan+ASEAN+KANZ)
     if (titleUpper.includes('ASEAN') || regionUpper.includes('ASEAN')) return 3500000 * 1.30; // $4.55M (Base)
     if (titleUpper.includes('JAPAN') || regionUpper.includes('JAPAN')) return 2800000 * 1.30; // $3.64M (Base)
     if (titleUpper.includes('KANZ') || regionUpper.includes('KANZ')) return 2000000 * 1.30; // $2.60M (Base)

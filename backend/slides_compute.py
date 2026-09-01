@@ -105,8 +105,20 @@ REGION_PLACEHOLDERS = {
         },
         "pipeline": {
             "weeks": ["Week 50", "Week 51", "Week 52", "Week 02", "Week 03", "Week 04", "Week 05"],
-            "actual": [4107000, 4294000, 4294000, 4294000, 5044000, 5284000, 5247000],
-            "weighted": [1324000, 1382000, 1382000, 1607000, 1607000, 1679000, 2099000]
+            "actual": [2263000, 2263000, 2263000, 2263000, 2263000, 2263000, 2318000],
+            "weighted": [1679000, 1041000, 1191000, 1416000, 1554000, 1679000, 2099000]
+        }
+    },
+    "ROW": {
+        "trend": {
+            "weeks": ["Week 50", "Week 51", "Week 52", "Week 02", "Week 03", "Week 04", "Week 05"],
+            "po": [1922000, 1922000, 2072000, 2072000, 2210000, 2263000, 2318000],
+            "total": [3247000, 3304000, 3454000, 3679000, 3817000, 3942000, 4417000]
+        },
+        "pipeline": {
+            "weeks": ["Week 50", "Week 51", "Week 52", "Week 02", "Week 03", "Week 04", "Week 05"],
+            "actual": [2263000, 2263000, 2263000, 2263000, 2263000, 2263000, 2318000],
+            "weighted": [1679000, 1041000, 1191000, 1416000, 1554000, 1679000, 2099000]
         }
     },
     "Legacy": {
@@ -272,7 +284,8 @@ async def _compute_cumulative_generic(
     db: AsyncIOMotorDatabase,
     region_name: str,
     target_category: str,
-    filter_query: dict = None
+    filter_query: dict = None,
+    fy: str = "FY2027"
 ) -> Dict:
     """
     Generic function to compute Cumulative Performance vs Targets (Slide 3/7 logic).
@@ -282,7 +295,7 @@ async def _compute_cumulative_generic(
         region_name: Name of region (e.g., 'US West', 'Overall')
         target_category: Category in target_settings ('US West', 'Overall - region')
         filter_query: MongoDB match query for weekly_tracker_data (e.g. {'mRegion': 'US West'})
-        
+        fy: Financial year        
     Returns:
         Dict with slide data
     """
@@ -302,7 +315,7 @@ async def _compute_cumulative_generic(
     
     query = {
         "ppt_type": "Weekly Tracker",
-        "financial_year": "FY2027",
+        "financial_year": fy,
         "category_type": target_category,
         "financial_qtr": {"$in": quarter_order}
     }
@@ -329,11 +342,12 @@ async def _compute_cumulative_generic(
     print("\n[2/4] Fetching weekly tracker data...")
     dataset_agg = await get_current_or_closest_week_data(db)
     
-    if dataset_agg is None or dataset_agg.empty:
-        return {"error": "No data available"}
+    # Apply Region and FY Filter
+    print(f"  → Filtering by FY: {fy}")
+    if dataset_agg is not None and not dataset_agg.empty and "closing date Fy" in dataset_agg.columns:
+        dataset_agg = dataset_agg[dataset_agg["closing date Fy"] == fy].copy()
     
-    # Apply Region Filter
-    if filter_query:
+    if filter_query and dataset_agg is not None and not dataset_agg.empty:
         print(f"  → Filtering by: {filter_query}")
         for key, val in filter_query.items():
             if key in dataset_agg.columns:
@@ -346,16 +360,14 @@ async def _compute_cumulative_generic(
             else:
                 print(f"  ⚠ Column {key} not found in dataset")
         
-        if dataset_agg.empty:
-            return {"error": f"No data available for {region_name}"}
-
-    week_number = int(dataset_agg['week'].iloc[0])
-    print(f"✓ Using data from Week {week_number}")
-
-    # 4. Aggregating data
-    print("\\n[3/4] Aggregating data...")
-    dataset_agg['granular_QTR'] = dataset_agg['granular_QTR'].fillna('Unknown')
-    summary = dataset_agg.groupby(['granular_QTR', 'projection - category'])['Weighted Amount'].sum().unstack(fill_value=0)
+    if dataset_agg is None or dataset_agg.empty:
+        week_number = None
+        summary = pd.DataFrame()
+    else:
+        week_number = int(dataset_agg['week'].iloc[0])
+        print(f"✓ Using data from Week {week_number}")
+        dataset_agg['granular_QTR'] = dataset_agg['granular_QTR'].fillna('Unknown')
+        summary = dataset_agg.groupby(['granular_QTR', 'projection - category'])['Weighted Amount'].sum().unstack(fill_value=0)
 
     # 5. Calculate cumulative sums
     print("\\n[4/4] Applying cumulative logic...")
@@ -514,7 +526,8 @@ async def _compute_trend_generic(
     db: AsyncIOMotorDatabase,
     region_name: str,
     target_category: str,
-    filter_query: dict = None
+    filter_query: dict = None,
+    fy: str = "FY2027"
 ) -> Dict:
     """
     Generic function to compute 8-Week Historical Trend (Slide 4/8 logic).
@@ -536,7 +549,7 @@ async def _compute_trend_generic(
     q4_base = None
     async for doc in collection_targets.find({
         "ppt_type": "Weekly Tracker",
-        "financial_year": "FY2027",
+        "financial_year": fy,
         "category_type": target_category
     }):
         val = doc.get("target_value", 0.0)
@@ -558,9 +571,12 @@ async def _compute_trend_generic(
     print("\\n[2/3] Fetching available database data...")
     collection_data = db["weekly_tracker_data"]
     
-    match_stage = filter_query if filter_query else {}
+    match_stage = filter_query.copy() if filter_query else {}
     if not match_stage and region_name == "Overall":
-         match_stage = {} # empty match for all 
+         match_stage = {} 
+         
+    # Ensure we only fetch for the requested FY
+    match_stage["closing date Fy"] = fy
 
     pipeline = []
     if match_stage:
@@ -602,7 +618,7 @@ async def _compute_trend_generic(
     # hardcoded placeholders represent total-region values, not type slices.
     is_opp_type_filtered = bool(filter_query and "OPP_Type" in filter_query)
 
-    if is_opp_type_filtered:
+    if is_opp_type_filtered or fy != "FY2027":
         ph_weeks, ph_po, ph_total = [], [], []
     else:
         # Get placeholders
@@ -623,8 +639,11 @@ async def _compute_trend_generic(
             # default to empty if not found
             ph_weeks, ph_po, ph_total = [], [], []
 
-    # Use DB data for weeks > 5 (assuming placeholders cover up to Week 05)
-    db_indices = [i for i, w in enumerate(db_weeks) if w > 5]
+    # Use DB data (filter >5 for FY2027 to avoid overlap with placeholders, or all weeks for other FYs)
+    if fy == "FY2027":
+        db_indices = [i for i, w in enumerate(db_weeks) if w > 5]
+    else:
+        db_indices = list(range(len(db_weeks)))
     filt_db_weeks = [f"Week {str(db_weeks[i]).zfill(2)}" for i in db_indices]
     filt_db_po = [db_po[i] for i in db_indices]
     filt_db_total = [db_total[i] for i in db_indices]
@@ -636,6 +655,31 @@ async def _compute_trend_generic(
     final_weeks = combined_weeks[-8:] if len(combined_weeks) >= 8 else combined_weeks
     final_po = combined_po[-8:] if len(combined_po) >= 8 else combined_po
     final_total = combined_total[-8:] if len(combined_total) >= 8 else combined_total
+
+    if len(final_weeks) < 8:
+        recent_weeks_docs = await collection_data.aggregate([
+            {"$group": {"_id": "$week"}},
+            {"$sort": {"_id": 1}}
+        ]).to_list(length=None)
+        all_upload_weeks = [doc["_id"] for doc in recent_weeks_docs if isinstance(doc.get("_id"), int) and doc["_id"] > 5]
+        latest_8_weeks = all_upload_weeks[-8:] if len(all_upload_weeks) >= 8 else all_upload_weeks
+        if latest_8_weeks:
+            final_weeks = [f"Week {str(w).zfill(2)}" for w in latest_8_weeks]
+            week_val_map_po = dict(zip(filt_db_weeks, filt_db_po))
+            week_val_map_total = dict(zip(filt_db_weeks, filt_db_total))
+            final_po = [float(week_val_map_po.get(w, 0.0)) for w in final_weeks]
+            final_total = [float(week_val_map_total.get(w, 0.0)) for w in final_weeks]
+        else:
+            final_weeks = ["Week 35"]
+            final_po = [0.0]
+            final_total = [0.0]
+
+    # Trim leading zero weeks if prior weeks have no data
+    first_data_idx = next((i for i, (po_v, tot_v) in enumerate(zip(final_po, final_total)) if po_v > 0 or tot_v > 0), None)
+    if first_data_idx is not None and first_data_idx > 0:
+        final_weeks = final_weeks[first_data_idx:]
+        final_po = final_po[first_data_idx:]
+        final_total = final_total[first_data_idx:]
 
     # 4. Generate Annotations
     styles = {
@@ -699,7 +743,8 @@ async def _compute_pipeline_generic(
     db: AsyncIOMotorDatabase,
     region_name: str,
     target_category: str,
-    filter_query: dict = None
+    filter_query: dict = None,
+    fy: str = "FY2027"
 ) -> Dict:
     """
     Generic function to compute Actual vs Weighted Pipeline (Slide 5/9 logic).
@@ -717,7 +762,7 @@ async def _compute_pipeline_generic(
     q4_base = None
     async for doc in collection_targets.find({
         "ppt_type": "Weekly Tracker",
-        "financial_year": "FY2027",
+        "financial_year": fy,
         "category_type": target_category
     }):
         val = doc.get("target_value", 0.0)
@@ -743,6 +788,7 @@ async def _compute_pipeline_generic(
     
     match_stage = filter_query.copy() if filter_query else {}
     match_stage["projection - category"] = "Pipeline"
+    match_stage["closing date Fy"] = fy
     
     pipeline = [
         {"$match": match_stage},
@@ -770,7 +816,7 @@ async def _compute_pipeline_generic(
     # Skip placeholders for OPP_Type-filtered (e.g. Services-only) views.
     is_opp_type_filtered = bool(filter_query and "OPP_Type" in filter_query)
 
-    if is_opp_type_filtered:
+    if is_opp_type_filtered or fy != "FY2027":
         ph_weeks, ph_actual, ph_weighted = [], [], []
     else:
         ph_data = REGION_PLACEHOLDERS.get(region_name, REGION_PLACEHOLDERS.get("Overall - region"))
@@ -788,7 +834,10 @@ async def _compute_pipeline_generic(
         else:
             ph_weeks, ph_actual, ph_weighted = [], [], []
         
-    db_indices = [i for i, w in enumerate(db_weeks) if w > 5]
+    if fy == "FY2027":
+        db_indices = [i for i, w in enumerate(db_weeks) if w > 5]
+    else:
+        db_indices = list(range(len(db_weeks)))
     filt_db_weeks = [f"Week {str(db_weeks[i]).zfill(2)}" for i in db_indices]
     filt_db_actual = [db_actual[i] for i in db_indices]
     filt_db_weighted = [db_weighted[i] for i in db_indices]
@@ -800,6 +849,31 @@ async def _compute_pipeline_generic(
     final_weeks = combined_weeks[-8:] if len(combined_weeks) >= 8 else combined_weeks
     final_actual = combined_actual[-8:] if len(combined_actual) >= 8 else combined_actual
     final_weighted = combined_weighted[-8:] if len(combined_weighted) >= 8 else combined_weighted
+
+    if len(final_weeks) < 8:
+        recent_weeks_docs = await collection_data.aggregate([
+            {"$group": {"_id": "$week"}},
+            {"$sort": {"_id": 1}}
+        ]).to_list(length=None)
+        all_upload_weeks = [doc["_id"] for doc in recent_weeks_docs if isinstance(doc.get("_id"), int) and doc["_id"] > 5]
+        latest_8_weeks = all_upload_weeks[-8:] if len(all_upload_weeks) >= 8 else all_upload_weeks
+        if latest_8_weeks:
+            final_weeks = [f"Week {str(w).zfill(2)}" for w in latest_8_weeks]
+            week_val_map_actual = dict(zip(filt_db_weeks, filt_db_actual))
+            week_val_map_weighted = dict(zip(filt_db_weeks, filt_db_weighted))
+            final_actual = [float(week_val_map_actual.get(w, 0.0)) for w in final_weeks]
+            final_weighted = [float(week_val_map_weighted.get(w, 0.0)) for w in final_weeks]
+        else:
+            final_weeks = ["Week 35"]
+            final_actual = [0.0]
+            final_weighted = [0.0]
+
+    # Trim leading zero weeks if prior weeks have no data
+    first_data_idx = next((i for i, (act_v, w_v) in enumerate(zip(final_actual, final_weighted)) if act_v > 0 or w_v > 0), None)
+    if first_data_idx is not None and first_data_idx > 0:
+        final_weeks = final_weeks[first_data_idx:]
+        final_actual = final_actual[first_data_idx:]
+        final_weighted = final_weighted[first_data_idx:]
 
     # 4. Generate Annotations & Styles
     styles = {
@@ -845,7 +919,7 @@ async def _compute_pipeline_generic(
 
 
 
-async def compute_slide1_data(db: AsyncIOMotorDatabase) -> Dict[str, str]:
+async def compute_slide1_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict[str, str]:
     """
     Compute data for Slide 1.
     
@@ -857,29 +931,38 @@ async def compute_slide1_data(db: AsyncIOMotorDatabase) -> Dict[str, str]:
     
     Args:
         db: MongoDB database instance
+        fy: Fiscal year filter
         
     Returns:
         Dictionary with formatted values for display
     """
     print("\n" + "=" * 70)
-    print("COMPUTING SLIDE 1 DATA")
+    print(f"COMPUTING SLIDE 1 DATA ({fy})")
     print("=" * 70)
     
-    # Step 1: Get current/closest week data
-    print("\n[1/3] Fetching weekly tracker data...")
+    # Step 1: Get target settings for requested FY
+    print("\n[1/3] Fetching target settings...")
+    targets = await get_target_settings(db, fy=fy)
+    
+    # Step 2: Get current/closest week data
+    print("\n[2/3] Fetching weekly tracker data...")
     dataset_agg = await get_current_or_closest_week_data(db)
+    
+    if dataset_agg is not None and not dataset_agg.empty and 'closing date Fy' in dataset_agg.columns:
+        dataset_agg = dataset_agg[dataset_agg['closing date Fy'] == fy].copy()
     
     if dataset_agg is None or dataset_agg.empty:
         print("✗ No data available for computation")
         return {
-            "stretch_target": "0.00",
-            "base_target": "0.00",
-            "total_po": "0.00",
-            "total_w_forecast": "0.00",
-            "error": "No data available"
+            "week": None,
+            "stretch_target": format_number(targets.get("stretch_target", 0.0)),
+            "base_target": format_number(targets.get("base_target", 0.0)),
+            "total_po": "N/A",
+            "total_w_forecast": "N/A",
+            "enable_animation": False
         }
     
-    print(f"✓ Loaded {len(dataset_agg)} records")
+    print(f"✓ Loaded {len(dataset_agg)} records for {fy}")
     
     # Extract week number from the data
     week_number = None
@@ -889,10 +972,6 @@ async def compute_slide1_data(db: AsyncIOMotorDatabase) -> Dict[str, str]:
             print(f"  → Week: {week_number}")
     except Exception as e:
         print(f"  ⚠ Could not extract week number: {e}")
-    
-    # Step 2: Get target settings
-    print("\n[2/3] Fetching target settings...")
-    targets = await get_target_settings(db)
     
     # Step 3: Compute metrics
     print("\n[3/3] Computing metrics...")
@@ -994,7 +1073,7 @@ async def get_previous_week_data(db: AsyncIOMotorDatabase, current_week: int) ->
     return pd.DataFrame(data) if data else None
 
 
-async def compute_slide2_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide2_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 2.
     
@@ -1020,6 +1099,9 @@ async def compute_slide2_data(db: AsyncIOMotorDatabase) -> Dict:
     if current_data is None or current_data.empty:
         print("✗ No current week data available")
         return {"error": "No data available"}
+
+    if 'closing date Fy' in current_data.columns:
+        current_data = current_data[current_data['closing date Fy'] == fy].copy()
     
     # Extract current week number
     current_week = None
@@ -1035,15 +1117,18 @@ async def compute_slide2_data(db: AsyncIOMotorDatabase) -> Dict:
     print("\n[2/3] Fetching previous week data...")
     previous_data = await get_previous_week_data(db, current_week)
     
+    if previous_data is not None and not previous_data.empty and 'closing date Fy' in previous_data.columns:
+        previous_data = previous_data[previous_data['closing date Fy'] == fy].copy()
+
     if previous_data is None or previous_data.empty:
-        print("✗ No previous week data available")
-        return {"error": "No previous week data available"}
+        # Fallback: if no previous week data for fy, use current_data as previous_data
+        previous_data = current_data.copy()
     
-    previous_week = int(previous_data['week'].iloc[0])
+    previous_week = int(previous_data['week'].iloc[0]) if 'week' in previous_data.columns and not previous_data.empty else current_week
     
     # Step 3: Get target settings
     print("\n[3/3] Fetching target settings and computing metrics...")
-    targets = await get_target_settings(db)
+    targets = await get_target_settings(db, fy=fy)
     
     base_target = targets["base_target"]
     stretch_target = targets["stretch_target"]
@@ -1152,7 +1237,7 @@ async def compute_slide2_data(db: AsyncIOMotorDatabase) -> Dict:
     
     return result
 
-async def compute_slide3_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide3_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 3 (Cumulative Performance vs Targets).
     
@@ -1166,11 +1251,12 @@ async def compute_slide3_data(db: AsyncIOMotorDatabase) -> Dict:
         db,
         region_name="Overall",
         target_category="Overall - region",
-        filter_query=None
+        filter_query=None,
+        fy=fy
     )
 
 
-async def compute_slide4_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide4_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 4 (8-Week Historical Trend).
     
@@ -1184,11 +1270,12 @@ async def compute_slide4_data(db: AsyncIOMotorDatabase) -> Dict:
         db,
         region_name="Overall",
         target_category="Overall - region",
-        filter_query=None
+        filter_query=None,
+        fy=fy
     )
 
 
-async def compute_slide5_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide5_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 5 (Pipeline Comparison).
     """
@@ -1196,10 +1283,11 @@ async def compute_slide5_data(db: AsyncIOMotorDatabase) -> Dict:
         db,
         region_name="Overall",
         target_category="Overall - region",
-        filter_query=None
+        filter_query=None,
+        fy=fy
     )
 
-async def compute_slide6_data(db):
+async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
     """
     Compute data for Slide 6 of the presentation.
     Region-wise PO breakdown with Q4 and Current QTR targets.
@@ -1268,7 +1356,7 @@ async def compute_slide6_data(db):
     # Fetch all relevant targets in one query
     async for doc in collection_targets.find({
         "ppt_type": "Weekly Tracker",
-        "financial_year": "FY2027",
+        "financial_year": fy,
         "financial_qtr": {"$in": all_quarters},
         "category_type": {"$in": region_order}
     }):
@@ -1294,7 +1382,8 @@ async def compute_slide6_data(db):
         {
             "$match": {
                 "week": {"$lte": target_week},
-                "projection - category": "Closed Won"
+                "projection - category": "Closed Won",
+                "closing date Fy": fy
             }
         },
         {
@@ -1541,7 +1630,7 @@ async def compute_slide6_data(db):
 # SLIDE 7, 8, 9: US WEST REGION-SPECIFIC SLIDES
 # ============================================================================
 
-async def compute_slide7_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide7_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 7 (US West Cumulative Performance vs Targets).
     """
@@ -1549,12 +1638,13 @@ async def compute_slide7_data(db: AsyncIOMotorDatabase) -> Dict:
         db,
         region_name="US West",
         target_category="US West",
-        filter_query={"mRegion": "US West"}
+        filter_query={"mRegion": "US West"},
+        fy=fy
     )
 
 
 
-async def compute_slide8_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide8_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 8 (US West Pipeline Tracking Over Time).
     """
@@ -1562,12 +1652,13 @@ async def compute_slide8_data(db: AsyncIOMotorDatabase, week: int = None) -> Dic
         db,
         region_name="US West",
         target_category="US West",
-        filter_query={"mRegion": "US West"}
+        filter_query={"mRegion": "US West"},
+        fy=fy
     )
 
 
 
-async def compute_slide9_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide9_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 9 (US West Actuals vs Pipeline Weekly Bars).
     """
@@ -1575,10 +1666,11 @@ async def compute_slide9_data(db: AsyncIOMotorDatabase, week: int = None) -> Dic
         db,
         region_name="US West",
         target_category="US West",
-        filter_query={"mRegion": "US West"}
+        filter_query={"mRegion": "US West"},
+        fy=fy
     )
 
-async def compute_slide10_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide10_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 10 (Europe Cumulative Performance vs Targets).
     """
@@ -1586,11 +1678,12 @@ async def compute_slide10_data(db: AsyncIOMotorDatabase) -> Dict:
         db,
         region_name="Europe",
         target_category="Europe",
-        filter_query={"mRegion": "Europe"}
+        filter_query={"mRegion": "Europe"},
+        fy=fy
     )
 
 
-async def compute_slide11_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide11_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 11 (Europe Pipeline Tracking Over Time).
     """
@@ -1598,11 +1691,12 @@ async def compute_slide11_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="Europe",
         target_category="Europe",
-        filter_query={"mRegion": "Europe"}
+        filter_query={"mRegion": "Europe"},
+        fy=fy
     )
 
 
-async def compute_slide12_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide12_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 12 (Europe Actuals vs Pipeline Weekly Bars).
     """
@@ -1610,11 +1704,12 @@ async def compute_slide12_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="Europe",
         target_category="Europe",
-        filter_query={"mRegion": "Europe"}
+        filter_query={"mRegion": "Europe"},
+        fy=fy
     )
 
 
-async def compute_slide13_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide13_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 13 (US East Cumulative Performance vs Targets).
     """
@@ -1622,11 +1717,12 @@ async def compute_slide13_data(db: AsyncIOMotorDatabase) -> Dict:
         db,
         region_name="US East",
         target_category="US East",
-        filter_query={"mRegion": "US East"}
+        filter_query={"mRegion": "US East"},
+        fy=fy
     )
 
 
-async def compute_slide14_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide14_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 14 (US East Pipeline Tracking Over Time).
     """
@@ -1634,11 +1730,12 @@ async def compute_slide14_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="US East",
         target_category="US East",
-        filter_query={"mRegion": "US East"}
+        filter_query={"mRegion": "US East"},
+        fy=fy
     )
 
 
-async def compute_slide15_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide15_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 15 (US East Actuals vs Pipeline Weekly Bars).
     """
@@ -1646,11 +1743,12 @@ async def compute_slide15_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="US East",
         target_category="US East",
-        filter_query={"mRegion": "US East"}
+        filter_query={"mRegion": "US East"},
+        fy=fy
     )
 
 
-async def compute_slide16_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide16_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 16 (Asean Cumulative Performance vs Targets).
     """
@@ -1658,11 +1756,12 @@ async def compute_slide16_data(db: AsyncIOMotorDatabase) -> Dict:
         db,
         region_name="Asean",
         target_category="Asean",
-        filter_query={"mRegion": "Asean"}
+        filter_query={"mRegion": "Asean"},
+        fy=fy
     )
 
 
-async def compute_slide17_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide17_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 17 (Asean Pipeline Tracking Over Time).
     """
@@ -1670,11 +1769,12 @@ async def compute_slide17_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="Asean",
         target_category="Asean",
-        filter_query={"mRegion": "Asean"}
+        filter_query={"mRegion": "Asean"},
+        fy=fy
     )
 
 
-async def compute_slide18_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide18_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 18 (Asean Actuals vs Pipeline Weekly Bars).
     """
@@ -1682,11 +1782,12 @@ async def compute_slide18_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="Asean",
         target_category="Asean",
-        filter_query={"mRegion": "Asean"}
+        filter_query={"mRegion": "Asean"},
+        fy=fy
     )
 
 
-async def compute_slide19_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide19_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 19 (Japan Cumulative Performance vs Targets).
     """
@@ -1694,11 +1795,12 @@ async def compute_slide19_data(db: AsyncIOMotorDatabase) -> Dict:
         db,
         region_name="Japan",
         target_category="Japan",
-        filter_query={"mRegion": "Japan"}
+        filter_query={"mRegion": "Japan"},
+        fy=fy
     )
 
 
-async def compute_slide20_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide20_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 20 (Japan Pipeline Tracking Over Time).
     """
@@ -1706,11 +1808,12 @@ async def compute_slide20_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="Japan",
         target_category="Japan",
-        filter_query={"mRegion": "Japan"}
+        filter_query={"mRegion": "Japan"},
+        fy=fy
     )
 
 
-async def compute_slide21_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide21_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 21 (Japan Actuals vs Pipeline Weekly Bars).
     """
@@ -1718,11 +1821,12 @@ async def compute_slide21_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="Japan",
         target_category="Japan",
-        filter_query={"mRegion": "Japan"}
+        filter_query={"mRegion": "Japan"},
+        fy=fy
     )
 
 
-async def compute_slide22_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide22_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 22 (KANZ Cumulative Performance vs Targets).
     """
@@ -1730,11 +1834,12 @@ async def compute_slide22_data(db: AsyncIOMotorDatabase) -> Dict:
         db,
         region_name="KANZ",
         target_category="KANZ",
-        filter_query={"mRegion": "KANZ"}
+        filter_query={"mRegion": "KANZ"},
+        fy=fy
     )
 
 
-async def compute_slide23_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide23_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 23 (KANZ Pipeline Tracking Over Time).
     """
@@ -1742,11 +1847,12 @@ async def compute_slide23_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="KANZ",
         target_category="KANZ",
-        filter_query={"mRegion": "KANZ"}
+        filter_query={"mRegion": "KANZ"},
+        fy=fy
     )
 
 
-async def compute_slide24_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide24_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 24 (KANZ Actuals vs Pipeline Weekly Bars).
     """
@@ -1754,11 +1860,12 @@ async def compute_slide24_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="KANZ",
         target_category="KANZ",
-        filter_query={"mRegion": "KANZ"}
+        filter_query={"mRegion": "KANZ"},
+        fy=fy
     )
 
 
-async def compute_slide25_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide25_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 25 (Legacy Cumulative Performance vs Targets).
     """
@@ -1766,11 +1873,12 @@ async def compute_slide25_data(db: AsyncIOMotorDatabase) -> Dict:
         db,
         region_name="Legacy",
         target_category="Legacy",
-        filter_query={"mRegion": "Legacy"}
+        filter_query={"mRegion": "Legacy"},
+        fy=fy
     )
 
 
-async def compute_slide26_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide26_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 26 (Legacy Pipeline Tracking Over Time).
     """
@@ -1778,11 +1886,12 @@ async def compute_slide26_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="Legacy",
         target_category="Legacy",
-        filter_query={"mRegion": "Legacy"}
+        filter_query={"mRegion": "Legacy"},
+        fy=fy
     )
 
 
-async def compute_slide27_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide27_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 27 (Legacy Actuals vs Pipeline Weekly Bars).
     """
@@ -1790,11 +1899,12 @@ async def compute_slide27_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="Legacy",
         target_category="Legacy",
-        filter_query={"mRegion": "Legacy"}
+        filter_query={"mRegion": "Legacy"},
+        fy=fy
     )
 
 
-async def compute_slide28_data(db: AsyncIOMotorDatabase) -> Dict:
+async def compute_slide28_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 28 (APAC Cumulative Performance vs Targets).
     Combined data for Japan, Korea (KANZ), and ASEAN.
@@ -1803,11 +1913,12 @@ async def compute_slide28_data(db: AsyncIOMotorDatabase) -> Dict:
         db,
         region_name="APAC",
         target_category={"$in": ["Japan", "KANZ", "Asean", "ASEAN"]},
-        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}
+        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}},
+        fy=fy
     )
 
 
-async def compute_slide29_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide29_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 29 (APAC Pipeline Tracking Over Time).
     Combined data for Japan, Korea (KANZ), and ASEAN.
@@ -1816,11 +1927,12 @@ async def compute_slide29_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="APAC",
         target_category={"$in": ["Japan", "KANZ", "Asean", "ASEAN"]},
-        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}
+        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}},
+        fy=fy
     )
 
 
-async def compute_slide30_data(db: AsyncIOMotorDatabase, week: int = None) -> Dict:
+async def compute_slide30_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
     Compute data for Slide 30 (APAC Actuals vs Pipeline Weekly Bars).
     Combined data for Japan, Korea (KANZ), and ASEAN.
@@ -1829,7 +1941,8 @@ async def compute_slide30_data(db: AsyncIOMotorDatabase, week: int = None) -> Di
         db,
         region_name="APAC",
         target_category={"$in": ["Japan", "KANZ", "Asean", "ASEAN"]},
-        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}
+        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}},
+        fy=fy
     )
 
 
@@ -1837,6 +1950,7 @@ async def compute_order_backlog_data(
     db: AsyncIOMotorDatabase,
     region_name: str = "Overall",
     opp_type_filter: Optional[str] = None,
+    fy: str = "FY2027",
 ) -> Dict:
     """
     Compute data for the Order Backlog Slide.
@@ -1847,14 +1961,14 @@ async def compute_order_backlog_data(
     Args:
         db: MongoDB database instance
         region_name: The region to filter by, or "Overall" for all regions combined.
-        opp_type_filter: Optional OPP_Type filter (e.g. 'Service'). When set, hardcoded
-            placeholders are skipped because they represent total backlog, not OPP_Type slices.
+        opp_type_filter: Optional OPP_Type filter (e.g. 'Service').
+        fy: Fiscal year filter
         
     Returns:
         Dict with weeks, backlog values, formatting styles, etc.
     """
     print(f"\n" + "=" * 70)
-    print(f"COMPUTING ORDER BACKLOG DATA FOR {region_name}"
+    print(f"COMPUTING ORDER BACKLOG DATA FOR {region_name} ({fy})"
           f"{' (Services only)' if opp_type_filter else ''}")
     print("=" * 70)
 
@@ -2043,7 +2157,7 @@ async def compute_order_backlog_data(
 
     async for doc in collection_targets.find({
         "ppt_type": "Weekly Tracker",
-        "financial_year": "FY2027",
+        "financial_year": fy,
         "financial_qtr": "Q4",
         "category_type": target_category
     }):
@@ -2155,7 +2269,8 @@ SERVICES_Q1_REGION_ALIASES = {
     "Japan": "Japan",
     "KANZ": "KANZ",
     "Legacy": "Legacy",
-    "APAC": "APAC",
+    "APAC": "ROW",
+    "ROW": "ROW",
 }
 
 SERVICES_Q1_COLORS = {
@@ -2178,6 +2293,7 @@ SERVICES_Q1_PIPELINE_SLIDES = {
     "KANZ": 24,
     "Legacy": 27,
     "APAC": 30,
+    "ROW": 30,
 }
 
 
@@ -2191,22 +2307,9 @@ def format_services_snapshot_value(value: float) -> str:
     return f"${value / 1e6:.2f}M"
 
 
-async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: str = "Overall", quarter: str = "Q2") -> Dict:
+async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: str = "Overall", quarter: str = "Q2", target_fy: str = "FY2027") -> Dict:
     """Return latest uploaded Services snapshot chart data for Overall or a region,
-    filtered to the selected fiscal quarter (Q1-Q4).
-
-    Windows are cumulative-ish (they include the immediately preceding quarter,
-    except Q1 which is standalone):
-        Q1 -> fiscal weeks 0-13     (Q1 only)
-        Q2 -> fiscal weeks 0-26     (Q1 + Q2)
-        Q3 -> fiscal weeks 14-39    (Q2 + Q3)
-        Q4 -> fiscal weeks 27-52    (Q3 + Q4)
-
-    The x-axis is a *continuous* week counter that keeps going past 52 (so
-    calendar week 1 of the following year is rendered as 53, week 13 as 65,
-    etc.). Tick labels are wrapped back to real calendar weeks on the client.
-    Missing weeks inside the window are forward-filled with the last known
-    audited total so the line never drops back to zero.
+    filtered to the selected fiscal quarter (Q1-Q4) and target fiscal year.
     """
     collection = db["services_q1_snapshots"]
     normalized_region = SERVICES_Q1_REGION_ALIASES.get(region, region)
@@ -2221,33 +2324,26 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
         {"type": "services_trend", "category": "q1_snapshot"},
         sort=[("created_at", -1)],
     )
-    if not latest_doc:
-        return {"error": "No Services snapshot data found. Upload the timeline and opportunity CSVs first."}
 
     query = {
         "type": "services_trend",
         "category": "q1_snapshot",
-        "upload_week": latest_doc["upload_week"],
         "region": normalized_region,
     }
+    if latest_doc:
+        query["upload_week"] = latest_doc["upload_week"]
 
     all_docs = await collection.find(query).sort([("fiscal_year", 1), ("snapshot_date", 1)]).to_list(length=None)
     docs = [d for d in all_docs if qs_fw <= int(d.get("fiscal_week_number", -1)) <= qe_fw]
-    if not docs:
-        return {"error": f"No Services snapshot data for {normalized_quarter} in {region}."}
 
     today = datetime.now()
     current_calendar_week = int(today.isocalendar().week)
-    current_fiscal_year = f"FY{today.year + 1 if today.month >= 4 else today.year}"
-    if 4 <= today.month <= 6:
-        current_quarter = "Q1"
-    elif 7 <= today.month <= 9:
-        current_quarter = "Q2"
-    elif 10 <= today.month <= 12:
-        current_quarter = "Q3"
+
+    active_fy = target_fy if target_fy in ("FY2027", "FY2028") else "FY2027"
+    if active_fy == "FY2028":
+        prior_fy = "FY2027"
     else:
-        current_quarter = "Q4"
-    is_live_quarter = normalized_quarter == current_quarter
+        prior_fy = "FY2026"
 
     def fy_start_cal_week_for(fy_str: str) -> int:
         cal_year = int(str(fy_str).replace("FY", "")) - 1
@@ -2260,24 +2356,21 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
         w = int(cal_week)
         return w if w >= fy_start_cw else w + 52
 
-    fiscal_years = sorted({doc["fiscal_year"] for doc in docs})
+    fiscal_years = [prior_fy, active_fy]
 
-    # Weighted pipeline and PO achieved supplement from the weekly slide, only relevant when
-    # the selected quarter is the one we are currently living in.
-    current_fy_weighted_pipeline_continuous: dict[int, float] = {}
-    current_fy_po_achieved_continuous: dict[int, float] = {}
-    
+    fy_weighted_pipeline_continuous: dict[str, dict[int, float]] = {prior_fy: {}, active_fy: {}}
+    fy_po_achieved_continuous: dict[str, dict[int, float]] = {prior_fy: {}, active_fy: {}}
+
     pipeline_slide_no = SERVICES_Q1_PIPELINE_SLIDES.get(normalized_region)
     trend_slide_no = pipeline_slide_no - 1 if pipeline_slide_no else None
-    
-    if is_live_quarter:
-        cur_fy_start = fy_start_cal_week_for(current_fiscal_year)
-        q_start_cont = cur_fy_start + qs_fw
-        q_end_cont = cur_fy_start + qe_fw
-        
-        # Pipeline Data
+
+    for target_fy_item in [prior_fy, active_fy]:
+        fy_start = fy_start_cal_week_for(target_fy_item)
+        q_start_cont = fy_start + qs_fw
+        q_end_cont = fy_start + qe_fw
+
         if pipeline_slide_no:
-            pipeline_slide_data = await compute_slide_services_data(db, pipeline_slide_no)
+            pipeline_slide_data = await compute_slide_services_data(db, pipeline_slide_no, fy=target_fy_item)
             if isinstance(pipeline_slide_data, dict) and not pipeline_slide_data.get("error"):
                 for week_label, weighted_value in zip(
                     pipeline_slide_data.get("weeks", []),
@@ -2287,13 +2380,12 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
                         week_number = int(str(week_label).replace("Week", "").strip())
                     except ValueError:
                         continue
-                    cont = to_continuous(week_number, cur_fy_start)
+                    cont = to_continuous(week_number, fy_start)
                     if q_start_cont <= cont <= q_end_cont:
-                        current_fy_weighted_pipeline_continuous[cont] = float(weighted_value or 0)
-        
-        # PO Closed Won Data
+                        fy_weighted_pipeline_continuous[target_fy_item][cont] = float(weighted_value or 0)
+
         if trend_slide_no:
-            trend_slide_data = await compute_slide_services_data(db, trend_slide_no)
+            trend_slide_data = await compute_slide_services_data(db, trend_slide_no, fy=target_fy_item)
             if isinstance(trend_slide_data, dict) and not trend_slide_data.get("error"):
                 for week_label, po_value in zip(
                     trend_slide_data.get("weeks", []),
@@ -2303,16 +2395,15 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
                         week_number = int(str(week_label).replace("Week", "").strip())
                     except ValueError:
                         continue
-                    cont = to_continuous(week_number, cur_fy_start)
+                    cont = to_continuous(week_number, fy_start)
                     if q_start_cont <= cont <= q_end_cont:
-                        current_fy_po_achieved_continuous[cont] = float(po_value or 0)
+                        fy_po_achieved_continuous[target_fy_item][cont] = float(po_value or 0)
 
     series = []
     for fy in fiscal_years:
         fy_start_cw = fy_start_cal_week_for(fy)
         fy_docs = [doc for doc in docs if doc["fiscal_year"] == fy]
 
-        # Continuous-week keyed lookup of uploaded snapshots.
         by_cw: dict[int, dict] = {}
         for doc in fy_docs:
             cal_week = doc.get("calendar_week_number")
@@ -2327,27 +2418,17 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
                 "date": doc.get("snapshot_date").strftime("%b %d, %Y") if doc.get("snapshot_date") else "",
             }
 
-        # Full continuous-week range for the selected quarter window.
         range_start = fy_start_cw + qs_fw
         range_end = fy_start_cw + qe_fw
 
-        # Cap the drawn range so lines don't extend into the future or beyond
-        # available data.
-        if fy == current_fiscal_year:
-            if is_live_quarter:
-                today_cont = to_continuous(current_calendar_week, fy_start_cw)
-                effective_end = min(range_end, today_cont)
-            else:
-                effective_end = min(range_end, max(by_cw.keys())) if by_cw else range_end
+        if fy == active_fy:
+            today_cont = to_continuous(current_calendar_week, fy_start_cw)
+            effective_end = min(range_end, today_cont)
         else:
-            if not by_cw:
-                continue
-            effective_end = min(range_end, max(by_cw.keys()))
+            effective_end = min(range_end, max(by_cw.keys())) if by_cw else range_end
 
         weeks_iter = range(range_start, effective_end + 1)
 
-            # Forward-fill audited totals across the window; pipeline uses the
-        # uploaded value when present, otherwise the live weekly-slide value.
         last_audited = 0.0
         last_date = ""
         x_values: list[int] = []
@@ -2356,7 +2437,6 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
         snapshot_dates: list[str] = []
         for w in weeks_iter:
             if w in by_cw:
-                # Normal behavior for past FYs
                 last_audited = by_cw[w]["audited"]
                 if by_cw[w]["date"]:
                     last_date = by_cw[w]["date"]
@@ -2366,20 +2446,18 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
 
             pipeline_val = uploaded_pipeline
             audited_val = last_audited
-            
-            if fy == current_fiscal_year:
-                if w in current_fy_weighted_pipeline_continuous:
-                    pipeline_val = current_fy_weighted_pipeline_continuous[w]
-                if w in current_fy_po_achieved_continuous:
-                    audited_val = current_fy_po_achieved_continuous[w]
-                    last_audited = audited_val  # Make sure we carry this forward as well
-                    
+
+            if fy in fy_weighted_pipeline_continuous and w in fy_weighted_pipeline_continuous[fy]:
+                pipeline_val = fy_weighted_pipeline_continuous[fy][w]
+            if fy in fy_po_achieved_continuous and w in fy_po_achieved_continuous[fy]:
+                audited_val = fy_po_achieved_continuous[fy][w]
+                last_audited = audited_val
+
             x_values.append(w)
             y_values.append(audited_val)
             pipeline_values.append(pipeline_val)
             snapshot_dates.append(last_date)
 
-        # Trim leading rows before any real data existed for this FY.
         first_nonzero = next((i for i, v in enumerate(y_values) if v > 0 or pipeline_values[i] > 0), None)
         if first_nonzero is None:
             continue
@@ -2424,7 +2502,7 @@ async def compute_services_q1_snapshot_data(db: AsyncIOMotorDatabase, region: st
     }
 
 
-async def compute_slide_services_data(db: AsyncIOMotorDatabase, slide_no: int) -> Dict:
+async def compute_slide_services_data(db: AsyncIOMotorDatabase, slide_no: int, fy: str = "FY2027") -> Dict:
     """
     Compute Services-only chart data for any region/cumulative/trend/pipeline slide.
 
@@ -2441,11 +2519,11 @@ async def compute_slide_services_data(db: AsyncIOMotorDatabase, slide_no: int) -
     filter_query["OPP_Type"] = "Service"
 
     if kind == "cumulative":
-        result = await _compute_cumulative_generic(db, region_name, target_category, filter_query)
+        result = await _compute_cumulative_generic(db, region_name, target_category, filter_query, fy=fy)
     elif kind == "trend":
-        result = await _compute_trend_generic(db, region_name, target_category, filter_query)
+        result = await _compute_trend_generic(db, region_name, target_category, filter_query, fy=fy)
     elif kind == "pipeline":
-        result = await _compute_pipeline_generic(db, region_name, target_category, filter_query)
+        result = await _compute_pipeline_generic(db, region_name, target_category, filter_query, fy=fy)
     else:
         return {"error": f"Unknown chart kind '{kind}' for slide {slide_no}"}
 

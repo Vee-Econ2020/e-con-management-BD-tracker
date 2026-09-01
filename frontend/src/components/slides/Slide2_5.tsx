@@ -202,19 +202,19 @@ function IsometricPieChart({
     );
 }
 
-export default function Slide2_5() {
+export default function Slide2_5({ fy = "FY2027" }: { fy?: string }) {
     const [data, setData] = useState<Slide2Data | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchSlideData();
-    }, []);
+    }, [fy]);
 
     const fetchSlideData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide2');
+            const response = await fetch(`/api/admin/slides/slide2?fy=${fy}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             if (result.error) throw new Error(result.error);
@@ -240,8 +240,7 @@ export default function Slide2_5() {
         <div style={{ width: '100%', height: '100%', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column' }}>
             {/* Title */}
             <div style={{ textAlign: 'center', padding: '1.5rem', marginBottom: '1rem' }}>
-                <h1 style={{ fontSize: '2.5rem', fontWeight: '800', color: '#1f2937', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
-                    FY2027 - Target Achievement Breakdown
+                <h1 style={{ fontSize: '2.5rem', fontWeight: '800', color: '#1f2937', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>{fy} - Target Achievement Breakdown
                 </h1>
             </div>
 

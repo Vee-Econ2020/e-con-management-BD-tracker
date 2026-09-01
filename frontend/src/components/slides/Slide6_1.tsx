@@ -1,7 +1,7 @@
 
 import { ImageUploadSlide } from './ImageUploadSlide';
 
-export default function Slide6_1({ isEditing }: { isEditing: boolean }) {
+export default function Slide6_1({ isEditing }: { isEditing: boolean; fy?: string }) {
     return (
         <ImageUploadSlide
             title="Overall - Highlights (Image)"

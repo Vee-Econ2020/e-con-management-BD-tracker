@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import { CumulativePerformanceChart } from '../shared_charts/CumulativePerformanceChart';
 
-export default function Slide3() {
+export default function Slide3({ fy = "FY2027" }: { fy?: string }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fy]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide3');
+            const response = await fetch(`/api/admin/slides/slide3?fy=${fy}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             if (result.error) throw new Error(result.error);
@@ -71,7 +71,7 @@ export default function Slide3() {
     return (
         <CumulativePerformanceChart
             data={data}
-            title="FY2027 - Cumulative Performance vs Targets"
+            title={`${fy} - Cumulative Performance vs Targets`}
         />
     );
 }

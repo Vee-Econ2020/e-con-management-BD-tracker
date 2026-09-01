@@ -25,12 +25,11 @@ interface ServicesChartSlideProps {
  * with the parent slide's manual entries in the shared `weekly_tracker_user_input`
  * collection.
  */
-export default function ServicesChartSlide({
-    slideNo,
+export default function ServicesChartSlide({ slideNo,
     chartKind,
     regionLabel,
     isEditing = false,
-}: ServicesChartSlideProps) {
+    fy = "FY2027" }: ServicesChartSlideProps & { fy?: string }) {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -40,7 +39,7 @@ export default function ServicesChartSlide({
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`/api/admin/slides/services/${slideNo}`);
+                const response = await fetch(`/api/admin/slides/services/${slideNo}?fy=${fy}`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const result = await response.json();
                 if (result.error) throw new Error(result.error);
@@ -61,7 +60,7 @@ export default function ServicesChartSlide({
         return () => {
             cancelled = true;
         };
-    }, [slideNo]);
+    }, [slideNo, fy]);
 
     if (loading) {
         return (
@@ -95,7 +94,7 @@ export default function ServicesChartSlide({
     }
 
     const titleByKind: Record<ServicesChartKind, string> = {
-        cumulative: `${regionLabel} — Services Cumulative Performance (FY2027)`,
+        cumulative: `${regionLabel} — Services Cumulative Performance (${fy})`,
         trend: `${regionLabel} — Services 8-Week Trend`,
         pipeline: `${regionLabel} — Services Pipeline (Actual vs Weighted)`,
     };
@@ -121,6 +120,7 @@ export default function ServicesChartSlide({
             slideNo={slideNo * 1000 + 1}
             isEditing={isEditing}
             hideTargets={hideTargets}
+            fy={fy}
         />
     );
 }

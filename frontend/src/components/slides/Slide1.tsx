@@ -9,23 +9,28 @@ interface Slide1Data {
     error?: string;
 }
 
-export default function Slide1() {
+export default function Slide1({ fy = "FY2027" }: { fy?: string }) {
     const [data, setData] = useState<Slide1Data | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchSlide1Data();
-    }, []);
+    }, [fy]);
 
     const fetchSlide1Data = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide1');
+            const response = await fetch(`/api/admin/slides/slide1?fy=${fy}`);
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
             const result = await response.json();
+            
+            if (result.error) {
+                throw new Error(result.error);
+            }
+            
             setData(result);
             setError(null);
         } catch (err) {
@@ -40,17 +45,15 @@ export default function Slide1() {
         return (
             <div style={{
                 backgroundColor: '#ffffff',
-                height: '300px',
+                height: '100%',
                 borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '2rem'
             }}>
-                <div style={{ textAlign: 'center', color: '#6b7280' }}>
-                    <div className="animate-pulse" style={{ fontSize: '1.125rem', fontWeight: '600' }}>
-                        Loading slide data...
-                    </div>
+                <div className="animate-pulse" style={{ fontSize: '1.25rem', fontWeight: '600', color: '#6b7280' }}>
+                    Loading summary data...
                 </div>
             </div>
         );
@@ -60,7 +63,7 @@ export default function Slide1() {
         return (
             <div style={{
                 backgroundColor: '#fee2e2',
-                height: '300px',
+                height: '100%',
                 borderRadius: '8px',
                 display: 'flex',
                 alignItems: 'center',
@@ -68,10 +71,8 @@ export default function Slide1() {
                 padding: '2rem'
             }}>
                 <div style={{ textAlign: 'center', color: '#991b1b' }}>
-                    <div style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                        Failed to load slide data
-                    </div>
-                    <div style={{ fontSize: '0.875rem' }}>{error}</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem' }}>Error Loading Slide</div>
+                    <div>{error || 'Unknown error occurred'}</div>
                 </div>
             </div>
         );
@@ -79,23 +80,35 @@ export default function Slide1() {
 
     return (
         <div style={{
-            backgroundColor: '#ffffff',
-            minHeight: '300px',
-            borderRadius: '8px',
-            padding: '2rem',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: 'url("https://www.e-consystems.com/images/weekly-tracker/background.png")',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            fontFamily: '"Segoe UI", system-ui, sans-serif'
         }}>
-            {/* Slide Title */}
+            {/* Dark Overlay */}
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)' }} />
+
             <div style={{
-                fontSize: '2rem',
-                fontWeight: 'bold',
-                textAlign: 'center',
-                marginBottom: '2rem',
-                color: '#1f2937',
-                borderBottom: '3px solid #3b82f6',
-                paddingBottom: '1rem'
+                position: 'relative',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                padding: '4rem 6rem',
+                color: 'white'
             }}>
-                FY2027 Weekly Tracker Overview{data.week ? ` - Week ${data.week}` : ''}
+                {/* Main Title */}
+                <h1 style={{ 
+                    fontSize: '4.5rem', 
+                    fontWeight: '800', 
+                    marginBottom: '1rem',
+                    textShadow: '2px 4px 12px rgba(0,0,0,0.5)'
+                }}>
+                {fy} Weekly Tracker Overview{data.week ? ` - Week ${data.week}` : ''}
+                </h1>
             </div>
 
             {/* Metrics Grid */}

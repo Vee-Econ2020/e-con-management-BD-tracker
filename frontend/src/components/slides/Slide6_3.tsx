@@ -42,19 +42,19 @@ const ACCENT_STYLES: Record<GrossMarginCard['accent'], { bg: string; border: str
     },
 };
 
-export default function Slide6_3() {
+export default function Slide6_3({ fy = "FY2027" }: { fy?: string }) {
     const [data, setData] = useState<OverallGrossMarginData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fy]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/overall-gross-margin');
+            const response = await fetch(`/api/admin/slides/overall-gross-margin?fy=${fy}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }

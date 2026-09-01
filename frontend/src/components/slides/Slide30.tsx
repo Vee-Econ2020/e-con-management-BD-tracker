@@ -5,19 +5,19 @@ interface Slide30Props {
     isEditing?: boolean;
 }
 
-export default function Slide30({ isEditing = false }: Slide30Props) {
+export default function Slide30({ isEditing = false , fy = "FY2027" }: Slide30Props & { fy?: string }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fy]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide30');
+            const response = await fetch(`/api/admin/slides/slide30?fy=${fy}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             if (result.error) throw new Error(result.error);
@@ -37,9 +37,10 @@ export default function Slide30({ isEditing = false }: Slide30Props) {
     return (
         <PipelineComparisonChart
             data={data}
-            title="APAC - Actuals vs Weighted Pipeline"
+            title="ROW - Actuals vs Weighted Pipeline"
             slideNo={30}
             isEditing={isEditing}
+            fy={fy}
         />
     );
 }

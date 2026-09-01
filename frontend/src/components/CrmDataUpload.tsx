@@ -162,7 +162,8 @@ export function CrmDataUpload() {
         }
     };
 
-    const handleSymbSoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    /*
+    const _handleSymbSoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const file = e.target.files[0];
         const formData = new FormData();
@@ -185,7 +186,7 @@ export function CrmDataUpload() {
         }
     };
 
-    const handleJabilUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const _handleJabilUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const file = e.target.files[0];
         const formData = new FormData();
@@ -208,8 +209,7 @@ export function CrmDataUpload() {
         }
     };
 
-
-    const handleSymbPlanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const _handleSymbPlanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const file = e.target.files[0];
         const formData = new FormData();
@@ -221,6 +221,7 @@ export function CrmDataUpload() {
             if (res.ok) { setStatusMsg(`Success: ${data.message}`); fetchLogs(); } else { setStatusMsg(`Error: ${data.detail}`); }
         } catch (err: any) { setStatusMsg(`Error: ${err.message}`); }
     };
+    */
 
     const handleErpMechUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;

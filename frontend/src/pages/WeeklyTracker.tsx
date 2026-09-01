@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { Download, Loader2, Plus, Play, Eye, EyeOff, Pencil, Trash2, X, PartyPopper, Image as ImageIcon, Type, Folder, FolderOpen, ChevronDown, ChevronRight } from 'lucide-react';
+import { Download, Loader2, Plus, Play, Eye, EyeOff, Pencil, Trash2, PartyPopper, Image as ImageIcon, Type, Folder, FolderOpen, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Building2, ExternalLink } from 'lucide-react';
 import { ConfettiSideCannons } from '../components/ConfettiSideCannons';
 import { useWeek } from '../context/WeekContext';
 import { useAuth } from '../context/AuthContext';
@@ -167,59 +167,59 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '21.2.5': (props: any) => <WhaleAccountSlide {...props} region="Japan" />,
     '24.2.5': (props: any) => <WhaleAccountSlide {...props} region="Korea" />,
     '27.2.5': (props: any) => <WhaleAccountSlide {...props} region="Legacy" />,
-    '30.2.5': (props: any) => <WhaleAccountSlide {...props} region="APAC" />,
+    '30.2.5': (props: any) => <WhaleAccountSlide {...props} region="ROW" />,
 
     // ── Services-only chart mirrors ───────────────────────────────────────
     // Each parent chart slide (cumulative/trend/pipeline) has a sibling here
     // that fetches /api/admin/slides/services/{slideNo} and renders the same
     // shared chart with `hideTargets` enabled.
     '3_services':  (props: any) => <ServicesChartSlide slideNo={3}  chartKind="cumulative" regionLabel="Overall" {...props} />,
-    '3_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Overall" quarter={props.quarter} />,
+    '3_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Overall" quarter={props.quarter} {...props} />,
     '4_services':  (props: any) => <ServicesChartSlide slideNo={4}  chartKind="trend"      regionLabel="Overall" {...props} />,
     '5_services':  (props: any) => <ServicesChartSlide slideNo={5}  chartKind="pipeline"   regionLabel="Overall" {...props} />,
     '7_services':  (props: any) => <ServicesChartSlide slideNo={7}  chartKind="cumulative" regionLabel="US West" {...props} />,
-    '7_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="US West" quarter={props.quarter} />,
+    '7_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="US West" quarter={props.quarter} {...props} />,
     '8_services':  (props: any) => <ServicesChartSlide slideNo={8}  chartKind="trend"      regionLabel="US West" {...props} />,
     '9_services':  (props: any) => <ServicesChartSlide slideNo={9}  chartKind="pipeline"   regionLabel="US West" {...props} />,
     '10_services': (props: any) => <ServicesChartSlide slideNo={10} chartKind="cumulative" regionLabel="Europe"  {...props} />,
-    '10_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Europe" quarter={props.quarter} />,
+    '10_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Europe" quarter={props.quarter} {...props} />,
     '11_services': (props: any) => <ServicesChartSlide slideNo={11} chartKind="trend"      regionLabel="Europe"  {...props} />,
     '12_services': (props: any) => <ServicesChartSlide slideNo={12} chartKind="pipeline"   regionLabel="Europe"  {...props} />,
     '13_services': (props: any) => <ServicesChartSlide slideNo={13} chartKind="cumulative" regionLabel="US East" {...props} />,
-    '13_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="US East" quarter={props.quarter} />,
+    '13_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="US East" quarter={props.quarter} {...props} />,
     '14_services': (props: any) => <ServicesChartSlide slideNo={14} chartKind="trend"      regionLabel="US East" {...props} />,
     '15_services': (props: any) => <ServicesChartSlide slideNo={15} chartKind="pipeline"   regionLabel="US East" {...props} />,
     '16_services': (props: any) => <ServicesChartSlide slideNo={16} chartKind="cumulative" regionLabel="ASEAN"   {...props} />,
-    '16_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Asean" quarter={props.quarter} />,
+    '16_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Asean" quarter={props.quarter} {...props} />,
     '17_services': (props: any) => <ServicesChartSlide slideNo={17} chartKind="trend"      regionLabel="ASEAN"   {...props} />,
     '18_services': (props: any) => <ServicesChartSlide slideNo={18} chartKind="pipeline"   regionLabel="ASEAN"   {...props} />,
     '19_services': (props: any) => <ServicesChartSlide slideNo={19} chartKind="cumulative" regionLabel="Japan"   {...props} />,
-    '19_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Japan" quarter={props.quarter} />,
+    '19_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Japan" quarter={props.quarter} {...props} />,
     '20_services': (props: any) => <ServicesChartSlide slideNo={20} chartKind="trend"      regionLabel="Japan"   {...props} />,
     '21_services': (props: any) => <ServicesChartSlide slideNo={21} chartKind="pipeline"   regionLabel="Japan"   {...props} />,
     '22_services': (props: any) => <ServicesChartSlide slideNo={22} chartKind="cumulative" regionLabel="KANZ"    {...props} />,
-    '22_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="KANZ" quarter={props.quarter} />,
+    '22_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="KANZ" quarter={props.quarter} {...props} />,
     '23_services': (props: any) => <ServicesChartSlide slideNo={23} chartKind="trend"      regionLabel="KANZ"    {...props} />,
     '24_services': (props: any) => <ServicesChartSlide slideNo={24} chartKind="pipeline"   regionLabel="KANZ"    {...props} />,
     '25_services': (props: any) => <ServicesChartSlide slideNo={25} chartKind="cumulative" regionLabel="Legacy"  {...props} />,
-    '25_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Legacy" quarter={props.quarter} />,
+    '25_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="Legacy" quarter={props.quarter} {...props} />,
     '26_services': (props: any) => <ServicesChartSlide slideNo={26} chartKind="trend"      regionLabel="Legacy"  {...props} />,
     '27_services': (props: any) => <ServicesChartSlide slideNo={27} chartKind="pipeline"   regionLabel="Legacy"  {...props} />,
-    '28_services':  (props: any) => <ServicesChartSlide slideNo={28} chartKind="cumulative" regionLabel="APAC"    {...props} />,
-    '28_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="APAC" quarter={props.quarter} />,
-    '29_services':  (props: any) => <ServicesChartSlide slideNo={29} chartKind="trend"      regionLabel="APAC"    {...props} />,
-    '30_services':  (props: any) => <ServicesChartSlide slideNo={30} chartKind="pipeline"   regionLabel="APAC"    {...props} />,
+    '28_services':  (props: any) => <ServicesChartSlide slideNo={28} chartKind="cumulative" regionLabel="ROW"     {...props} />,
+    '28_services_q1': (props: any) => <ServicesQ1SnapshotSlide region="ROW" quarter={props.quarter} {...props} />,
+    '29_services':  (props: any) => <ServicesChartSlide slideNo={29} chartKind="trend"      regionLabel="ROW"     {...props} />,
+    '30_services':  (props: any) => <ServicesChartSlide slideNo={30} chartKind="pipeline"   regionLabel="ROW"     {...props} />,
 
     // Services-only Order Backlog mirrors
-    '6.2_services':    () => <ServicesBacklogSlide region="Overall" />,
-    '9.2.2_services':  () => <ServicesBacklogSlide region="US West" />,
-    '12.2.2_services': () => <ServicesBacklogSlide region="Europe" />,
-    '15.2.2_services': () => <ServicesBacklogSlide region="US East" />,
-    '18.2.2_services': () => <ServicesBacklogSlide region="Asean" />,
-    '21.2.2_services': () => <ServicesBacklogSlide region="Japan" />,
-    '24.2.2_services': () => <ServicesBacklogSlide region="KANZ" />,
-    '27.2.2_services': () => <ServicesBacklogSlide region="Legacy" />,
-    '30.2.2_services': () => <ServicesBacklogSlide region="APAC" />,
+    '6.2_services':    (props: any) => <ServicesBacklogSlide region="Overall" {...props} />,
+    '9.2.2_services':  (props: any) => <ServicesBacklogSlide region="US West" {...props} />,
+    '12.2.2_services': (props: any) => <ServicesBacklogSlide region="Europe" {...props} />,
+    '15.2.2_services': (props: any) => <ServicesBacklogSlide region="US East" {...props} />,
+    '18.2.2_services': (props: any) => <ServicesBacklogSlide region="Asean" {...props} />,
+    '21.2.2_services': (props: any) => <ServicesBacklogSlide region="Japan" {...props} />,
+    '24.2.2_services': (props: any) => <ServicesBacklogSlide region="KANZ" {...props} />,
+    '27.2.2_services': (props: any) => <ServicesBacklogSlide region="Legacy" {...props} />,
+    '30.2.2_services': (props: any) => <ServicesBacklogSlide region="ROW" {...props} />,
 
     // Invoicing Data slides (8-Week Trend)
     '3_invoice':  (props: any) => <InvoiceChartSlide regionLabel="Overall"  region="Overall"  {...props} />,
@@ -230,7 +230,7 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '19_invoice': (props: any) => <InvoiceChartSlide regionLabel="Japan"    region="Japan"    {...props} />,
     '22_invoice': (props: any) => <InvoiceChartSlide regionLabel="KANZ"     region="KANZ"     {...props} />,
     '25_invoice': (props: any) => <InvoiceChartSlide regionLabel="Legacy"   region="Legacy"   {...props} />,
-    '28_invoice': (props: any) => <InvoiceChartSlide regionLabel="APAC"     region="APAC"     {...props} />,
+    '28_invoice': (props: any) => <InvoiceChartSlide regionLabel="ROW"       region="ROW"       {...props} />,
 };
 
 const EXPORT_SLIDE_WIDTH = 1920;
@@ -301,6 +301,7 @@ interface StandardSlideFrameProps {
     onNextSlide?: () => void;
     onPreviousSlide?: () => void;
     quarter?: string;
+    fy?: string;
 }
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -321,12 +322,40 @@ function StandardSlideFrame({
     onNextSlide,
     onPreviousSlide,
     quarter,
+    fy,
 }: StandardSlideFrameProps) {
     const frameRef = useRef<HTMLDivElement>(null);
 
     return (
         <div ref={frameRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-            <SlideComponent isEditing={isEditing} onNextSlide={onNextSlide} onPreviousSlide={onPreviousSlide} quarter={quarter} />
+            {fy && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        bottom: '12px',
+                        right: '16px',
+                        zIndex: 40,
+                        backgroundColor: '#1d4ed8',
+                        color: '#ffffff',
+                        padding: '4px 14px',
+                        borderRadius: '9999px',
+                        fontSize: '0.85rem',
+                        fontWeight: '800',
+                        letterSpacing: '0.05em',
+                        boxShadow: '0 2px 8px rgba(29, 78, 216, 0.4)',
+                        border: '1.5px solid rgba(255, 255, 255, 0.5)',
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        backdropFilter: 'blur(4px)'
+                    }}
+                >
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#60a5fa', boxShadow: '0 0 4px #60a5fa' }} />
+                    <span>{fy}</span>
+                </div>
+            )}
+            <SlideComponent isEditing={isEditing} onNextSlide={onNextSlide} onPreviousSlide={onPreviousSlide} quarter={quarter} fy={fy} />
             <GifOverlay
                 containerRef={frameRef}
                 isEditing={isEditing}
@@ -601,113 +630,298 @@ const LazySlideWrapper = ({ children, slideNum }: { children: React.ReactNode, s
 };
 
 // ... (Rest of components: StatusCard is fine to keep inside or reusing)
+interface MissingSlideItem {
+    key: string;
+    name: string;
+    slideId: string;
+}
+
 interface StatusCardProps {
     title: string;
     status?: 'pending' | 'completed';
     filled?: number;
     total?: number;
-    onView?: () => void;
-    onViewWhale?: () => void;
-    missingNames?: string[];
+    missingItems?: MissingSlideItem[];
     whaleAccounts?: string[];
+    whaleSlideId?: string;
+    firstSlideId?: string;
+    onNavigateSlide?: (slideId?: string) => void;
 }
 
-const StatusCard = ({ title, filled = 0, total = 0, onView, onViewWhale, missingNames = [], whaleAccounts = [] }: StatusCardProps) => {
-    const missing = Math.max(0, total - filled);
-    const canView = total > 0 && !!onView;
+const StatusCard = ({ 
+    title, 
+    filled = 0, 
+    total = 0, 
+    missingItems = [], 
+    whaleAccounts = [],
+    whaleSlideId,
+    firstSlideId,
+    onNavigateSlide 
+}: StatusCardProps) => {
+    const isComplete = total > 0 && filled === total;
+    const pct = total > 0 ? Math.round((filled / total) * 100) : 0;
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    const [hoveredWhale, setHoveredWhale] = useState<boolean>(false);
+    const [hoveredHeader, setHoveredHeader] = useState<boolean>(false);
 
     return (
         <div style={{
-            backgroundColor: '#d1d5db',
+            backgroundColor: '#ffffff',
             borderRadius: '16px',
-            padding: '1rem',
-            minHeight: '100px',
+            padding: '1.25rem',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            border: '1px solid rgba(255,255,255,0.2)',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-            gap: '0.6rem'
+            border: isComplete ? '1.5px solid #6ee7b7' : '1px solid #cbd5e1',
+            boxShadow: isComplete 
+                ? '0 4px 20px -2px rgba(16, 185, 129, 0.12)' 
+                : '0 4px 16px -2px rgba(15, 23, 42, 0.05)',
+            gap: '0.8rem',
+            transition: 'all 0.2s ease-in-out',
+            position: 'relative',
+            overflow: 'hidden'
         }}>
+            {/* Header: Title & Completion Badge */}
             <div>
-                <span style={{
-                    fontSize: '0.95rem',
-                    fontWeight: '800',
-                    color: '#1f2937'
+                <div 
+                    onClick={() => firstSlideId && onNavigateSlide?.(firstSlideId)}
+                    onMouseEnter={() => setHoveredHeader(true)}
+                    onMouseLeave={() => setHoveredHeader(false)}
+                    style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between', 
+                        marginBottom: '0.4rem',
+                        cursor: firstSlideId ? 'pointer' : 'default',
+                        padding: '0.2rem 0.3rem',
+                        borderRadius: '6px',
+                        backgroundColor: hoveredHeader && firstSlideId ? '#f1f5f9' : 'transparent',
+                        transition: 'background-color 0.15s ease'
+                    }}
+                    title={firstSlideId ? `Click to view ${title} slides` : undefined}
+                >
+                    <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        {title}
+                        {firstSlideId && (
+                            <ExternalLink size={12} style={{ opacity: hoveredHeader ? 0.9 : 0.4, color: hoveredHeader ? '#2563eb' : '#64748b', transition: 'all 0.15s ease' }} />
+                        )}
+                    </span>
+                    {isComplete ? (
+                        <span style={{
+                            backgroundColor: '#dcfce7',
+                            color: '#15803d',
+                            fontSize: '0.72rem',
+                            fontWeight: '800',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '9999px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            border: '1px solid #a7f3d0'
+                        }}>
+                            <CheckCircle2 size={12} /> Complete
+                        </span>
+                    ) : filled > 0 ? (
+                        <span style={{
+                            backgroundColor: '#fef3c7',
+                            color: '#b45309',
+                            fontSize: '0.72rem',
+                            fontWeight: '800',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '9999px',
+                            border: '1px solid #fde68a'
+                        }}>
+                            {filled}/{total} Filled
+                        </span>
+                    ) : (
+                        <span style={{
+                            backgroundColor: '#ffe4e6',
+                            color: '#be123c',
+                            fontSize: '0.72rem',
+                            fontWeight: '800',
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: '9999px',
+                            border: '1px solid #fecdd3'
+                        }}>
+                            0/{total} Filled
+                        </span>
+                    )}
+                </div>
+
+                {/* Progress Bar */}
+                <div style={{ width: '100%', backgroundColor: '#f1f5f9', height: '6px', borderRadius: '9999px', overflow: 'hidden', marginTop: '0.5rem' }}>
+                    <div style={{
+                        width: `${pct}%`,
+                        height: '100%',
+                        background: isComplete ? 'linear-gradient(90deg, #10b981, #059669)' : 'linear-gradient(90deg, #3b82f6, #6366f1)',
+                        borderRadius: '9999px',
+                        transition: 'width 0.4s ease'
+                    }} />
+                </div>
+            </div>
+
+            {/* Missing Slide Items Section */}
+            {missingItems.length > 0 && (
+                <div style={{
+                    backgroundColor: '#fff1f2',
+                    borderRadius: '12px',
+                    padding: '0.65rem 0.8rem',
+                    border: '1px solid #fecdd3'
                 }}>
-                    {title}
-                </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f766e' }}>{filled}/{total} filled</div>
-                <div style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 700 }}>{missing} missing</div>
-            </div>
-            {missingNames.length > 0 && (
-                <div style={{ fontSize: '0.75rem', color: '#7c2d12', fontWeight: 600, lineHeight: 1.35 }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.15rem' }}>
-                        Missing items
+                    <div style={{
+                        fontSize: '0.72rem',
+                        fontWeight: '800',
+                        color: '#e11d48',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        marginBottom: '0.4rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                    }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <AlertCircle size={13} /> Missing items ({missingItems.length})
+                        </span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#be123c', textTransform: 'none', opacity: 0.85 }}>
+                            Click to view slide
+                        </span>
                     </div>
-                    <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                        {missingNames.map(n => (
-                            <li key={n} style={{ marginBottom: '0.1rem' }}>{n}</li>
+                    <ul style={{ margin: 0, padding: 0, listStyle: 'none', color: '#334155', fontSize: '0.78rem', fontWeight: 600 }}>
+                        {missingItems.map((item, idx) => (
+                            <li 
+                                key={item.key}
+                                onClick={() => item.slideId && onNavigateSlide?.(item.slideId)}
+                                onMouseEnter={() => setHoveredIndex(idx)}
+                                onMouseLeave={() => setHoveredIndex(null)}
+                                style={{
+                                    padding: '0.35rem 0.5rem',
+                                    borderRadius: '6px',
+                                    marginBottom: '0.2rem',
+                                    cursor: 'pointer',
+                                    backgroundColor: hoveredIndex === idx ? '#ffe4e6' : 'transparent',
+                                    color: hoveredIndex === idx ? '#be123c' : '#334155',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '0.5rem',
+                                    transition: 'all 0.15s ease',
+                                    transform: hoveredIndex === idx ? 'translateX(2px)' : 'none'
+                                }}
+                                title={`Click to navigate to slide: ${item.name}`}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
+                                    <span style={{ 
+                                        width: '6px', 
+                                        height: '6px', 
+                                        borderRadius: '50%', 
+                                        backgroundColor: hoveredIndex === idx ? '#e11d48' : '#f43f5e',
+                                        flexShrink: 0 
+                                    }} />
+                                    <span style={{ 
+                                        overflow: 'hidden', 
+                                        textOverflow: 'ellipsis', 
+                                        whiteSpace: 'nowrap',
+                                        fontWeight: hoveredIndex === idx ? 700 : 600,
+                                        textDecoration: hoveredIndex === idx ? 'underline' : 'none'
+                                    }}>
+                                        {item.name}
+                                    </span>
+                                </div>
+                                <ExternalLink 
+                                    size={12} 
+                                    style={{ 
+                                        flexShrink: 0, 
+                                        color: hoveredIndex === idx ? '#be123c' : '#94a3b8',
+                                        opacity: hoveredIndex === idx ? 1 : 0.6,
+                                        transform: hoveredIndex === idx ? 'scale(1.15)' : 'scale(1)',
+                                        transition: 'all 0.15s ease'
+                                    }} 
+                                />
+                            </li>
                         ))}
                     </ul>
                 </div>
             )}
+
+            {/* Missing Whale Accounts Section */}
             {title !== 'Overall' && title !== 'Financial Team' && whaleAccounts.length < 2 && (
-                <div style={{ fontSize: '0.75rem', color: '#7c2d12', fontWeight: 600, lineHeight: 1.35, marginTop: '0.2rem' }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.15rem' }}>
-                        Whale accounts missing
+                <div style={{
+                    backgroundColor: '#fff7ed',
+                    borderRadius: '12px',
+                    padding: '0.65rem 0.8rem',
+                    border: '1px solid #fed7aa'
+                }}>
+                    <div style={{
+                        fontSize: '0.72rem',
+                        fontWeight: '800',
+                        color: '#c2410c',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        marginBottom: '0.4rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                    }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <Building2 size={13} /> Whale accounts missing
+                        </span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: '700', color: '#c2410c', textTransform: 'none', opacity: 0.85 }}>
+                            Click to view slide
+                        </span>
                     </div>
-                    <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                        {whaleAccounts.length === 1 ? (
-                            <li style={{ marginBottom: '0.1rem' }}>1 more account to add (Added: {whaleAccounts[0]})</li>
-                        ) : (
-                            <li style={{ marginBottom: '0.1rem' }}>2 accounts to add</li>
-                        )}
+                    <ul style={{ margin: 0, padding: 0, listStyle: 'none', color: '#431407', fontSize: '0.78rem', fontWeight: 600 }}>
+                        <li
+                            onClick={() => whaleSlideId && onNavigateSlide?.(whaleSlideId)}
+                            onMouseEnter={() => setHoveredWhale(true)}
+                            onMouseLeave={() => setHoveredWhale(false)}
+                            style={{
+                                padding: '0.35rem 0.5rem',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                backgroundColor: hoveredWhale ? '#ffedd5' : 'transparent',
+                                color: hoveredWhale ? '#c2410c' : '#431407',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '0.5rem',
+                                transition: 'all 0.15s ease',
+                                transform: hoveredWhale ? 'translateX(2px)' : 'none'
+                            }}
+                            title="Click to navigate to Whale Accounts slide"
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
+                                <span style={{ 
+                                    width: '6px', 
+                                    height: '6px', 
+                                    borderRadius: '50%', 
+                                    backgroundColor: hoveredWhale ? '#ea580c' : '#f97316',
+                                    flexShrink: 0 
+                                }} />
+                                <span style={{ 
+                                    fontWeight: hoveredWhale ? 700 : 600,
+                                    textDecoration: hoveredWhale ? 'underline' : 'none'
+                                }}>
+                                    {whaleAccounts.length === 1 ? (
+                                        `1 more account to add (Added: ${whaleAccounts[0]})`
+                                    ) : (
+                                        '2 accounts to add'
+                                    )}
+                                </span>
+                            </div>
+                            <ExternalLink 
+                                size={12} 
+                                style={{ 
+                                    flexShrink: 0, 
+                                    color: hoveredWhale ? '#c2410c' : '#94a3b8',
+                                    opacity: hoveredWhale ? 1 : 0.6,
+                                    transform: hoveredWhale ? 'scale(1.15)' : 'scale(1)',
+                                    transition: 'all 0.15s ease'
+                                }} 
+                            />
+                        </li>
                     </ul>
                 </div>
             )}
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
-                {canView && (
-                    <button
-                        onClick={onView}
-                        style={{
-                            backgroundColor: '#5D9CEC',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0.35rem 0.8rem',
-                            borderRadius: '9999px',
-                            fontWeight: 700,
-                            fontSize: '0.8rem',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 4px rgba(93,156,236,0.35)'
-                        }}
-                        title={`View pending input slides for ${title}`}
-                    >
-                        View
-                    </button>
-                )}
-                {onViewWhale && (
-                    <button
-                        onClick={onViewWhale}
-                        style={{
-                            backgroundColor: '#10b981',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0.35rem 0.8rem',
-                            borderRadius: '9999px',
-                            fontWeight: 700,
-                            fontSize: '0.8rem',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 4px rgba(16,185,129,0.35)'
-                        }}
-                        title={`View Whale accounts for ${title}`}
-                    >
-                        Whales
-                    </button>
-                )}
-            </div>
         </div>
     );
 };
@@ -721,6 +935,17 @@ export default function WeeklyTracker() {
     const [activeSlideIndex, setActiveSlideIndex] = useState(0);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const slideshowRef = useRef<HTMLDivElement>(null);
+    const [selectedFY, setSelectedFY] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const urlFy = new URLSearchParams(window.location.search).get('fy');
+            if (urlFy) return urlFy;
+        }
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1; // 1-indexed (Jan=1, Apr=4)
+        const fyNum = month >= 4 ? year + 1 : year;
+        return `FY${fyNum}`;
+    });
 
     // Track which slide is being edited
     const [editingSlide, setEditingSlide] = useState<number | string | null>(null);
@@ -796,7 +1021,7 @@ export default function WeeklyTracker() {
         if (mainId <= 21) return 'Japan';
         if (mainId <= 24) return 'Korea';
         if (mainId <= 27) return 'Legacy';
-        if (mainId <= 30) return 'APAC';
+        if (mainId <= 30) return 'ROW';
         return 'Other';
     };
 
@@ -911,6 +1136,12 @@ export default function WeeklyTracker() {
     const displaySlides = useMemo<SlideItem[]>(() => {
         const result: SlideItem[] = [];
         BASE_SLIDES.forEach(sId => {
+            if (!isAdmin) {
+                const reg = getSlideRegion(sId);
+                if (['Asean', 'Japan', 'Korea'].includes(reg)) {
+                    return;
+                }
+            }
             // Add standard slide
             result.push({ id: sId, isCustom: false });
 
@@ -922,7 +1153,7 @@ export default function WeeklyTracker() {
                 });
         });
         return result;
-    }, [customSlides]);
+    }, [customSlides, isAdmin]);
 
     const BULK_SLIDE_CATEGORIES = useMemo(() => [
         {
@@ -1068,7 +1299,12 @@ export default function WeeklyTracker() {
         await handleBulkVisibilityChange(currentlyHidden, false);
     };
 
-    const REGION_CLUSTER_NAMES = useMemo(() => ['USA West', 'Europe', 'APAC', 'USA East', 'Asean', 'Japan', 'Korea', 'Legacy'], []);
+    const REGION_CLUSTER_NAMES = useMemo(() => {
+        if (isAdmin) {
+            return ['USA West', 'Europe', 'ROW', 'USA East', 'Asean', 'Japan', 'Korea', 'Legacy'];
+        }
+        return ['USA West', 'Europe', 'ROW', 'USA East', 'Legacy'];
+    }, [isAdmin]);
     const ALL_CLUSTERS = useMemo(() => ['Overall', ...REGION_CLUSTER_NAMES], [REGION_CLUSTER_NAMES]);
 
     const [expandedClusters, setExpandedClusters] = useState<Set<string>>(() => new Set<string>());
@@ -1172,6 +1408,7 @@ export default function WeeklyTracker() {
                 onDeleteText={(id) => deleteTextOverlay(slideItem.id, id)}
                 onDeleteImage={(id) => deleteImageOverlay(slideItem.id, id)}
                 quarter={getServicesQuarter(slideItem.id)}
+                fy={selectedFY}
             />
         );
     };
@@ -1431,22 +1668,28 @@ export default function WeeklyTracker() {
                                     {isEditable ? (
                                         <button
                                             onClick={() => handleEditToggle(slideId, isCustom ? title : undefined)}
+                                            disabled={savingSlides.has(slideId)}
                                             style={{
-                                                backgroundColor: isCurrentlyEditing ? '#10b981' : '#93c5fd',
+                                                backgroundColor: isCurrentlyEditing ? (savingSlides.has(slideId) ? '#059669' : '#10b981') : '#93c5fd',
                                                 border: 'none',
                                                 padding: '0.3rem 1rem',
                                                 borderRadius: '20px',
                                                 fontWeight: '700',
                                                 color: isCurrentlyEditing ? '#fff' : '#1e3a8a',
-                                                cursor: 'pointer',
+                                                cursor: savingSlides.has(slideId) ? 'wait' : 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 gap: '0.3rem',
-                                                transition: 'all 0.2s'
+                                                transition: 'all 0.2s',
+                                                opacity: savingSlides.has(slideId) ? 0.85 : 1
                                             }}
                                         >
                                             {isCurrentlyEditing ? (
-                                                <><X size={14} /> Done</>
+                                                savingSlides.has(slideId) ? (
+                                                    <><Loader2 size={14} className="animate-spin" /> Saving...</>
+                                                ) : (
+                                                    <><CheckCircle2 size={14} /> Done</>
+                                                )
                                             ) : (
                                                 <><Pencil size={14} /> Edit</>
                                             )}
@@ -1839,22 +2082,30 @@ export default function WeeklyTracker() {
         }
     };
 
-    const handleEditToggle = (slideId: number | string, currentTitle?: string) => {
+    const [savingSlides, setSavingSlides] = useState<Set<number | string>>(new Set());
+
+    const handleEditToggle = async (slideId: number | string, currentTitle?: string) => {
         if (editingSlide === slideId) {
-            // Saving/Closing
-            // Simple heuristic or pass flag
-            // Actually, we can check displaySlides or just rely on editedTitle state usage
-            // But we need to identify if it WAS a custom slide to save title.
-            // We can check if editedTitle is not empty/different? 
-            // Better: Check if found in customSlides.
+            setSavingSlides(prev => new Set(prev).add(slideId));
+            
             const customSlide = customSlides.find(s => s.id === slideId);
             if (customSlide && editedTitle !== customSlide.title) {
-                updateCustomSlideTitle(String(slideId), editedTitle);
+                await updateCustomSlideTitle(String(slideId), editedTitle);
             }
-            setEditingSlide(null);
-            setEditedTitle("");
+
+            window.dispatchEvent(new CustomEvent('tracker_refresh_slides', { detail: { slideId } }));
+            window.dispatchEvent(new CustomEvent('tracker_refresh_checklist'));
+            
+            setTimeout(() => {
+                setSavingSlides(prev => {
+                    const next = new Set(prev);
+                    next.delete(slideId);
+                    return next;
+                });
+                setEditingSlide(null);
+                setEditedTitle("");
+            }, 350);
         } else {
-            // Opening
             setEditingSlide(slideId);
             if (currentTitle) setEditedTitle(currentTitle);
         }
@@ -2131,7 +2382,8 @@ export default function WeeklyTracker() {
                 body: JSON.stringify({
                     week: currentWeek,
                     regions: selectedExportRegions.size > 0 ? Array.from(selectedExportRegions) : null,
-                    frontend_url: window.location.origin
+                    frontend_url: window.location.origin,
+                    fy: selectedFY
                 })
             });
 
@@ -2316,7 +2568,7 @@ export default function WeeklyTracker() {
         'USA West': ['us_west_acc_mgmt', 'us_west_acc_mgmt_actions', 'us_west_new_biz', 'us_west_new_biz_actions'],
         'Europe': ['europe_acc_mgmt', 'europe_acc_mgmt_actions', 'europe_new_biz', 'europe_new_biz_actions'],
         'USA East': ['us_east_acc_mgmt', 'us_east_acc_mgmt_actions', 'us_east_new_biz', 'us_east_new_biz_actions'],
-        'APAC': [
+        'ROW': [
             'apac_asean_korea_acc_mgmt', 'apac_asean_korea_acc_mgmt_actions',
             'apac_asean_korea_new_biz', 'apac_asean_korea_new_biz_actions',
             'apac_japan_acc_new_biz', 'apac_japan_acc_new_biz_actions'
@@ -2334,7 +2586,7 @@ export default function WeeklyTracker() {
         'USA West': ['9.1', '9.1.1', '9.2', '9.2.1', '9.2.5'],
         'Europe': ['12.1', '12.1.1', '12.2', '12.2.1', '12.2.5'],
         'USA East': ['15.1', '15.1.1', '15.2', '15.2.1', '15.2.5'],
-        'APAC': ['30.1', '30.1.1', '30.2', '30.2.1', '30.3', '30.3.1', '30.2.5'],
+        'ROW': ['30.1', '30.1.1', '30.2', '30.2.1', '30.3', '30.3.1', '30.2.5'],
         'Asean': ['18.1', '18.1.1', '18.2.5'],
         'Japan': ['21.1', '21.1.1', '21.2.5'],
         'Korea': ['24.1', '24.1.1', '24.2.5'],
@@ -2344,20 +2596,21 @@ export default function WeeklyTracker() {
 
     const [highlightedSlides, setHighlightedSlides] = useState<Set<string>>(new Set());
 
-    const handleViewRegion = (region: string) => {
+    const handleViewRegion = (region: string, targetSlideId?: string) => {
         const ids = REGION_SLIDE_IDS[region] || [];
         if (ids.length === 0) return;
-        setHighlightedSlides(new Set(ids));
+        const slideIdToHighlight = targetSlideId || ids[0];
+        setHighlightedSlides(new Set([slideIdToHighlight]));
         setExpandedClusters(prev => {
             const next = new Set(prev);
             next.add(region);
             return next;
         });
-        // Scroll to the first highlighted slide
+        // Scroll to the target highlighted slide
         setTimeout(() => {
-            const first = document.getElementById(`slide-preview-${ids[0]}`);
-            if (first) {
-                first.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const el = document.getElementById(`slide-preview-${slideIdToHighlight}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }, 50);
         // Auto-clear highlight after a few seconds
@@ -2366,24 +2619,13 @@ export default function WeeklyTracker() {
         }, 5000);
     };
 
-    const handleViewWhale = (region: string) => {
-        const ids = REGION_SLIDE_IDS[region] || [];
-        const whaleId = ids[ids.length - 1];
-        if (!whaleId) return;
-        setHighlightedSlides(new Set([whaleId]));
-        setExpandedClusters(prev => {
-            const next = new Set(prev);
-            next.add(region);
-            return next;
-        });
-        setTimeout(() => {
-            const el = document.getElementById(`slide-preview-${whaleId}`);
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 50);
-        window.setTimeout(() => setHighlightedSlides(new Set()), 5000);
-    };
-
-    const [regionCounts, setRegionCounts] = useState<Record<string, { filled: number; total: number; missing: string[]; whaleNames: string[] }>>({});
+    const [regionCounts, setRegionCounts] = useState<Record<string, { 
+        filled: number; 
+        total: number; 
+        missingItems: MissingSlideItem[]; 
+        whaleNames: string[];
+        whaleSlideId?: string;
+    }>>({});
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     useEffect(() => {
@@ -2393,18 +2635,28 @@ export default function WeeklyTracker() {
     }, []);
 
     // Human readable name for a slide input key
-    const getSlideInputName = (sid: string): string => {
+    const getSlideInputName = (sid: string, regionName?: string): string => {
+        const prefix = regionName ? `${regionName} - ` : '';
         if (sid.includes('_whale_account_')) {
             const num = sid.split('_whale_account_')[1];
-            return `Whale Account ${num}`;
+            return `${prefix}Whale Account ${num}`;
         }
-        if (sid.endsWith('_acc_new_biz_actions')) return 'Account / New Business Action Points';
-        if (sid.endsWith('_acc_new_biz')) return 'Account / New Business Summary';
-        if (sid.endsWith('_acc_mgmt_actions')) return 'Account Management - Action Points';
-        if (sid.endsWith('_acc_mgmt')) return 'Account Management Summary';
-        if (sid.endsWith('_new_biz_actions')) return 'New Business - Action Points';
-        if (sid.endsWith('_new_biz')) return 'New Business Summary';
-        return sid;
+        
+        // Exact slide titles matching slide headers
+        if (sid === 'apac_asean_korea_acc_mgmt') return 'ROW — Asean & Korea Account Summary';
+        if (sid === 'apac_asean_korea_acc_mgmt_actions') return 'ROW — Asean & Korea Account Action Items';
+        if (sid === 'apac_asean_korea_new_biz') return 'ROW — Asean & Korea New Business Summary';
+        if (sid === 'apac_asean_korea_new_biz_actions') return 'ROW — Asean & Korea New Business Action Items';
+        if (sid === 'apac_japan_acc_new_biz') return 'ROW — Japan Account / New Business Summary';
+        if (sid === 'apac_japan_acc_new_biz_actions') return 'ROW — Japan Account / New Business Action Items';
+
+        if (sid.endsWith('_acc_new_biz_actions')) return `${prefix}Account / New Business Action Items`;
+        if (sid.endsWith('_acc_new_biz')) return `${prefix}Account / New Business Summary`;
+        if (sid.endsWith('_acc_mgmt_actions')) return `${prefix}Account Management Action Items`;
+        if (sid.endsWith('_acc_mgmt')) return `${prefix}Account Management Summary`;
+        if (sid.endsWith('_new_biz_actions')) return `${prefix}New Business Action Items`;
+        if (sid.endsWith('_new_biz')) return `${prefix}New Business Summary`;
+        return `${prefix}${sid}`;
     };
 
     useEffect(() => {
@@ -2414,14 +2666,15 @@ export default function WeeklyTracker() {
         const regions = Object.keys(REGION_SLIDES);
 
         const fetchForRegion = async (region: string) => {
-            const slideIds = REGION_SLIDES[region] || [];
-            const missing: string[] = [];
+            const slideKeys = REGION_SLIDES[region] || [];
+            const slideIds = REGION_SLIDE_IDS[region] || [];
+            const missingKeys: string[] = [];
 
-            await Promise.all(slideIds.map(async (sid) => {
+            await Promise.all(slideKeys.map(async (sid) => {
                 try {
-                    const res = await fetch(`/api/admin/slide-inputs/${encodeURIComponent(sid)}`);
+                    const res = await fetch(`/api/admin/slide-inputs/${encodeURIComponent(sid)}?fy=${selectedFY}`);
                     if (!res.ok) {
-                        missing.push(sid);
+                        missingKeys.push(sid);
                         return;
                     }
                     const entries = await res.json();
@@ -2432,10 +2685,10 @@ export default function WeeklyTracker() {
                         const text = typeof e.freeform_text === 'string' ? e.freeform_text.trim() : '';
                         return text.length > 0;
                     });
-                    if (!hasCurrent) missing.push(sid);
+                    if (!hasCurrent) missingKeys.push(sid);
                 } catch (err) {
                     console.error('Failed to fetch slide inputs for', sid, err);
-                    missing.push(sid);
+                    missingKeys.push(sid);
                 }
             }));
             
@@ -2443,7 +2696,7 @@ export default function WeeklyTracker() {
             // Whale Accounts missing items (2 required)
             if (region !== 'Overall' && region !== 'Financial Team') {
                 try {
-                    const wRes = await fetch(`/api/admin/whale-accounts/stats/${encodeURIComponent(region)}/${currentWeek}`);
+                    const wRes = await fetch(`/api/admin/whale-accounts/stats/${encodeURIComponent(region)}/${currentWeek}?fy=${selectedFY}`);
                     if (wRes.ok) {
                         const data = await wRes.json();
                         whaleNames = data.names || [];
@@ -2453,26 +2706,47 @@ export default function WeeklyTracker() {
                 }
             }
             
-            const expectedTotal = slideIds.length + (region !== 'Overall' && region !== 'Financial Team' ? 2 : 0);
+            const expectedTotal = slideKeys.length + (region !== 'Overall' && region !== 'Financial Team' ? 2 : 0);
             const whaleMissingCount = Math.max(0, 2 - whaleNames.length);
 
             // Preserve ordering as defined in REGION_SLIDES
-            const orderedMissing = slideIds.filter(s => missing.includes(s)).map(getSlideInputName);
+            const orderedMissingItems: MissingSlideItem[] = slideKeys
+                .map((key, idx) => ({
+                    key,
+                    name: getSlideInputName(key, region),
+                    slideId: slideIds[idx] || ''
+                }))
+                .filter(item => missingKeys.includes(item.key));
+
+            const whaleSlideId = slideIds.length > 0 ? slideIds[slideIds.length - 1] : undefined;
             
-            return { region, filled: expectedTotal - orderedMissing.length - whaleMissingCount, total: expectedTotal, missing: orderedMissing, whaleNames };
+            return { 
+                region, 
+                filled: expectedTotal - orderedMissingItems.length - whaleMissingCount, 
+                total: expectedTotal, 
+                missingItems: orderedMissingItems, 
+                whaleNames,
+                whaleSlideId
+            };
         };
 
         (async () => {
             const results = await Promise.all(regions.map(r => fetchForRegion(r)));
-            const map: Record<string, { filled: number; total: number; missing: string[]; whaleNames: string[] }> = {};
+            const map: Record<string, { filled: number; total: number; missingItems: MissingSlideItem[]; whaleNames: string[]; whaleSlideId?: string }> = {};
             results.forEach(r => {
                 if (!r) return;
-                map[r.region] = { filled: r.filled, total: r.total, missing: r.missing, whaleNames: r.whaleNames };
+                map[r.region] = { 
+                    filled: r.filled, 
+                    total: r.total, 
+                    missingItems: r.missingItems, 
+                    whaleNames: r.whaleNames,
+                    whaleSlideId: r.whaleSlideId
+                };
             });
             setRegionCounts(map);
         })();
 
-    }, [currentWeek, refreshTrigger]);
+    }, [currentWeek, selectedFY, refreshTrigger]);
 
     const isExportServer = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('export_server') === 'true';
 
@@ -2632,23 +2906,63 @@ export default function WeeklyTracker() {
                 <h2 style={{ fontSize: '2rem', fontWeight: '700', color: '#9ca3af', marginBottom: '0.5rem' }}>
                     Pending user input check list
                 </h2>
-                <div style={{ fontSize: '1.2rem', color: '#9ca3af', fontWeight: '600', marginBottom: '3rem' }}>
+                <div style={{ fontSize: '1.2rem', color: '#9ca3af', fontWeight: '600', marginBottom: '1rem' }}>
                     Current week : week {currentWeek}
+                </div>
+                
+                {/* FY Tabs */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '1.1rem', fontWeight: '700', color: '#4b5563' }}>
+                        Financial Year:
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem', backgroundColor: '#e2e8f0', padding: '0.3rem', borderRadius: '10px' }}>
+                        {['FY2027', 'FY2028'].map(fy => (
+                            <button
+                                key={fy}
+                                onClick={() => setSelectedFY(fy)}
+                                style={{
+                                    padding: '0.5rem 1.5rem',
+                                    backgroundColor: selectedFY === fy ? '#2563eb' : 'transparent',
+                                    color: selectedFY === fy ? 'white' : '#475569',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontWeight: '700',
+                                    fontSize: '1rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: selectedFY === fy ? '0 2px 4px rgba(37,99,235,0.3)' : 'none'
+                                }}
+                            >
+                                {fy}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
             {/* Pending Input Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1.5rem', marginBottom: '5rem', maxWidth: '1200px' }}>
-                {['Overall','USA West','Europe','USA East','Asean','Japan','Korea','APAC','Legacy','Financial Team'].map(name => {
-                    const stats = regionCounts[name] || { filled: 0, total: REGION_SLIDES[name]?.length || 0, missing: [] as string[], whaleNames: [] as string[] };
-                    const hasWhales = name !== 'Overall' && name !== 'Financial Team';
-                    return <StatusCard key={name} title={name} filled={stats.filled} total={stats.total} missingNames={stats.missing} whaleAccounts={stats.whaleNames} onView={() => handleViewRegion(name)} onViewWhale={hasWhales ? () => handleViewWhale(name) : undefined} />;
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem', marginBottom: '5rem', maxWidth: '1200px' }}>
+                {(isAdmin ? ['USA West', 'Europe', 'USA East', 'Asean', 'Japan', 'Korea', 'ROW', 'Legacy'] : ['USA West', 'Europe', 'USA East', 'ROW', 'Legacy']).map(name => {
+                    const stats = regionCounts[name] || { filled: 0, total: REGION_SLIDE_IDS[name]?.length || 0, missingItems: [], whaleNames: [], whaleSlideId: undefined };
+                    return (
+                        <StatusCard 
+                            key={name} 
+                            title={name} 
+                            filled={stats.filled} 
+                            total={stats.total} 
+                            missingItems={stats.missingItems} 
+                            whaleAccounts={stats.whaleNames}
+                            whaleSlideId={stats.whaleSlideId}
+                            firstSlideId={REGION_SLIDE_IDS[name]?.[0]}
+                            onNavigateSlide={(slideId) => handleViewRegion(name, slideId)}
+                        />
+                    );
                 })}
             </div>
 
             {/* PPT Section */}
             <div style={{ marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginLeft: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginLeft: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
                     <h2 style={{ fontSize: '2.5rem', fontWeight: '700', color: '#9ca3af', margin: 0 }}>
                         PPT Section
                     </h2>
@@ -2673,6 +2987,30 @@ export default function WeeklyTracker() {
                             ))}
                         </select>
                     )}
+                    {/* FY Switcher in PPT Section header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#e2e8f0', padding: '0.25rem', borderRadius: '8px', marginLeft: '0.5rem' }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#475569', paddingLeft: '0.5rem' }}>FY:</span>
+                        {['FY2027', 'FY2028'].map(fy => (
+                            <button
+                                key={fy}
+                                onClick={() => setSelectedFY(fy)}
+                                style={{
+                                    padding: '0.4rem 1rem',
+                                    backgroundColor: selectedFY === fy ? '#2563eb' : 'transparent',
+                                    color: selectedFY === fy ? 'white' : '#475569',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontWeight: '700',
+                                    fontSize: '0.95rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    boxShadow: selectedFY === fy ? '0 2px 4px rgba(37,99,235,0.3)' : 'none'
+                                }}
+                            >
+                                {fy}
+                            </button>
+                        ))}
+                    </div>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '1rem', marginLeft: '1rem', marginBottom: '1rem' }}>
                     <button

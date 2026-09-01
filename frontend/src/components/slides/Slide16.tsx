@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import { CumulativePerformanceChart } from '../shared_charts/CumulativePerformanceChart';
 
-export default function Slide16() {
+export default function Slide16({ fy = "FY2027" }: { fy?: string }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fy]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide16');
+            const response = await fetch(`/api/admin/slides/slide16?fy=${fy}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             if (result.error) throw new Error(result.error);
@@ -33,7 +33,7 @@ export default function Slide16() {
     return (
         <CumulativePerformanceChart 
             data={data} 
-            title="FY2027 - ASEAN Cumulative Performance vs Targets" 
+            title={`${fy} - ASEAN Cumulative Performance vs Targets`} 
         />
     );
 }

@@ -5,19 +5,19 @@ interface Slide21Props {
     isEditing?: boolean;
 }
 
-export default function Slide21({ isEditing = false }: Slide21Props) {
+export default function Slide21({ isEditing = false , fy = "FY2027" }: Slide21Props & { fy?: string }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fy]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide21');
+            const response = await fetch(`/api/admin/slides/slide21?fy=${fy}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             if (result.error) throw new Error(result.error);
@@ -40,6 +40,7 @@ export default function Slide21({ isEditing = false }: Slide21Props) {
             title="Japan - Actuals vs Weighted Pipeline"
             slideNo={21}
             isEditing={isEditing}
+            fy={fy}
         />
     );
 }

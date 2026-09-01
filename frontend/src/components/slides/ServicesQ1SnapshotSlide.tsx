@@ -13,7 +13,7 @@ const formatCurrency = (value: number) => {
     return `$${(value / 1e6).toFixed(2)}M`;
 };
 
-export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: ServicesQ1SnapshotSlideProps) {
+export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' , fy = "FY2027" }: ServicesQ1SnapshotSlideProps & { fy?: string }) {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
                 setLoading(true);
                 // Add cache-busting to prevent stale data
                 const cacheBuster = new Date().getTime();
-                const response = await fetch(`/api/admin/slides/services-q1-snapshot?region=${encodeURIComponent(region)}&quarter=${encodeURIComponent(quarter)}&_cb=${cacheBuster}`, {
+                const response = await fetch(`/api/admin/slides/services-q1-snapshot?region=${encodeURIComponent(region)}&quarter=${encodeURIComponent(quarter)}&fy=${fy}&_cb=${cacheBuster}`, {
                     cache: 'no-store',
                     headers: {
                         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -53,7 +53,7 @@ export default function ServicesQ1SnapshotSlide({ region, quarter = 'Q2' }: Serv
         return () => {
             cancelled = true;
         };
-    }, [region, quarter]);
+    }, [region, quarter, fy]);
 
     const wrapCalWeek = (w: number) => ((w - 1) % 52) + 1;
 

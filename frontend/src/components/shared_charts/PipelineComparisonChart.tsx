@@ -31,7 +31,7 @@ const REGION_OPTIONS = [
     'Japan',
     'KANZ',
     'Management',
-    'APAC'
+    'ROW'
 ];
 
 const SERVICE_OPTIONS = ['ALL', 'Services'];
@@ -45,11 +45,11 @@ const getInitialRegionForSlide = (sNo?: number): string => {
     if (sNo === 21 || sNo === 21001) return 'Japan';
     if (sNo === 24 || sNo === 24001) return 'KANZ';
     if (sNo === 27 || sNo === 27001) return 'Management';
-    if (sNo === 30 || sNo === 30001) return 'APAC';
+    if (sNo === 30 || sNo === 30001) return 'ROW';
     return 'Overall';
 };
 
-export function PipelineComparisonChart({ data, title, slideNo, isEditing = false, hideTargets = false }: PipelineChartProps) {
+export function PipelineComparisonChart({ data, title, slideNo, isEditing = false, hideTargets = false, fy = "FY2027" }: PipelineChartProps & { fy?: string }) {
     const plotRef = useRef<any>(null);
     const [figData, setFigData] = useState<any[]>([]);
     const [figLayout, setFigLayout] = useState<any>({});
@@ -87,12 +87,12 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
             .then(d => setCurrentSystemWeek(d.week))
             .catch(err => console.error("Failed to fetch current week:", err));
 
-    }, [slideNo]);
+    }, [slideNo, fy]);
 
     const fetchInputs = async () => {
         if (!slideNo) return;
         try {
-            const res = await fetch(`/api/admin/slide-inputs/${slideNo}`);
+            const res = await fetch(`/api/admin/slide-inputs/${slideNo}?fy=${fy}`);
             const items: SlideInput[] = await res.json();
             setPipelineItems(items.filter(i => i.table_name === 'pipeline_to_po'));
             setPipelineLostItems(items.filter(i => i.table_name === 'pipeline_lost'));
@@ -102,6 +102,14 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
         }
     };
 
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        const handleRefresh = () => fetchInputs();
+        window.addEventListener('tracker_refresh_slides', handleRefresh);
+        return () => window.removeEventListener('tracker_refresh_slides', handleRefresh);
+    }, [slideNo, fy]);
+
     const handleAddRow = async (tableName: string) => {
         if (!slideNo) return;
         const text = tableName === 'pipeline_to_po' ? newPipelineText : tableName === 'pipeline_lost' ? newPipelineLostText : newNewPipelineText;
@@ -110,6 +118,7 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
         const reg = newRegionMap[tableName] || getInitialRegionForSlide(slideNo);
         const stype = newServiceTypeMap[tableName] || (slideNo > 1000 ? 'Services' : 'ALL');
 
+        setIsSaving(true);
         try {
             const res = await fetch('/api/admin/slide-inputs', {
                 method: 'POST',
@@ -120,22 +129,27 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
                     freeform_text: text.trim(),
                     week_recorded: currentSystemWeek,
                     region: reg,
-                    service_type: stype
+                    service_type: stype,
+                    fy: fy
                 })
             });
             if (res.ok) {
                 if (tableName === 'pipeline_to_po') setNewPipelineText('');
                 else if (tableName === 'pipeline_lost') setNewPipelineLostText('');
                 else setNewNewPipelineText('');
-                fetchInputs();
+                await fetchInputs();
+                window.dispatchEvent(new CustomEvent('tracker_refresh_checklist'));
             }
         } catch (err) {
             console.error('Failed to add input:', err);
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleUpdateRow = async (item: SlideInput) => {
         if (!item.id) return;
+        setIsSaving(true);
         try {
             const res = await fetch(`/api/admin/slide-inputs/${item.id}`, {
                 method: 'PUT',
@@ -147,27 +161,35 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
                     row_index: item.row_index,
                     week_recorded: currentSystemWeek,
                     region: editRegion,
-                    service_type: editServiceType
+                    service_type: editServiceType,
+                    fy: fy
                 })
             });
             if (res.ok) {
                 setEditingId(null);
                 setEditText('');
-                fetchInputs();
+                await fetchInputs();
+                window.dispatchEvent(new CustomEvent('tracker_refresh_checklist'));
             }
         } catch (err) {
             console.error('Failed to update input:', err);
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleDeleteRow = async (id: string) => {
+        setIsSaving(true);
         try {
             const res = await fetch(`/api/admin/slide-inputs/${id}`, { method: 'DELETE' });
             if (res.ok) {
-                fetchInputs();
+                await fetchInputs();
+                window.dispatchEvent(new CustomEvent('tracker_refresh_checklist'));
             }
         } catch (err) {
             console.error('Failed to delete input:', err);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -546,17 +568,18 @@ export function PipelineComparisonChart({ data, title, slideNo, isEditing = fals
                             </select>
                             <button
                                 onClick={() => handleAddRow(tableName)}
+                                disabled={isSaving}
                                 style={{
-                                    backgroundColor: '#3b82f6',
+                                    backgroundColor: isSaving ? '#93c5fd' : '#3b82f6',
                                     color: '#fff',
                                     border: 'none',
                                     borderRadius: '4px',
                                     padding: '2px 8px',
                                     fontSize: '0.65rem',
                                     fontWeight: '700',
-                                    cursor: 'pointer'
+                                    cursor: isSaving ? 'wait' : 'pointer'
                                 }}
-                            >+ Add</button>
+                            >{isSaving ? 'Saving...' : '+ Add'}</button>
                         </div>
                     </div>
                 )}

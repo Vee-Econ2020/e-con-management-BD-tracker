@@ -5,19 +5,19 @@ interface Slide24Props {
     isEditing?: boolean;
 }
 
-export default function Slide24({ isEditing = false }: Slide24Props) {
+export default function Slide24({ isEditing = false , fy = "FY2027" }: Slide24Props & { fy?: string }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fy]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/admin/slides/slide24');
+            const response = await fetch(`/api/admin/slides/slide24?fy=${fy}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             if (result.error) throw new Error(result.error);
@@ -40,6 +40,7 @@ export default function Slide24({ isEditing = false }: Slide24Props) {
             title="KANZ - Actuals vs Weighted Pipeline"
             slideNo={24}
             isEditing={isEditing}
+            fy={fy}
         />
     );
 }
