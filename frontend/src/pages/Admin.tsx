@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { TargetSetting } from '../components/TargetSetting';
 import { CrmDataUpload } from '../components/CrmDataUpload';
 import AccessManagement from './AccessManagement';
+import { AiAgentConfig } from '../components/AiAgentConfig';
 import { useAuth } from '../context/AuthContext';
 
 function Admin() {
-    const [activeTab, setActiveTab] = useState<'crm' | 'target' | 'access'>('target');
+    const [activeTab, setActiveTab] = useState<'crm' | 'target' | 'access' | 'ai_agent'>('target');
     const navigate = useNavigate();
     const { logout } = useAuth();
 
@@ -72,7 +73,7 @@ function Admin() {
             </h1>
 
             {/* Tabs Row - Positioned to touch the content box below */}
-            <div style={{ display: 'flex', gap: '1rem', marginLeft: '2rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', marginLeft: '2rem', flexWrap: 'wrap' }}>
                 <button
                     onClick={() => setActiveTab('crm')}
                     style={{
@@ -176,6 +177,40 @@ function Admin() {
                     <div style={{ fontSize: '1.6rem', lineHeight: '1.2' }}>Access</div>
                     <div style={{ fontSize: '1.1rem', fontWeight: '700' }}>Management</div>
                 </button>
+
+                <button
+                    onClick={() => setActiveTab('ai_agent')}
+                    style={{
+                        backgroundColor: activeTab === 'ai_agent' ? '#333333' : '#9ca3af',
+                        color: activeTab === 'ai_agent' ? 'white' : '#000000',
+                        border: 'none',
+                        padding: '1.2rem 2.5rem 1.2rem 3.5rem',
+                        fontSize: '1.6rem',
+                        fontWeight: '900',
+                        textAlign: 'left',
+                        minWidth: '260px',
+                        clipPath: 'polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 0 100%)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        opacity: activeTab === 'ai_agent' ? 1 : 0.6,
+                        marginBottom: '-1px',
+                        position: 'relative',
+                        zIndex: 2,
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}
+                >
+                    <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: '16px',
+                        backgroundColor: '#3a549c'
+                    }}></div>
+                    <div style={{ fontSize: '1.6rem', lineHeight: '1.2' }}>AI Agents</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: '700' }}>AI Assistant</div>
+                </button>
             </div>
 
             <div style={{
@@ -191,6 +226,8 @@ function Admin() {
                 {activeTab === 'target' && <TargetSetting />}
                 
                 {activeTab === 'access' && <AccessManagement />}
+
+                {activeTab === 'ai_agent' && <AiAgentConfig />}
             </div>
         </div>
     );

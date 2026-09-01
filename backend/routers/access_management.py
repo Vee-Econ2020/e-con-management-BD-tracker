@@ -19,6 +19,7 @@ class ApproveRequest(BaseModel):
     sub_role: str
     tracker_access: List[str]
     symb_permissions: List[str]
+    ai_agent_access: Optional[bool] = False
 
 @router.post("/request-access")
 async def request_access(payload: AccessRequest):
@@ -147,6 +148,7 @@ class UpdateUserRequest(BaseModel):
     sub_role: str
     tracker_access: List[str]
     symb_permissions: List[str]
+    ai_agent_access: Optional[bool] = False
 
 @router.put("/update-user/{email}")
 async def update_user_access(email: str, payload: UpdateUserRequest, current_user: dict = Depends(get_current_user)):
@@ -155,6 +157,8 @@ async def update_user_access(email: str, payload: UpdateUserRequest, current_use
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    has_ai = payload.ai_agent_access or ("AI Agent" in payload.tracker_access)
+
     await db["users"].update_one(
         {"email": email},
         {"$set": {
@@ -162,6 +166,7 @@ async def update_user_access(email: str, payload: UpdateUserRequest, current_use
             "sub_role": payload.sub_role,
             "tracker_access": payload.tracker_access,
             "symb_permissions": payload.symb_permissions,
+            "ai_agent_access": has_ai,
             "has_pending_page_request": False,
             "requested_pages": [],
             "updated_at": datetime.utcnow(),
@@ -174,7 +179,8 @@ async def update_user_access(email: str, payload: UpdateUserRequest, current_use
             "role": payload.role,
             "sub_role": payload.sub_role,
             "tracker_access": payload.tracker_access,
-            "symb_permissions": payload.symb_permissions
+            "symb_permissions": payload.symb_permissions,
+            "ai_agent_access": has_ai
         }}
     )
     return {"status": "ok", "message": "User access updated successfully"}
@@ -186,6 +192,8 @@ async def approve_request(email: str, payload: ApproveRequest, current_user: dic
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    has_ai = payload.ai_agent_access or ("AI Agent" in payload.tracker_access)
+
     # If active user requesting a new page
     if user.get("status") == "Active":
         await db["users"].update_one(
@@ -195,6 +203,7 @@ async def approve_request(email: str, payload: ApproveRequest, current_user: dic
                 "sub_role": payload.sub_role,
                 "tracker_access": payload.tracker_access,
                 "symb_permissions": payload.symb_permissions,
+                "ai_agent_access": has_ai,
                 "has_pending_page_request": False,
                 "requested_pages": [],
                 "updated_at": datetime.utcnow(),
@@ -207,7 +216,8 @@ async def approve_request(email: str, payload: ApproveRequest, current_user: dic
                 "role": payload.role,
                 "sub_role": payload.sub_role,
                 "tracker_access": payload.tracker_access,
-                "symb_permissions": payload.symb_permissions
+                "symb_permissions": payload.symb_permissions,
+                "ai_agent_access": has_ai
             }}
         )
         return {"status": "ok", "message": "User page request approved successfully"}
@@ -227,6 +237,7 @@ async def approve_request(email: str, payload: ApproveRequest, current_user: dic
             "sub_role": payload.sub_role,
             "tracker_access": payload.tracker_access,
             "symb_permissions": payload.symb_permissions,
+            "ai_agent_access": has_ai,
             "salt": salt.hex(),
             "password_hash": password_hash,
             "initial_password": password,

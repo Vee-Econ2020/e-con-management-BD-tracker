@@ -1237,8 +1237,8 @@ export default function AccessManagement() {
 
                                 <div>
                                     <label>Tracker Access</label>
-                                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                                        {['Weekly', 'Revenue', 'SYMB', 'Admin'].map(t => (
+                                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                                        {['Weekly', 'Revenue', 'SYMB', 'Admin', 'AI Agent'].map(t => (
                                             <label key={t} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                                 <input type="checkbox" checked={trackerAccess.includes(t)} onChange={() => handleTrackerChange(t)} /> {t}
                                             </label>

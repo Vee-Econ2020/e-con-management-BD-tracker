@@ -81,6 +81,7 @@ import ServicesBacklogSlide from '../components/slides/ServicesBacklogSlide';
 import { WhaleAccountSlide } from '../components/slides/WhaleAccountSlide';
 import ServicesQ1SnapshotSlide from '../components/slides/ServicesQ1SnapshotSlide';
 import InvoiceChartSlide from '../components/slides/InvoiceChartSlide';
+import { AiChatbot } from '../components/AiChatbot';
 
 // --- Configuration ---
 // Components that accept isEditing prop
@@ -3478,6 +3479,9 @@ export default function WeeklyTracker() {
                     );
                 })}
             </div>
+
+            {/* AI Agent Chatbot Section (Admin Preview Only) */}
+            {isAdmin && <AiChatbot currentWeek={currentWeek} fy={selectedFY} />}
 
             {/* Slideshow Modal / Overlay */}
             {isSlideshowOpen && (

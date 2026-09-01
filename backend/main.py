@@ -12,6 +12,8 @@ from routers import admin
 from routers import auth as auth_router
 from routers import access_management
 from routers import export as export_router
+from routers import ai_agent
+
 from context import target_week_var
 
 app = FastAPI(title="e-con Business Development Tracker API")
@@ -20,6 +22,7 @@ app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(auth_router.router, prefix="/api/admin/auth", tags=["auth"])
 app.include_router(access_management.router, prefix="/api/access", tags=["access"])
 app.include_router(export_router.router, prefix="/api/admin", tags=["export"])
+app.include_router(ai_agent.router, prefix="/api", tags=["ai_agent"])
 
 # CORS Configuration
 app.add_middleware(
