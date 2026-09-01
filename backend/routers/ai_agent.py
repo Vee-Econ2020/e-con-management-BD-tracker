@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 import re
 import uuid
@@ -13,6 +14,7 @@ from typing import List, Optional, Dict, Any
 import pandas as pd
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi.responses import Response
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -82,28 +84,33 @@ STRICT DOMAIN GUARDRAILS:
 5. Format your answers clearly with bullet points, structured sections, and markdown tables where suitable. Always specify the financial year or week number if relevant.
 
 AVAILABLE TOOLS & STRATEGY PLAYBOOK:
-1. `get_dashboard_summary`:
+1. `search_company_or_deal`:
+   - ALWAYS USE THIS FIRST whenever the user asks about ANY specific company, customer, deal, client, or account name (e.g. 'JPW', 'Exotec', 'Neros Technologies', 'Hillman', 'Anton Par', 'NEURA Robotics', 'Emesent', etc.).
+   - This tool simultaneously searches across:
+     a) Slide Tables & Notes (`weekly_tracker_user_input` - Pipeline to PO, Pushout, New Pipeline, Notes)
+     b) CRM Pipeline & Closed Won Opportunities (`weekly_tracker_data` across all weeks)
+     c) Order Backlogs (`orderbacklogs`)
+     d) Whale Accounts & Executive Notes (`whale_accounts`)
+   - Example Questions: "find when JPW closed won week", "How many weeks was Exotec in PO Pending in Europe?", "Show all deals for Neros Technologies".
+2. `get_dashboard_summary`:
    - USE FOR: Executive KPI overviews, total PO won till now, cumulative performance, overall pipeline forecast, Base Target vs Stretch Target, total invoiced revenue, achievement percentages, and deficits.
    - Example Questions: "What is the total PO won till now in FY2027?", "What is our stretch target and deficit?", "How much have we invoiced so far?"
-2. `get_order_backlogs`:
+3. `get_order_backlogs`:
    - USE FOR: Total overall order backlog, regional backlog, and opportunity type breakdown (Existing Business, Samples, Service, etc.).
    - Returns: `total_uninvoiced_backlog` (in USD), `total_uninvoiced_formatted` (e.g., $17.87M), and detailed list per region.
-   - Present the total uninvoiced order backlog prominently at the top, followed by the breakdown by region and opportunity type.
-3. `run_mongo_aggregation`:
+4. `run_mongo_aggregation`:
    - USE FOR: Custom aggregations, dynamic sums, counts, and grouping across any database collection.
    - Example Questions: "Breakdown of Closed Won POs by quarter", "Top 5 sales owners by pipeline", "Total revenue per region", "Count of opportunities in each stage".
-4. `execute_pandas_analytics`:
+5. `execute_pandas_analytics`:
    - USE FOR: Advanced mathematical calculations, custom ratios, percentile trends, or multi-week comparisons using Python/Pandas over the dataset.
-5. `get_slide_data`:
+6. `get_slide_data`:
    - USE FOR: Slide-specific data and charts (Slide 1 to 30, or Services slides).
-6. `search_user_inputs`:
-   - USE FOR: Manual slide notes, table contents, and regional BD inputs (e.g. key POs won >50K, pending opps, PO Pending table, RFQs, pushout, meeting notes).
-   - Example Questions: "How many weeks was Exotec in PO Pending in Europe?", "Search slide notes for client updates", "Find notes on pushout deals".
-7. `search_whale_accounts`:
+7. `search_user_inputs`:
+   - USE FOR: Manual slide notes, table contents, and regional BD inputs.
+8. `search_whale_accounts`:
    - USE FOR: High-value Whale account updates, executive notes, and historical logs.
-8. `search_pipeline_data`:
-   - USE FOR: CRM opportunity search across weeks for any account/deal name, stage, or region.
-   - Example Questions: "Show all pipeline opportunities for Exotec", "Find deals in Europe in Proposal stage".
+9. `search_pipeline_data`:
+   - USE FOR: Specific CRM opportunity drill-downs and deal details.
 
 DATABASE SCHEMAS & KEY FIELD NAMES:
 - `orderbacklogs`:
@@ -166,8 +173,122 @@ def serialize_mongo_val(val: Any) -> Any:
 async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
     """Execute read-only database query or computation based on the tool name requested by the LLM."""
     try:
+        # 0. Comprehensive cross-database search for any company, deal, account, or customer name
+        if tool_name == "search_company_or_deal":
+            query = args.get("query", "").strip()
+            region = args.get("region")
+            if not query:
+                return {"error": "query parameter is required"}
+
+            reg_rgx = {"$regex": f"^{re.escape(region)}$", "$options": "i"} if region and region.lower() not in ["all", "overall"] else None
+
+            # 1. Search Slide Tables & Notes (weekly_tracker_user_input)
+            user_input_q: Dict[str, Any] = {
+                "$or": [
+                    {"freeform_text": {"$regex": re.escape(query), "$options": "i"}},
+                    {"table_name": {"$regex": re.escape(query), "$options": "i"}}
+                ]
+            }
+            if reg_rgx:
+                user_input_q = {"$and": [user_input_q, {"$or": [{"region": reg_rgx}, {"slide_id": {"$regex": re.escape(region), "$options": "i"}}]}]}
+
+            slide_entries = []
+            async for doc in db["weekly_tracker_user_input"].find(user_input_q).sort("week_recorded", -1).limit(40):
+                slide_entries.append({
+                    "source": "Slide Note / Table",
+                    "week": doc.get("week_recorded"),
+                    "region": doc.get("region"),
+                    "table_name": doc.get("table_name"),
+                    "slide_id": doc.get("slide_id") or doc.get("slide_no"),
+                    "text": clean_html(doc.get("freeform_text", "")),
+                    "raw_text": doc.get("freeform_text", "")[:300],
+                    "date_updated": serialize_mongo_val(doc.get("date_updated"))
+                })
+
+            # 2. Search CRM Opportunities & Closed Won Deals (weekly_tracker_data)
+            crm_q: Dict[str, Any] = {
+                "$or": [
+                    {"Account Name": {"$regex": re.escape(query), "$options": "i"}},
+                    {"account_name": {"$regex": re.escape(query), "$options": "i"}},
+                    {"Opportunity Name": {"$regex": re.escape(query), "$options": "i"}},
+                    {"opportunity_name": {"$regex": re.escape(query), "$options": "i"}},
+                    {"Customer Name": {"$regex": re.escape(query), "$options": "i"}}
+                ]
+            }
+            if reg_rgx:
+                crm_q = {"$and": [crm_q, {"$or": [{"mRegion": reg_rgx}, {"region": reg_rgx}]}]}
+
+            crm_records = []
+            async for doc in db["weekly_tracker_data"].find(crm_q).sort("week", -1).limit(40):
+                crm_records.append({
+                    "source": "CRM Opportunity",
+                    "week": doc.get("week"),
+                    "region": doc.get("mRegion") or doc.get("region"),
+                    "account_name": doc.get("Account Name") or doc.get("account_name"),
+                    "opportunity_name": doc.get("Opportunity Name") or doc.get("opportunity_name"),
+                    "stage": doc.get("stage") or doc.get("Stage"),
+                    "category": doc.get("projection - category") or doc.get("category"),
+                    "weighted_amount": doc.get("Weighted Amount") or doc.get("weighted_amount"),
+                    "amount": doc.get("amount") or doc.get("revenue") or doc.get("Amount - unInvoiced"),
+                    "fy": doc.get("closing date Fy") or doc.get("fy"),
+                    "owner": doc.get("Opportunity Owner") or doc.get("opportunity_owner")
+                })
+
+            # 3. Search Order Backlogs (orderbacklogs)
+            backlog_q: Dict[str, Any] = {
+                "$or": [
+                    {"Account Name": {"$regex": re.escape(query), "$options": "i"}},
+                    {"Opportunity Name": {"$regex": re.escape(query), "$options": "i"}},
+                    {"OPP_Name": {"$regex": re.escape(query), "$options": "i"}},
+                    {"Customer": {"$regex": re.escape(query), "$options": "i"}}
+                ]
+            }
+            if reg_rgx:
+                backlog_q = {"$and": [backlog_q, {"$or": [{"mRegion": reg_rgx}, {"region": reg_rgx}]}]}
+
+            backlogs = []
+            async for doc in db["orderbacklogs"].find(backlog_q).sort("week", -1).limit(30):
+                backlogs.append({
+                    "source": "Order Backlog",
+                    "week": doc.get("week"),
+                    "region": doc.get("mRegion") or doc.get("region"),
+                    "amount_uninvoiced": doc.get("Amount - unInvoiced") or doc.get("amount"),
+                    "opp_type": doc.get("OPP_Type"),
+                    "fy": doc.get("closing date Fy")
+                })
+
+            # 4. Search Whale Accounts (whale_accounts)
+            whale_q: Dict[str, Any] = {
+                "$or": [
+                    {"account_name": {"$regex": re.escape(query), "$options": "i"}},
+                    {"text_data": {"$regex": re.escape(query), "$options": "i"}}
+                ]
+            }
+            if reg_rgx:
+                whale_q = {"$and": [whale_q, {"region": reg_rgx}]}
+
+            whales = []
+            async for doc in db["whale_accounts"].find(whale_q).limit(15):
+                whales.append({
+                    "source": "Whale Account",
+                    "account_name": doc.get("account_name"),
+                    "region": doc.get("region"),
+                    "week_updated": doc.get("week_updated"),
+                    "notes": clean_html(doc.get("text_data", ""))[:300]
+                })
+
+            total_found = len(slide_entries) + len(crm_records) + len(backlogs) + len(whales)
+            return {
+                "searched_query": query,
+                "total_matches": total_found,
+                "slide_entries_and_tables": slide_entries,
+                "crm_opportunities": crm_records,
+                "order_backlogs": backlogs,
+                "whale_accounts": whales
+            }
+
         # 1. Executive Dashboard KPIs (Slide 2 Overview)
-        if tool_name == "get_dashboard_summary":
+        elif tool_name == "get_dashboard_summary":
             fy = args.get("fy", "FY2027")
             week = args.get("week")
             token = None
@@ -687,6 +808,24 @@ async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
 
 TOOL_DECLARATIONS = [
     {
+        "name": "search_company_or_deal",
+        "description": "Comprehensive unified search across all databases for any company, customer, deal, or account name (e.g. 'JPW', 'Exotec', 'Neros Technologies', 'Hillman', 'Anton Par', 'NEURA Robotics', 'Emesent'). Simultaneously searches Slide Tables (Pipeline to PO, Pushout, New Pipeline, manual slide notes across all weeks), CRM pipeline opportunities, Closed Won deals, Order Backlogs, and Whale Accounts. ALWAYS use this tool first when looking up any specific entity or deal.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The exact or partial name of the company, customer, account, or deal (e.g. 'JPW', 'Exotec', 'Neros')."
+                },
+                "region": {
+                    "type": "string",
+                    "description": "Optional region filter (e.g. 'US West', 'Europe', 'US East', 'APAC', 'ASEAN', 'Japan', 'KANZ', 'ROW')."
+                }
+            },
+            "required": ["query"]
+        }
+    },
+    {
         "name": "get_dashboard_summary",
         "description": "Fetches the high-level executive dashboard summary and Slide 2 KPI metrics for e-con Systems (Base Target, Stretch Target, Total Closed Won POs, Pipeline Forecast, Total Invoiced, Deficits, Growth vs Previous Week). ALWAYS use this tool first whenever the user asks for total PO won, cumulative metrics, overall pipeline, targets, or invoiced revenue.",
         "parameters": {
@@ -1097,6 +1236,114 @@ async def get_ai_logs(
             "satisfaction_rate": f"{(useful_count / max(useful_count + not_useful_count, 1)) * 100:.1f}%"
         }
     }
+
+
+@router.get("/admin/ai/logs/export")
+async def export_ai_logs(
+    export_format: str = Query("csv", regex="^(csv|xlsx|json)$"),
+    search: Optional[str] = None,
+    filter_rating: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    if current_user.get("role") != "Admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+
+    db = get_db()
+    query: Dict[str, Any] = {}
+
+    if filter_rating and filter_rating in ["useful", "not_useful"]:
+        query["feedback_rating"] = filter_rating
+
+    if search:
+        query["$or"] = [
+            {"user_email": {"$regex": re.escape(search), "$options": "i"}},
+            {"user_prompt": {"$regex": re.escape(search), "$options": "i"}},
+            {"ai_response": {"$regex": re.escape(search), "$options": "i"}},
+            {"session_id": {"$regex": re.escape(search), "$options": "i"}},
+        ]
+
+    cursor = db["ai_chat_logs"].find(query).sort("timestamp", -1)
+
+    rows = []
+    async for doc in cursor:
+        ts = doc.get("timestamp")
+        if isinstance(ts, datetime):
+            ts_str = ts.strftime("%Y-%m-%d %H:%M:%S UTC")
+        else:
+            ts_str = str(ts or "")
+
+        tools_called = doc.get("tools_called", [])
+        if isinstance(tools_called, list):
+            tools_str = ", ".join(str(t) for t in tools_called)
+        else:
+            tools_str = str(tools_called or "")
+
+        tools_details = doc.get("tools_executed_details", [])
+        try:
+            tools_details_str = json.dumps(serialize_mongo_val(tools_details), indent=2)
+        except Exception:
+            tools_details_str = str(tools_details)
+
+        rating = doc.get("feedback_rating")
+        rating_label = "Useful" if rating == "useful" else ("Not Useful" if rating == "not_useful" else "No Rating")
+        latency_val = doc.get("latency_formatted") or (f"{doc.get('latency_ms')/1000.0:.2f}s" if doc.get("latency_ms") else "")
+
+        rows.append({
+            "Timestamp": ts_str,
+            "User Name": doc.get("user_name") or "User",
+            "User Email": doc.get("user_email") or "",
+            "Question Asked": doc.get("user_prompt") or "",
+            "AI Response": doc.get("ai_response") or "",
+            "Tools Called": tools_str,
+            "Time Taken": latency_val,
+            "Latency (ms)": doc.get("latency_ms") if doc.get("latency_ms") is not None else "",
+            "Model Used": doc.get("model_used") or "",
+            "Feedback Rating": rating_label,
+            "Feedback Comment": doc.get("feedback_comment") or "",
+            "Week": doc.get("week") if doc.get("week") is not None else "",
+            "Region": doc.get("region") or "",
+            "Slide Context": doc.get("slide_id") or "",
+            "Session ID": doc.get("session_id") or "",
+            "Execution Trace Details": tools_details_str
+        })
+
+    filename_timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+    if export_format == "json":
+        json_content = json.dumps(rows, indent=2, default=str)
+        return Response(
+            content=json_content,
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="ai_audit_logs_{filename_timestamp}.json"'}
+        )
+
+    df = pd.DataFrame(rows)
+
+    if export_format == "xlsx":
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="AI Audit Logs")
+            ws = writer.sheets["AI Audit Logs"]
+            for col in ws.columns:
+                max_len = max(len(str(cell.value or '')) for cell in col)
+                col_letter = col[0].column_letter
+                ws.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 60)
+        buf.seek(0)
+        return Response(
+            content=buf.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="ai_audit_logs_{filename_timestamp}.xlsx"'}
+        )
+
+    # Default CSV with UTF-8 BOM encoding for seamless Excel compatibility
+    csv_buf = io.StringIO()
+    df.to_csv(csv_buf, index=False)
+    csv_bytes = csv_buf.getvalue().encode("utf-8-sig")
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="ai_audit_logs_{filename_timestamp}.csv"'}
+    )
 
 
 # ─── USER CHAT ENDPOINTS ───────────────────────────────────────────────────

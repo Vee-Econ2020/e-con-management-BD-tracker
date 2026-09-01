@@ -39,6 +39,7 @@ function ToolExecutionViewer({ tools, latency }: { tools: Array<{ tool: string; 
     if (!tools || tools.length === 0) return null;
 
     const toolLabels: Record<string, string> = {
+        search_company_or_deal: 'Company & Deal Search',
         get_dashboard_summary: 'Dashboard Executive KPIs',
         run_mongo_aggregation: 'Dynamic MongoDB Aggregation',
         execute_pandas_analytics: 'Python / Pandas Analytics',

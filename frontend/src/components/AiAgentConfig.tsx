@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Cpu, ShieldAlert, CheckCircle2, AlertCircle, RefreshCw, Sparkles,
     ThumbsUp, ThumbsDown, MessageSquare, Eye, EyeOff, Search,
-    Clock, Database
+    Clock, Database, Download, FileSpreadsheet, FileText, ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AiStarIcon } from './AiChatbot';
@@ -69,6 +69,12 @@ export function AiAgentConfig() {
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+
+    // Export state
+    const [isExporting, setIsExporting] = useState(false);
+    const [showExportMenu, setShowExportMenu] = useState(false);
+    const [exportStatus, setExportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const exportMenuRef = useRef<HTMLDivElement>(null);
 
     const fetchConfig = async () => {
         try {
@@ -150,6 +156,70 @@ export function AiAgentConfig() {
     useEffect(() => {
         fetchLogs();
     }, [token, page, ratingFilter]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+                setShowExportMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleExportLogs = async (format: 'csv' | 'xlsx' | 'json' = 'csv') => {
+        setIsExporting(true);
+        setShowExportMenu(false);
+        setExportStatus(null);
+        try {
+            const params = new URLSearchParams({
+                export_format: format
+            });
+            if (searchQuery.trim()) params.append('search', searchQuery.trim());
+            if (ratingFilter !== 'all') params.append('filter_rating', ratingFilter);
+
+            const res = await fetch(`/api/admin/ai/logs/export?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || 'Failed to export audit logs');
+            }
+
+            const blob = await res.blob();
+            const disposition = res.headers.get('Content-Disposition');
+            let filename = `ai_audit_logs_${new Date().toISOString().slice(0, 10)}.${format}`;
+            if (disposition && disposition.includes('filename=')) {
+                const match = disposition.match(/filename="?([^";]+)"?/);
+                if (match && match[1]) filename = match[1];
+            }
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            setExportStatus({
+                type: 'success',
+                message: `Export successful! Downloaded ${filename}`
+            });
+            setTimeout(() => setExportStatus(null), 5000);
+        } catch (err: any) {
+            console.error('Audit log export error:', err);
+            setExportStatus({
+                type: 'error',
+                message: err.message || 'Error exporting audit logs'
+            });
+            setTimeout(() => setExportStatus(null), 6000);
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -771,7 +841,170 @@ export function AiAgentConfig() {
                         <RefreshCw size={16} className={logsLoading ? 'animate-spin' : ''} />
                         Refresh
                     </button>
+
+                    {/* Export Audit Log Button & Dropdown */}
+                    <div ref={exportMenuRef} style={{ position: 'relative' }}>
+                        <button
+                            type="button"
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            disabled={isExporting}
+                            style={{
+                                padding: '0.65rem 1.25rem',
+                                backgroundColor: '#1e293b',
+                                border: '1px solid #0f172a',
+                                borderRadius: '8px',
+                                fontWeight: '800',
+                                fontSize: '0.88rem',
+                                color: '#ffffff',
+                                cursor: isExporting ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                boxShadow: '0 2px 8px rgba(15, 23, 42, 0.15)',
+                                transition: 'all 0.15s ease'
+                            }}
+                            onMouseOver={(e) => !isExporting && (e.currentTarget.style.backgroundColor = '#0f172a')}
+                            onMouseOut={(e) => !isExporting && (e.currentTarget.style.backgroundColor = '#1e293b')}
+                        >
+                            {isExporting ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
+                            <span>{isExporting ? 'Exporting...' : 'Export Audit Logs'}</span>
+                            <ChevronDown size={14} style={{ transform: showExportMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                        </button>
+
+                        {showExportMenu && (
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    right: 0,
+                                    top: 'calc(100% + 6px)',
+                                    backgroundColor: '#ffffff',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
+                                    border: '1px solid #cbd5e1',
+                                    padding: '0.6rem',
+                                    zIndex: 50,
+                                    minWidth: '260px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.35rem'
+                                }}
+                            >
+                                <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', padding: '0.3rem 0.6rem' }}>
+                                    Export Format (All Logs)
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleExportLogs('csv')}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.65rem',
+                                        padding: '0.65rem 0.85rem',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        backgroundColor: '#f8fafc',
+                                        color: '#0f172a',
+                                        fontSize: '0.85rem',
+                                        fontWeight: '700',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        transition: 'background 0.15s'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                                >
+                                    <div style={{ backgroundColor: '#e0f2fe', padding: '6px', borderRadius: '6px', display: 'flex' }}>
+                                        <FileText size={16} color="#0284c7" />
+                                    </div>
+                                    <div>
+                                        <div style={{ color: '#0f172a' }}>Export as CSV (.csv)</div>
+                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '500' }}>Excel & Google Sheets compatible</div>
+                                    </div>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleExportLogs('xlsx')}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.65rem',
+                                        padding: '0.65rem 0.85rem',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        backgroundColor: '#f8fafc',
+                                        color: '#0f172a',
+                                        fontSize: '0.85rem',
+                                        fontWeight: '700',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        transition: 'background 0.15s'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                                >
+                                    <div style={{ backgroundColor: '#dcfce7', padding: '6px', borderRadius: '6px', display: 'flex' }}>
+                                        <FileSpreadsheet size={16} color="#16a34a" />
+                                    </div>
+                                    <div>
+                                        <div style={{ color: '#0f172a' }}>Export as Excel (.xlsx)</div>
+                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '500' }}>Formatted workbook with columns</div>
+                                    </div>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleExportLogs('json')}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.65rem',
+                                        padding: '0.65rem 0.85rem',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        backgroundColor: '#f8fafc',
+                                        color: '#0f172a',
+                                        fontSize: '0.85rem',
+                                        fontWeight: '700',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        transition: 'background 0.15s'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                                >
+                                    <div style={{ backgroundColor: '#f3e8ff', padding: '6px', borderRadius: '6px', display: 'flex' }}>
+                                        <Database size={16} color="#7c3aed" />
+                                    </div>
+                                    <div>
+                                        <div style={{ color: '#0f172a' }}>Export as JSON (.json)</div>
+                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '500' }}>Raw query trace & step parameters</div>
+                                    </div>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
+
+                {/* Export Status Feedback Alert */}
+                {exportStatus && (
+                    <div style={{
+                        marginBottom: '1.25rem',
+                        padding: '0.85rem 1rem',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        backgroundColor: exportStatus.type === 'success' ? '#dcfce7' : '#fee2e2',
+                        color: exportStatus.type === 'success' ? '#15803d' : '#b91c1c',
+                        fontSize: '0.88rem',
+                        fontWeight: '700'
+                    }}>
+                        {exportStatus.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                        {exportStatus.message}
+                    </div>
+                )}
 
                 {/* Logs Table */}
                 {logsLoading ? (
