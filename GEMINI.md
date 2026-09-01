@@ -3,6 +3,7 @@
 ## 1. Google Gemini AI Function Calling & Serialization Invariants
 - **Protobuf BSON Sanitization**: Gemini function call parameters (`fc.args`) and tool outputs contain Google Protobuf structures (`MapComposite`, `RepeatedComposite`). NEVER write raw `fc.args` or un-sanitized dictionaries directly to MongoDB.
 - Always use `sanitize_gemini_args()` / `serialize_mongo_val()` to recursively cast all protobuf objects, NumPy types (`np.int64`, `np.float64`), and ObjectId/Decimal128 instances to native JSON-serializable Python types before MongoDB session or audit log insertion.
+- **MongoDB `_id` Immutability**: When updating existing session documents (`ai_chat_sessions`) via `update_one` with `$set`, ALWAYS pop `_id` from the payload dictionary (`doc.pop("_id", None)`). In MongoDB, passing `_id` inside a `$set` operator triggers `WriteError: Performing an update on the path '_id' would modify the immutable field '_id'`.
 - **Text Extraction Safety**: In multi-turn tool loops, never call `response.text` unconditionally without checking whether the candidate part is a `function_call`. Use safe extraction from `response.candidates[0].content.parts` to avoid `ValueError: Could not convert part.function_call to text`.
 
 ## 2. AI Tool Design & Anti-Looping Architecture

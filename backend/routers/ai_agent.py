@@ -97,11 +97,13 @@ AVAILABLE TOOLS & STRATEGY PLAYBOOK:
 5. `get_slide_data`:
    - USE FOR: Slide-specific data and charts (Slide 1 to 30, or Services slides).
 6. `search_user_inputs`:
-   - USE FOR: Qualitative manual slide notes (e.g. key POs won >50K, pending opps, RFQs, meeting notes).
+   - USE FOR: Manual slide notes, table contents, and regional BD inputs (e.g. key POs won >50K, pending opps, PO Pending table, RFQs, pushout, meeting notes).
+   - Example Questions: "How many weeks was Exotec in PO Pending in Europe?", "Search slide notes for client updates", "Find notes on pushout deals".
 7. `search_whale_accounts`:
    - USE FOR: High-value Whale account updates, executive notes, and historical logs.
 8. `search_pipeline_data`:
-   - USE FOR: Specific CRM opportunity drill-downs and deal details.
+   - USE FOR: CRM opportunity search across weeks for any account/deal name, stage, or region.
+   - Example Questions: "Show all pipeline opportunities for Exotec", "Find deals in Europe in Proposal stage".
 
 DATABASE SCHEMAS & KEY FIELD NAMES:
 - `orderbacklogs`:
@@ -392,18 +394,34 @@ async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
             fy = args.get("fy", "FY2027")
 
             query: Dict[str, Any] = {}
-            if region and region.lower() != "all" and region.lower() != "overall":
-                query["region"] = {"$regex": f"^{re.escape(region)}$", "$options": "i"}
+            if region and region.lower() not in ["all", "overall"]:
+                region_or = [
+                    {"region": {"$regex": f"^{re.escape(region)}$", "$options": "i"}},
+                    {"slide_id": {"$regex": re.escape(region), "$options": "i"}}
+                ]
+                region_slide_map = {
+                    "us west": 9, "europe": 12, "us east": 15, "asean": 18,
+                    "japan": 21, "kanz": 24, "management": 27, "row": 30
+                }
+                if region.lower() in region_slide_map:
+                    region_or.append({"slide_no": region_slide_map[region.lower()]})
+                query["$or"] = region_or
+
             if week is not None:
                 query["week_recorded"] = int(week)
+
             if query_text:
-                query["$or"] = [
+                text_or = [
                     {"freeform_text": {"$regex": re.escape(query_text), "$options": "i"}},
                     {"table_name": {"$regex": re.escape(query_text), "$options": "i"}},
                     {"slide_id": {"$regex": re.escape(query_text), "$options": "i"}},
                 ]
+                if "$or" in query:
+                    query = {"$and": [{"$or": query["$or"]}, {"$or": text_or}]}
+                else:
+                    query["$or"] = text_or
 
-            cursor = db["weekly_tracker_user_input"].find(query).limit(40)
+            cursor = db["weekly_tracker_user_input"].find(query).sort("week_recorded", -1).limit(60)
             results = []
             async for doc in cursor:
                 results.append({
@@ -411,7 +429,9 @@ async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
                     "region": doc.get("region"),
                     "table_name": doc.get("table_name"),
                     "slide_id": doc.get("slide_id") or doc.get("slide_no"),
-                    "text": clean_html(doc.get("freeform_text", ""))
+                    "text": clean_html(doc.get("freeform_text", "")),
+                    "raw_content": doc.get("freeform_text", "")[:400],
+                    "date_updated": serialize_mongo_val(doc.get("date_updated"))
                 })
             return {"count": len(results), "user_inputs": results}
 
@@ -463,33 +483,55 @@ async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
             region = args.get("region")
             week = args.get("week")
             stage = args.get("stage")
-            limit = min(int(args.get("limit", 30)), 60)
+            limit = min(int(args.get("limit", 60)), 100)
 
-            query = {}
-            if region and region.lower() != "all" and region.lower() != "overall":
-                query["region"] = {"$regex": f"^{re.escape(region)}$", "$options": "i"}
+            query: Dict[str, Any] = {}
+            if region and region.lower() not in ["all", "overall"]:
+                query["$or"] = [
+                    {"mRegion": {"$regex": f"^{re.escape(region)}$", "$options": "i"}},
+                    {"region": {"$regex": f"^{re.escape(region)}$", "$options": "i"}}
+                ]
             if week is not None:
                 query["week"] = int(week)
             if stage:
-                query["stage"] = {"$regex": re.escape(stage), "$options": "i"}
-            if account_name:
-                query["$or"] = [
-                    {"account_name": {"$regex": re.escape(account_name), "$options": "i"}},
-                    {"opportunity_name": {"$regex": re.escape(account_name), "$options": "i"}}
+                stg_or = [
+                    {"stage": {"$regex": re.escape(stage), "$options": "i"}},
+                    {"Stage": {"$regex": re.escape(stage), "$options": "i"}},
+                    {"projection - category": {"$regex": re.escape(stage), "$options": "i"}}
                 ]
+                if "$or" in query:
+                    query = {"$and": [{"$or": query["$or"]}, {"$or": stg_or}]}
+                else:
+                    query["$or"] = stg_or
+            if account_name:
+                acc_or = [
+                    {"Account Name": {"$regex": re.escape(account_name), "$options": "i"}},
+                    {"account_name": {"$regex": re.escape(account_name), "$options": "i"}},
+                    {"Opportunity Name": {"$regex": re.escape(account_name), "$options": "i"}},
+                    {"opportunity_name": {"$regex": re.escape(account_name), "$options": "i"}},
+                    {"Customer Name": {"$regex": re.escape(account_name), "$options": "i"}}
+                ]
+                if "$and" in query:
+                    query["$and"].append({"$or": acc_or})
+                elif "$or" in query:
+                    query = {"$and": [{"$or": query["$or"]}, {"$or": acc_or}]}
+                else:
+                    query["$or"] = acc_or
 
-            cursor = db["weekly_tracker_data"].find(query).limit(limit)
+            cursor = db["weekly_tracker_data"].find(query).sort("week", -1).limit(limit)
             records = []
             async for doc in cursor:
                 records.append({
                     "week": doc.get("week"),
-                    "region": doc.get("region"),
-                    "account_name": doc.get("account_name"),
-                    "opportunity_name": doc.get("opportunity_name"),
-                    "stage": doc.get("stage"),
-                    "revenue": doc.get("revenue") or doc.get("amount") or doc.get("total_revenue"),
-                    "category": doc.get("category") or doc.get("category_value"),
-                    "owner": doc.get("opportunity_owner") or doc.get("owner")
+                    "region": doc.get("mRegion") or doc.get("region"),
+                    "account_name": doc.get("Account Name") or doc.get("account_name"),
+                    "opportunity_name": doc.get("Opportunity Name") or doc.get("opportunity_name"),
+                    "stage": doc.get("stage") or doc.get("Stage"),
+                    "category": doc.get("projection - category") or doc.get("category"),
+                    "weighted_amount": doc.get("Weighted Amount") or doc.get("weighted_amount"),
+                    "amount": doc.get("amount") or doc.get("revenue") or doc.get("total_revenue") or doc.get("Amount - unInvoiced"),
+                    "fy": doc.get("closing date Fy") or doc.get("fy"),
+                    "owner": doc.get("Opportunity Owner") or doc.get("opportunity_owner") or doc.get("owner")
                 })
             return {"count": len(records), "records": records}
 
@@ -1265,20 +1307,32 @@ async def handle_ai_chat(payload: ChatMessageRequest, current_user: Optional[dic
                 final_response_text = response.text
             except Exception:
                 text_parts = []
-                if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                if response and response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
                     text_parts = [p.text for p in response.candidates[0].content.parts if hasattr(p, "text") and p.text]
                 if text_parts:
                     final_response_text = "\n".join(text_parts)
-                else:
-                    # Final synthesis fallback if needed
-                    synth_resp = await asyncio.to_thread(
-                        chat.send_message,
-                        "Please synthesize and present your final structured summary answer based on the data retrieved above."
-                    )
-                    try:
-                        final_response_text = synth_resp.text
-                    except Exception:
-                        final_response_text = "Analysis completed based on the retrieved data."
+
+        # Fallback text-only synthesis if tool loop reached cap or function calls exhausted without text
+        if not final_response_text:
+            try:
+                synth_model = genai.GenerativeModel(
+                    model_name=cfg["model_name"],
+                    system_instruction=cfg["system_prompt"] + "\n\nYou are in final synthesis mode. Answer the user's question directly, clearly, and comprehensively based on the data retrieved from tools. Output structured markdown tables and bullet points with exact figures and weeks."
+                )
+                trace_summary = json.dumps(tools_executed_log, default=str)
+                synth_prompt = (
+                    f"User Question: {payload.message}\n\n"
+                    f"Retrieved Database Tool Results:\n{trace_summary}\n\n"
+                    "Please synthesize and provide a comprehensive final markdown answer answering the user's question directly using the retrieved data above."
+                )
+                synth_resp = await asyncio.to_thread(synth_model.generate_content, synth_prompt)
+                try:
+                    final_response_text = synth_resp.text
+                except Exception:
+                    final_response_text = "Analysis completed based on the retrieved data."
+            except Exception as synth_err:
+                print(f"Fallback synthesis error: {synth_err}")
+                final_response_text = "Analysis completed based on the retrieved data."
 
     except Exception as gemini_err:
         final_response_text = f"An error occurred while generating the answer: {str(gemini_err)}"
@@ -1317,6 +1371,9 @@ async def handle_ai_chat(payload: ChatMessageRequest, current_user: Optional[dic
     session_doc["updated_at"] = datetime.utcnow()
 
     clean_session_doc = serialize_mongo_val(session_doc)
+    # Remove _id to prevent MongoDB WriteError (modifying immutable field '_id')
+    if isinstance(clean_session_doc, dict):
+        clean_session_doc.pop("_id", None)
 
     # Update or insert session in DB
     await db["ai_chat_sessions"].update_one(
@@ -1346,6 +1403,8 @@ async def handle_ai_chat(payload: ChatMessageRequest, current_user: Optional[dic
         "timestamp": datetime.utcnow()
     }
     clean_log_entry = serialize_mongo_val(log_entry)
+    if isinstance(clean_log_entry, dict):
+        clean_log_entry.pop("_id", None)
     await db["ai_chat_logs"].insert_one(clean_log_entry)
 
     return {
