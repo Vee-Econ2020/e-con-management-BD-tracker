@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Body, File, Form, UploadFile, BackgroundTasks, Header
+from fastapi import APIRouter, HTTPException, Body, File, Form, UploadFile, BackgroundTasks, Header, Query
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 from typing import List, Optional
@@ -2370,10 +2370,17 @@ async def delete_slide_input(input_id: str):
 
 # --- Hidden Slides API ---
 @router.get("/hidden-slides")
-async def get_hidden_slides():
+async def get_hidden_slides(fy: Optional[str] = Query(None)):
     try:
         coll = get_collection("weekly_tracker_settings")
-        doc = await coll.find_one({"type": "hidden_slides"})
+        doc = None
+        if fy:
+            doc = await coll.find_one({"type": "hidden_slides", "fy": fy})
+            if not doc and fy == "FY2027":
+                # Fallback to legacy document where fy was not yet set
+                doc = await coll.find_one({"type": "hidden_slides", "fy": {"$exists": False}})
+        else:
+            doc = await coll.find_one({"type": "hidden_slides"})
         # Return list of strings
         return {"hidden_slides": doc.get("slides", []) if doc else []}
     except Exception as e:
@@ -2382,21 +2389,23 @@ async def get_hidden_slides():
 
 @router.post("/hidden-slides/toggle")
 async def toggle_hidden_slide(payload: dict = Body(...)):
-    # payload: {"slide_id": "9.1"} (string or int)
+    # payload: {"slide_id": "9.1", "fy": "FY2027"} (string or int)
     slide_id = payload.get("slide_id")
     if slide_id is None:
         raise HTTPException(status_code=400, detail="Missing slide_id")
     
-    # Ensure consistency (store as strings)
+    fy = payload.get("fy", "FY2027")
     s_id_str = str(slide_id)
     
     try:
         coll = get_collection("weekly_tracker_settings")
-        doc = await coll.find_one({"type": "hidden_slides"})
+        doc = await coll.find_one({"type": "hidden_slides", "fy": fy})
+        if not doc and fy == "FY2027":
+            doc = await coll.find_one({"type": "hidden_slides", "fy": {"$exists": False}})
         
         if not doc:
             # Create new
-            await coll.insert_one({"type": "hidden_slides", "slides": [s_id_str]})
+            await coll.insert_one({"type": "hidden_slides", "fy": fy, "slides": [s_id_str]})
             return {"current_hidden": [s_id_str], "status": "hidden"}
         else:
             current_slides = set(doc.get("slides", []))
@@ -2408,8 +2417,9 @@ async def toggle_hidden_slide(payload: dict = Body(...)):
                 status = "hidden"
                 
             await coll.update_one(
-                {"type": "hidden_slides"},
-                {"$set": {"slides": list(current_slides)}}
+                {"_id": doc["_id"]},
+                {"$set": {"type": "hidden_slides", "fy": fy, "slides": list(current_slides)}},
+                upsert=True
             )
             return {"current_hidden": list(current_slides), "status": status}
     except Exception as e:
@@ -2421,11 +2431,22 @@ async def set_hidden_slides(payload: dict = Body(...)):
     slides = payload.get("slides")
     if not isinstance(slides, list):
         raise HTTPException(status_code=400, detail="Missing or invalid slides list")
+    fy = payload.get("fy", "FY2027")
     s_ids = [str(s) for s in slides]
     try:
         coll = get_collection("weekly_tracker_settings")
+        existing = await coll.find_one({"type": "hidden_slides", "fy": fy})
+        if not existing and fy == "FY2027":
+            legacy = await coll.find_one({"type": "hidden_slides", "fy": {"$exists": False}})
+            if legacy:
+                await coll.update_one(
+                    {"_id": legacy["_id"]},
+                    {"$set": {"fy": fy, "slides": s_ids}}
+                )
+                return {"current_hidden": s_ids, "status": "success"}
+
         await coll.update_one(
-            {"type": "hidden_slides"},
+            {"type": "hidden_slides", "fy": fy},
             {"$set": {"slides": s_ids}},
             upsert=True
         )
@@ -2709,7 +2730,7 @@ async def get_slide_image(slide_id: str, week: int):
 
 # --- Custom Slides API ---
 @router.get("/custom-slides")
-async def get_custom_slides():
+async def get_custom_slides(fy: Optional[str] = Query(None)):
     try:
         coll = get_collection("weekly_tracker_custom_slides")
         images_coll = get_collection("weekly_tracker_images")
@@ -2743,8 +2764,13 @@ async def get_custom_slides():
 
         result = []
         for s in valid_slides:
+            slide_fy = s.get("fy", "FY2027")
+            # If fy filter specified, match exact fy (treating missing fy as FY2027)
+            if fy and slide_fy != fy:
+                continue
             s["id"] = str(s["_id"])
             del s["_id"]
+            s["fy"] = slide_fy
             if "created_at" in s:
                 s["created_at"] = str(s["created_at"])
             s["gifEnabled"] = bool(s.get("gifEnabled", False))
@@ -2760,6 +2786,7 @@ async def get_custom_slides():
 async def add_custom_slide(payload: dict = Body(...)):
     try:
         coll = get_collection("weekly_tracker_custom_slides")
+        fy = payload.get("fy", "FY2027")
         new_slide = {
             "parentId": payload.get("parentId"),
             "type": payload.get("type", "image"),
@@ -2767,6 +2794,7 @@ async def add_custom_slide(payload: dict = Body(...)):
             "gifEnabled": bool(payload.get("gifEnabled", False)),
             "gifUrl": payload.get("gifUrl") or DEFAULT_CUSTOM_SLIDE_GIF_URL,
             "gifPosition": normalize_gif_position(payload.get("gifPosition")),
+            "fy": fy,
             "created_at": datetime.now()
         }
         res = await coll.insert_one(new_slide)
@@ -2780,6 +2808,7 @@ async def add_custom_slide(payload: dict = Body(...)):
             "gifEnabled": new_slide["gifEnabled"],
             "gifUrl": new_slide["gifUrl"],
             "gifPosition": new_slide["gifPosition"],
+            "fy": new_slide["fy"],
             "created_at": str(new_slide["created_at"])
         }
         
@@ -2797,6 +2826,8 @@ async def delete_custom_slide(slide_id: str):
         from bson import ObjectId
         coll = get_collection("weekly_tracker_custom_slides")
         res = await coll.delete_one({"_id": ObjectId(slide_id)})
+        images_coll = get_collection("weekly_tracker_images")
+        await images_coll.delete_many({"slide_id": slide_id})
         return {"status": "success"}
     except Exception as e:
         print(f"Error deleting custom slide: {e}")

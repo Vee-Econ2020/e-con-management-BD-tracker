@@ -266,6 +266,7 @@ interface CustomSlideData {
     gifEnabled?: boolean;
     gifUrl?: string;
     gifPosition?: GifPosition;
+    fy?: string;
     created_at?: string;
 }
 
@@ -1152,15 +1153,15 @@ export default function WeeklyTracker() {
             // Add standard slide
             result.push({ id: sId, isCustom: false });
 
-            // Add any custom slides attached to this parent
+            // Add any custom slides attached to this parent for selected FY
             customSlides
-                .filter(c => String(c.parentId) === String(sId))
+                .filter(c => String(c.parentId) === String(sId) && (!c.fy || c.fy === selectedFY))
                 .forEach(c => {
                     result.push({ id: c.id, isCustom: true, data: c });
                 });
         });
         return result;
-    }, [customSlides, isAdmin]);
+    }, [customSlides, isAdmin, selectedFY]);
 
     const BULK_SLIDE_CATEGORIES = useMemo(() => [
         {
@@ -1283,7 +1284,7 @@ export default function WeeklyTracker() {
             await fetch('/api/admin/hidden-slides/set', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ slides: Array.from(nextHidden) })
+                body: JSON.stringify({ slides: Array.from(nextHidden), fy: selectedFY })
             });
             showToast(hide ? `Hidden ${strIds.length} slides` : `Unhidden ${strIds.length} slides`);
         } catch (err) {
@@ -1772,7 +1773,8 @@ export default function WeeklyTracker() {
                     type: 'image',
                     gifEnabled: false,
                     gifUrl: DEFAULT_CUSTOM_GIF_URL,
-                    gifPosition: DEFAULT_CUSTOM_GIF_POSITION
+                    gifPosition: DEFAULT_CUSTOM_GIF_POSITION,
+                    fy: selectedFY
                 })
             });
             if (res.ok) {
@@ -2124,10 +2126,12 @@ export default function WeeklyTracker() {
     };
 
     useEffect(() => {
-        // Fetch custom slides on mount
-        fetch('/api/admin/custom-slides')
+        let isCurrent = true;
+        // Fetch custom slides for selected financial year
+        fetch(`/api/admin/custom-slides?fy=${selectedFY}`)
             .then(res => res.json())
             .then(data => {
+                if (!isCurrent) return;
                 if (data.slides) {
                     setCustomSlides(data.slides.map((slide: CustomSlideData) => ({
                         ...slide,
@@ -2135,22 +2139,38 @@ export default function WeeklyTracker() {
                         gifUrl: slide.gifUrl || DEFAULT_CUSTOM_GIF_URL,
                         gifPosition: slide.gifPosition || DEFAULT_CUSTOM_GIF_POSITION
                     })));
+                } else {
+                    setCustomSlides([]);
                 }
             })
-            .catch(err => console.error(err));
-    }, []);
+            .catch(err => {
+                if (!isCurrent) return;
+                console.error(err);
+            });
+        return () => { isCurrent = false; };
+    }, [selectedFY]);
 
     useEffect(() => {
-        // Fetch hidden slides
-        fetch('/api/admin/hidden-slides')
+        let isCurrent = true;
+        // Fetch hidden slides for selected financial year
+        fetch(`/api/admin/hidden-slides?fy=${selectedFY}`)
             .then(res => res.json())
             .then(data => {
+                if (!isCurrent) return;
                 if (data.hidden_slides) {
                     setHiddenSlides(new Set(data.hidden_slides.map(String)));
+                } else {
+                    setHiddenSlides(new Set());
                 }
             })
-            .catch(err => console.error("Failed to fetch hidden slides", err));
+            .catch(err => {
+                if (!isCurrent) return;
+                console.error("Failed to fetch hidden slides", err);
+            });
+        return () => { isCurrent = false; };
+    }, [selectedFY]);
 
+    useEffect(() => {
         // Fetch confetti slides
         fetch('/api/admin/confetti-slides')
             .then(res => res.json())
@@ -2538,7 +2558,7 @@ export default function WeeklyTracker() {
             await fetch('/api/admin/hidden-slides/toggle', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ slide_id: slideNum })
+                body: JSON.stringify({ slide_id: slideNum, fy: selectedFY })
             });
             showToast(action === 'hide' ? `Slide ${slideNum} hidden` : `Slide ${slideNum} visible`);
         } catch (err) {

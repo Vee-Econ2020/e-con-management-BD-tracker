@@ -325,8 +325,9 @@ function OverallTotalBanner({ data, enableAnimation, formatCurrency, getProgress
     formatCurrency: (v: number) => string,
     getProgressGradient: () => string
 }) {
-    // Animation isolated to this component
-    const animatedTotalPercentage = useAnimatedProgress(data.percentage, enableAnimation, 2000, 1000);
+    // Animation isolated to this component (capped at 100% for milestone progress bar)
+    const animatedTotalPercentage = useAnimatedProgress(Math.min(data.percentage, 100), enableAnimation, 2000, 1000);
+    const cappedTotalBarProgress = Math.min(animatedTotalPercentage, 100);
 
     const diff = data.prev_po_achieved !== undefined ? data.po_achieved - data.prev_po_achieved : 0;
     const isGrowth = diff > 0;
@@ -392,9 +393,10 @@ function OverallTotalBanner({ data, enableAnimation, formatCurrency, getProgress
                         <div style={{
                             height: '100%',
                             position: 'relative',
-                            width: `${Math.min(animatedTotalPercentage, 100)}%`,
+                            width: `${cappedTotalBarProgress}%`,
                             background: getProgressGradient(),
-                            backgroundSize: `${(100 / Math.max(animatedTotalPercentage, 1)) * 100}% 100%`,
+                            backgroundSize: `${(100 / Math.max(cappedTotalBarProgress, 1)) * 100}% 100%`,
+                            backgroundRepeat: 'no-repeat',
                             borderRadius: '8px',
                             transition: 'width 0.1s linear',
                             display: 'flex',
@@ -559,8 +561,9 @@ const Card = memo(function Card({ row, qtr, enableAnimation, formatCurrency, gra
     gradient: string,
     isSmaller?: boolean
 }) {
-    // 2s duration, 1s delay
-    const animatedPercentage = useAnimatedProgress(row.percentage, enableAnimation, 2000, 1000);
+    // 2s duration, 1s delay (capped at 100% for milestone progress bar)
+    const animatedPercentage = useAnimatedProgress(Math.min(row.percentage, 100), enableAnimation, 2000, 1000);
+    const cappedBarProgress = Math.min(animatedPercentage, 100);
 
     // Determines if the current quarter target (base or stretch) has been met
     const baseKey = qtr;            // e.g. "QP4"
@@ -675,9 +678,10 @@ const Card = memo(function Card({ row, qtr, enableAnimation, formatCurrency, gra
                         <div style={{
                             height: '100%',
                             position: 'relative',
-                            width: `${Math.min(animatedPercentage, 100)}%`, // USE ANIMATED VALUE
+                            width: `${cappedBarProgress}%`, // USE ANIMATED VALUE CAPPED AT 100
                             background: gradient,
-                            backgroundSize: `${(100 / Math.max(animatedPercentage, 1)) * 100}% 100%`,
+                            backgroundSize: `${(100 / Math.max(cappedBarProgress, 1)) * 100}% 100%`,
+                            backgroundRepeat: 'no-repeat',
                             borderRadius: '6px',
                             transition: 'width 0.1s linear',
                             display: 'flex',
