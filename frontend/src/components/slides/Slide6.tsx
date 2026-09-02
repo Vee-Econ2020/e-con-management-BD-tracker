@@ -133,7 +133,15 @@ export default function Slide6({ fy = "FY2027" }: { fy?: string }) {
                     letterSpacing: '-0.03em',
                     lineHeight: 1.1
                 }}>
-                    FY 26-27 : PO's Achieved
+                    {(() => {
+                        const match = fy.match(/FY(\d{4})/i);
+                        if (match) {
+                            const endYear = parseInt(match[1], 10);
+                            const startYear = endYear - 1;
+                            return `FY ${String(startYear).slice(-2)}-${String(endYear).slice(-2)} : PO's Achieved`;
+                        }
+                        return `${fy} : PO's Achieved`;
+                    })()}
                 </h1>
                 <div style={{
                     display: 'inline-flex',

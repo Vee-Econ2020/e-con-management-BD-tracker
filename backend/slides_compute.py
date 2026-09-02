@@ -382,7 +382,10 @@ async def _compute_cumulative_generic(
     elif today.month in [10, 11, 12]: current_cal_qtr = 'Q3'
     else: current_cal_qtr = 'Q4'
 
-    if is_before_april1:
+    if fy == "FY2028":
+        fy2028_qtr_map = {'Q1': 'QP1', 'Q2': 'QP2', 'Q3': 'QP3', 'Q4': 'QP4'}
+        current_display_qtr = fy2028_qtr_map.get(current_cal_qtr, 'QP2')
+    elif is_before_april1:
         qtr_map = {'Q1': 'QP2', 'Q2': 'QP3', 'Q3': 'QP4', 'Q4': 'QP4'}
         current_display_qtr = qtr_map.get(current_cal_qtr, 'QP4')
     else:
@@ -391,10 +394,10 @@ async def _compute_cumulative_generic(
     try:
         current_qtr_idx = quarter_order.index(current_display_qtr)
     except ValueError:
-        current_qtr_idx = 2
+        current_qtr_idx = 0 if fy == "FY2028" else 2
 
     # Logic for Closed Won
-    if is_before_april1:
+    if is_before_april1 and fy != "FY2028":
         total_closed_won = summary.loc['QP1', 'Closed Won'] if 'QP1' in summary.index and 'Closed Won' in summary.columns else 0
         for qtr in quarter_order:
             val = summary.loc[qtr, 'Closed Won'] if qtr in summary.index and 'Closed Won' in summary.columns else 0
@@ -473,7 +476,25 @@ async def _compute_cumulative_generic(
     current_progress_x = current_qtr_idx
     fy_year = today.year if today.month >= 4 else today.year - 1
 
-    if not is_before_april1:
+    if fy == "FY2028":
+        # For FY2028, current date is in the prior fiscal year (QP quarters: QP2, QP3, QP4)
+        # QP2 corresponds to Jul 1 - Oct 1 (x: 0 -> 1, starting from QP2 tick)
+        # QP3 corresponds to Oct 1 - Jan 1 (x: 1 -> 2, starting from QP3 tick)
+        # QP4 corresponds to Jan 1 - Apr 1 (x: 2 -> 3, starting from QP4 tick)
+        qp_date_ranges = [
+            (0, datetime(fy_year, 7, 1), datetime(fy_year, 10, 1)),          # QP2: x=0→1 (from QP2)
+            (1, datetime(fy_year, 10, 1), datetime(fy_year + 1, 1, 1)),      # QP3: x=1→2 (from QP3)
+            (2, datetime(fy_year + 1, 1, 1), datetime(fy_year + 1, 4, 1)),   # QP4: x=2→3 (from QP4)
+        ]
+        for base_x, q_start, q_end in qp_date_ranges:
+            if q_start <= today < q_end:
+                days_total = (q_end - q_start).days
+                days_elapsed = (today - q_start).days
+                current_progress_x = base_x + (days_elapsed / days_total if days_total > 0 else 0)
+                break
+        else:
+            current_progress_x = 0.0
+    elif not is_before_april1:
         # We're past April 1 — position within FY quarters (Q1-Q4)
         # Line should be between previous quarter and current quarter during the current quarter
         # and only reach the current quarter tick when that quarter ends
@@ -514,7 +535,7 @@ async def _compute_cumulative_generic(
         "y_won": y_won,
         "y_total": y_total,
         "annotations": all_static_annotations,
-        "is_before_april1": is_before_april1,
+        "is_before_april1": False if fy == "FY2028" else is_before_april1,
         "current_display_qtr": current_display_qtr,
         "current_progress_x": current_progress_x,
         "region": region_name,
@@ -1331,7 +1352,6 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
 
     # 3. Get current quarter (FY2027 quarters: QP2, QP3, QP4, Q1, Q2, Q3, Q4)
     # FY2027 starts in April 2026 (approximately)
-    # Current date is Feb 2026, which is QP4 of FY2027
     # Week 1-13: QP4, 14-26: Q1, 27-39: Q2, 40-52: Q3 (approximate for FY2027)
     if target_week <= 13:
         current_qtr = "QP4"
@@ -1341,12 +1361,23 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
         current_qtr = "Q2"
     else:
         current_qtr = "Q3"
+
+    # If viewing FY2028, current date is in the prior year relative to FY2028 (QP quarters)
+    if fy == "FY2028":
+        fy2028_qtr_map = {
+            "Q1": "QP1",
+            "Q2": "QP2",
+            "Q3": "QP3",
+            "Q4": "QP4",
+            "QP4": "QP4"
+        }
+        current_qtr = fy2028_qtr_map.get(current_qtr, "QP2")
     
     print(f"✓ Current Quarter: {current_qtr}")
 
     # 4. Fetch targets for all quarters
     collection_targets = db["target_settings"]
-    all_quarters = ['QP2', 'QP3', 'QP4', 'Q1', 'Q2', 'Q3', 'Q4']
+    all_quarters = ['QP1', 'QP2', 'QP3', 'QP4', 'Q1', 'Q2', 'Q3', 'Q4']
     
     # Structure: region -> { q4_target, current_qtr_target, base_targets: {}, stretch_targets: {} }
     region_targets = {r: {'q4_target': 0, 'current_qtr_target': 0, 'base_targets': {}, 'stretch_targets': {}} for r in region_order}
@@ -1440,6 +1471,7 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
 
     # Define quarter end weeks for marker logic
     qtr_end_weeks = {
+        'QP1': 0,
         'QP2': 0,
         'QP3': 0,
         'QP4': 13,
@@ -1458,21 +1490,11 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
         for qtr, val in region_targets[r]['base_targets'].items():
             if val <= 0: continue
             
-            # Historical quarters (QP2, QP3) are assumed automatically achieved
+            # Historical quarters (QP1, QP2, QP3) are assumed automatically achieved
             # on time since they are from preceding years
-            if qtr in ['QP2', 'QP3']:
+            if qtr in ['QP1', 'QP2', 'QP3']:
                 status = "green"
             else:
-                # end_week = qtr_end_weeks.get(qtr, 52)
-                # eval_week = min(end_week, target_week)
-                # po_at_qtr_end = region_week_po[r].get(eval_week, 0)
-                
-                # if po_at_qtr_end >= val:
-                #     status = "green"
-                # elif po_current >= val:
-                #     status = "red"
-                # else:
-                #     status = "none"
                 if po_current >= val:
                     status = "green"
                 else:
@@ -1483,8 +1505,7 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
         for qtr, val in region_targets[r]['stretch_targets'].items():
             if val <= 0: continue
             
-            if qtr in ['QP2', 'QP3']:
-                # status = "purple"
+            if qtr in ['QP1', 'QP2', 'QP3']:
                 status = "green"  # Using green universally for all achieved
             else:
                 # end_week = qtr_end_weeks.get(qtr, 52)
@@ -1568,19 +1589,9 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
     for qtr, val in total_base_targets.items():
         if val <= 0: continue
         
-        if qtr in ['QP2', 'QP3']:
+        if qtr in ['QP1', 'QP2', 'QP3']:
              status = "green"
         else:
-            # end_week = qtr_end_weeks.get(qtr, 52)
-            # eval_week = min(end_week, target_week)
-            # po_at_qtr_end = total_week_po.get(eval_week, 0)
-            
-            # if po_at_qtr_end >= val:
-            #     status = "green"
-            # elif total_po >= val:
-            #     status = "red"
-            # else:
-            #     status = "none"
             if total_po >= val:
                 status = "green"
             else:
@@ -1590,8 +1601,7 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
     for qtr, val in total_stretch_targets.items():
         if val <= 0: continue
         
-        if qtr in ['QP2', 'QP3']:
-            # status = "purple"
+        if qtr in ['QP1', 'QP2', 'QP3']:
             status = "green" # Using green universally for all achieved
         else:
             # end_week = qtr_end_weeks.get(qtr, 52)
