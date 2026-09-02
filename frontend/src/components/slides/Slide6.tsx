@@ -164,17 +164,34 @@ export default function Slide6({ fy = "FY2027" }: { fy?: string }) {
                 ))}
             </div>
 
-            {/* Grid - Second Row (4 cards) */}
+            {/* Second Row (cards: ROW & Management) - centered, matching width of top cards */}
             <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
+                display: 'flex',
+                justifyContent: 'center',
                 gap: '1rem',
                 marginBottom: '1.25rem',
-                flex: 1,
+                flex: 1.2,
                 minHeight: 0
             }}>
                 {secondRow.map((row, index) => (
-                    <Card key={index} row={row} qtr={data.current_quarter} enableAnimation={data.enable_animation !== false} formatCurrency={formatCurrency} gradient={getProgressGradient()} isSmaller />
+                    <div
+                        key={index}
+                        style={{
+                            width: secondRow.length <= 2 ? 'calc((100% - 2rem) / 3)' : '100%',
+                            flex: secondRow.length > 2 ? 1 : undefined,
+                            height: '100%',
+                            minHeight: 0
+                        }}
+                    >
+                        <Card
+                            row={row}
+                            qtr={data.current_quarter}
+                            enableAnimation={data.enable_animation !== false}
+                            formatCurrency={formatCurrency}
+                            gradient={getProgressGradient()}
+                            isSmaller={secondRow.length > 2}
+                        />
+                    </div>
                 ))}
             </div>
 

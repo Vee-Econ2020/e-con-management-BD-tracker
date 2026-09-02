@@ -78,61 +78,71 @@ STRICT DOMAIN GUARDRAILS:
 2. If a user asks general world knowledge, politics, sports, entertainment, or any query unrelated to e-con Systems Weekly Tracker (e.g. "Who is Donald Trump?", "Tell me a joke"), you MUST politely decline with:
    "I am specialized exclusively for e-con Systems Weekly Tracker data and business development metrics. I cannot assist with topics outside this scope."
 3. You have read-only database query, aggregation, and computation capabilities via tools. When a user asks about any metric, region, company/customer name, or slide activity, ALWAYS use the appropriate tool to query the live data.
-4. EFFICIENCY & IMMEDIATE SYNTHESIS RULE:
-   - Call the most specific tool directly in your very first turn (e.g., `get_dashboard_summary` for executive KPIs, `get_order_backlogs` for backlogs).
-   - Once you receive the tool response, IMMEDIATELY synthesize and output your final structured answer. DO NOT loop or make repetitive queries.
+4. STRICT EFFICIENCY & SINGLE-TURN SYNTHESIS MANDATE:
+   - Call the most specific tool directly in your very first turn (e.g., `search_company_or_deal` for any customer/deal, `get_dashboard_summary` for executive KPIs/Slide 2, `get_order_backlogs` for backlogs).
+   - When the tool response returns relevant data, DO NOT make repetitive or exploratory secondary tool queries. IMMEDIATELY synthesize and output your final executive answer with structured tables, bullet points, and exact figures/weeks.
 5. Format your answers clearly with bullet points, structured sections, and markdown tables where suitable. Always specify the financial year or week number if relevant.
 
-AVAILABLE TOOLS & STRATEGY PLAYBOOK:
+TOOL SELECTION STRATEGY PLAYBOOK:
 1. `search_company_or_deal`:
-   - ALWAYS USE THIS FIRST whenever the user asks about ANY specific company, customer, deal, client, or account name (e.g. 'JPW', 'Exotec', 'Neros Technologies', 'Hillman', 'Anton Par', 'NEURA Robotics', 'Emesent', etc.).
-   - This tool simultaneously searches across:
-     a) Slide Tables & Notes (`weekly_tracker_user_input` - Pipeline to PO, Pushout, New Pipeline, Notes)
+   - MANDATORY FIRST TOOL for ANY specific company, customer, deal, client, account, or project name (e.g. 'JPW', 'Exotec', 'Liebherr', 'Cubic', 'HUDL', 'Agility Robotics', 'Neros Technologies', 'Hillman', 'Anton Par', 'NEURA Robotics', 'Emesent', etc.).
+   - Simultaneously searches and chronologically aggregates across:
+     a) Slide Tables & Notes (`weekly_tracker_user_input` - Pipeline to PO, Pushout, New Pipeline, Notes across all weeks)
      b) CRM Pipeline & Closed Won Opportunities (`weekly_tracker_data` across all weeks)
      c) Order Backlogs (`orderbacklogs`)
-     d) Whale Accounts & Executive Notes (`whale_accounts`)
-   - Example Questions: "find when JPW closed won week", "How many weeks was Exotec in PO Pending in Europe?", "Show all deals for Neros Technologies".
+     d) Strategic Whale Accounts & Executive Notes (`whale_accounts`)
+   - Example Questions: "find when JPW closed won week", "how many weeks was Exotec in PO pending in Europe?", "querry all action items for Exotec", "give me the summary of Cubic whale accounts across weeks".
 2. `get_dashboard_summary`:
-   - USE FOR: Executive KPI overviews, total PO won till now, cumulative performance, overall pipeline forecast, Base Target vs Stretch Target, total invoiced revenue, achievement percentages, and deficits.
-   - Example Questions: "What is the total PO won till now in FY2027?", "What is our stretch target and deficit?", "How much have we invoiced so far?"
+   - MANDATORY FIRST TOOL for: Slide 2 Executive KPI overviews, Total PO Won (Closed Won), cumulative performance, overall pipeline forecast, Base Target vs Stretch Target, total invoiced revenue, achievement percentages, and deficits.
+   - Example Questions: "what is the total PO won in FY2028?", "What is our stretch target and deficit in FY2027?", "How much have we invoiced so far?"
 3. `get_order_backlogs`:
-   - USE FOR: Total overall order backlog, regional backlog, and opportunity type breakdown (Existing Business, Samples, Service, etc.).
-   - Returns: `total_uninvoiced_backlog` (in USD), `total_uninvoiced_formatted` (e.g., $17.87M), and detailed list per region.
-4. `run_mongo_aggregation`:
-   - USE FOR: Custom aggregations, dynamic sums, counts, and grouping across any database collection.
-   - Example Questions: "Breakdown of Closed Won POs by quarter", "Top 5 sales owners by pipeline", "Total revenue per region", "Count of opportunities in each stage".
-5. `execute_pandas_analytics`:
-   - USE FOR: Advanced mathematical calculations, custom ratios, percentile trends, or multi-week comparisons using Python/Pandas over the dataset.
-6. `get_slide_data`:
-   - USE FOR: Slide-specific data and charts (Slide 1 to 30, or Services slides).
-7. `search_user_inputs`:
+   - MANDATORY FIRST TOOL for: Total overall order backlog, regional backlog breakdown, and opportunity type breakdown (Existing Business, Samples, Service, Free Sample).
+4. `get_slide_data`:
+   - USE FOR: Presentation slide-specific data and charts (Slide 1 to 30, or Services slides).
+5. `search_whale_accounts`:
+   - USE FOR: High-value Whale account updates, executive notes, and historical log variants.
+6. `search_user_inputs`:
    - USE FOR: Manual slide notes, table contents, and regional BD inputs.
-8. `search_whale_accounts`:
-   - USE FOR: High-value Whale account updates, executive notes, and historical logs.
-9. `search_pipeline_data`:
+7. `search_pipeline_data`:
    - USE FOR: Specific CRM opportunity drill-downs and deal details.
+8. `run_mongo_aggregation`:
+   - ONLY USE WHEN other specialized tools cannot answer the question (e.g. complex dynamic group-by, multi-stage pipeline across custom criteria).
 
 DATABASE SCHEMAS & KEY FIELD NAMES:
+- `weekly_tracker_user_input` (Manual slide notes, tables, and regional inputs):
+  * `freeform_text`: string (contains raw HTML and text of notes, accounts, deal values e.g. "Exotec - 223K", action items).
+  * `table_name`: string ('po_pending_count', 'pipeline_to_po', 'pos_won_50k', 'rfq_proposals', 'region_overview', 'pushouts').
+  * `week_recorded`: integer (e.g. 7, 8, 35, 36).
+  * `slide_id`: string (e.g. 'europe_new_biz', 'us_west_acc_mgmt', 'us_east_acc_mgmt', 'asean_acc_mgmt', 'japan_acc_mgmt').
+  * `slide_no`: integer (e.g. 9, 12, 15, 18, 21, 24, 27, 30).
+  * `region`: string ('Europe', 'US West', 'US East', 'Japan', 'Asean', 'KANZ', 'APAC', 'ROW').
+  * CRITICAL NOTE: Fields like `key_pos_won`, `pending_opps_notes`, `rfq_proposals_notes`, `pos_won_gt_50k`, `user_input` DO NOT EXIST on this collection. All content is stored in `freeform_text`.
+- `whale_accounts` (Strategic high-value accounts & executive status):
+  * `account_name`: string (e.g. 'HUDL', 'Cubic', 'Liebherr', 'Neura Robotics', 'Exotec', 'Agility Robotics').
+  * `region`: string ('Europe', 'USA East', 'USA West', 'Asean', 'Japan', 'Legacy', 'ROW').
+  * `week_updated`: integer (e.g. 28, 31, 35).
+  * `text_data`: string (latest notes, action items, BOM discussions, pricing).
+  * `variants`: array of historical log objects `[{"version": "V1", "log_date": "...", "text_data": "..."}]`.
+- `weekly_tracker_data` (CRM Opportunities & Won Deals):
+  * `week`: integer (e.g. 1 to 53).
+  * `closing date Fy`: string (e.g. 'FY2026', 'FY2027', 'FY2028').
+  * `mRegion` / `region`: string ('US West', 'Europe', 'US East', 'Japan', 'Asean', 'KANZ', 'APAC', 'ROW').
+  * `projection - category`: string ('Closed Won' for won POs, 'Pipeline' for open pipeline).
+  * `stage`: string ('Closed Won', 'Proposal', 'Negotiation', 'Qualified', etc.).
+  * `Weighted Amount`: numeric ($ value weighted by probability; sum of Closed Won gives Total PO Won).
+  * `amount` / `revenue` / `total_revenue`: numeric.
+  * `granular_QTR` / `closing date QTR`: string ('Q1', 'Q2', 'Q3', 'Q4', 'QP2', 'QP3', 'QP4').
+  * `Opportunity Name`, `Account Name`, `Opportunity Owner`, `OPP_Type`.
 - `orderbacklogs`:
-  * `week`: integer (e.g., 35, 36)
-  * `mRegion` / `region`: string ('US West', 'Europe', 'US East', 'Japan', 'Asean', 'KANZ', 'APAC', 'ROW', 'Legacy')
-  * `Amount - unInvoiced` / `amount`: numeric ($ amount remaining un-invoiced)
-  * `OPP_Type`: string ('Existing Business', 'New Business', 'Samples', 'Service', 'Free Sample')
-  * `closing date Fy`: string ('FY2026', 'FY2027', 'FY2028')
-- `weekly_tracker_data` (CRM Opportunities):
-  * `week`: integer (e.g., 35, 36)
-  * `closing date Fy`: string (e.g., 'FY2027')
-  * `mRegion` / `region`: string ('US West', 'Europe', 'US East', 'Japan', 'Asean', 'KANZ', 'APAC', 'ROW')
-  * `projection - category`: string ('Closed Won' for won POs, 'Pipeline' for open pipeline)
-  * `stage`: string ('Closed Won', 'Proposal', 'Negotiation', etc.)
-  * `Weighted Amount`: numeric (dollar value weighted by probability; sum of Closed Won gives Total PO Won)
-  * `amount` / `revenue` / `total_revenue`: numeric
-  * `granular_QTR` / `closing date QTR`: string ('QP2', 'QP3', 'QP4', 'Q1', 'Q2', 'Q3', 'Q4')
-  * `Opportunity Name`, `Account Name`, `Opportunity Owner`, `OPP_Type`
+  * `week`: integer (e.g. 35, 36).
+  * `mRegion` / `region`: string ('US West', 'Europe', 'US East', 'Japan', 'Asean', 'KANZ', 'APAC', 'ROW', 'Legacy').
+  * `Amount - unInvoiced` / `amount`: numeric ($ amount remaining un-invoiced).
+  * `OPP_Type`: string ('Existing Business', 'New Business', 'Samples', 'Service', 'Free Sample').
+  * `closing date Fy`: string ('FY2026', 'FY2027', 'FY2028').
 - `target_settings`:
-  * `financial_year` ('FY2027'), `financial_qtr` ('overall', 'Q1'..), `category_type` ('Overall - region'), `category_value` ('Stretch Target', 'base target'), `target_value` (numeric)
+  * `financial_year` ('FY2027', 'FY2028'), `financial_qtr` ('overall', 'Q1'..), `category_type` ('Overall - region'), `category_value` ('Stretch Target', 'base target'), `target_value` (numeric).
 - `invoice_data` / `invoicing_data`:
-  * `week`, `grand_total`, `Account Name`, `econ-Region`, `Invoice Date`
+  * `week`: integer, `grand_total`: numeric, `Account Name`: string, `econ-Region`: string, `Invoice Date`: string.
 """
 
 
@@ -168,6 +178,97 @@ def sanitize_gemini_args(obj: Any) -> Any:
 def serialize_mongo_val(val: Any) -> Any:
     """Helper to convert MongoDB types (ObjectId, Decimal128, datetime), NumPy scalars, and protobuf objects to JSON serializable objects."""
     return sanitize_gemini_args(val)
+
+
+def sanitize_mongo_dict(obj: Any) -> Any:
+    """Recursively sanitize MongoDB query operators, stripping backticks and fixing missing $ on operators."""
+    if isinstance(obj, list):
+        return [sanitize_mongo_dict(item) for item in obj]
+    if not isinstance(obj, dict):
+        return obj
+
+    cleaned: Dict[str, Any] = {}
+    for k, v in obj.items():
+        clean_k = k.strip("`'\"") if isinstance(k, str) else str(k)
+
+        # Fix missing $ on common sub-operators
+        if clean_k in [
+            "regex", "options", "or", "and", "in", "nin", "ne",
+            "gt", "gte", "lt", "lte", "sum", "first", "last", "avg", "push"
+        ]:
+            clean_k = f"${clean_k}"
+
+        # If value is a JSON string representation of a dict, parse it
+        if isinstance(v, str) and v.startswith("{") and v.endswith("}"):
+            try:
+                v = json.loads(v)
+            except Exception:
+                pass
+
+        cleaned[clean_k] = sanitize_mongo_dict(v)
+    return cleaned
+
+
+def sanitize_mongo_pipeline(raw_pipeline: Any) -> List[Dict[str, Any]]:
+    """
+    Defensively repairs common LLM mistakes in MongoDB aggregation pipelines:
+    1. Unwraps invalid stage schemas e.g. {"stage_data": {...}, "pipeline_stage": "$match"} -> {"$match": {...}}
+    2. Auto-fixes missing '$' prefixes on stage operators (match -> $match, group -> $group, etc.)
+    3. Strips SQL backticks on field names e.g. `Account Name` -> Account Name
+    4. Auto-fixes sub-operators like options: 'i' -> $options: 'i', regex -> $regex
+    5. Converts numeric float limit/skip values (5.0 -> 5)
+    """
+    if isinstance(raw_pipeline, str):
+        try:
+            raw_pipeline = json.loads(raw_pipeline)
+        except Exception:
+            return []
+
+    if not isinstance(raw_pipeline, list):
+        return []
+
+    KNOWN_STAGES = {
+        "match", "group", "project", "sort", "limit", "skip", "unwind",
+        "lookup", "addfields", "count", "facet", "replaceroot", "sortbycount", "set"
+    }
+
+    sanitized: List[Dict[str, Any]] = []
+    for stage in raw_pipeline:
+        if not isinstance(stage, dict):
+            continue
+
+        # Check for unwrapping pattern e.g. {"stage_data": {...}, "pipeline_stage": "$match"}
+        if "pipeline_stage" in stage or "stage" in stage:
+            stage_op = stage.get("pipeline_stage") or stage.get("stage")
+            stage_data = stage.get("stage_data") or stage.get("data") or stage.get("query") or {}
+            if isinstance(stage_op, str):
+                op = stage_op if stage_op.startswith("$") else f"${stage_op}"
+                sanitized.append({op: sanitize_mongo_dict(stage_data)})
+                continue
+
+        stage_clean: Dict[str, Any] = {}
+        for k, v in stage.items():
+            clean_k = k.strip("`'\"")
+
+            # Check if missing leading '$' for known stage
+            if clean_k.lower() in KNOWN_STAGES:
+                clean_k = f"${clean_k.lower()}"
+            elif not clean_k.startswith("$") and len(stage) == 1:
+                clean_k = f"${clean_k}"
+
+            # If $limit or $skip, ensure integer
+            if clean_k in ["$limit", "$skip"]:
+                try:
+                    v = int(v)
+                except Exception:
+                    v = 50
+
+            stage_clean[clean_k] = sanitize_mongo_dict(v)
+
+        if stage_clean:
+            sanitized.append(stage_clean)
+
+    return sanitized
 
 
 async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
@@ -277,10 +378,36 @@ async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
                     "notes": clean_html(doc.get("text_data", ""))[:300]
                 })
 
+            # 5. Build Unified Chronological Progression Timeline
+            timeline = []
+            for se in slide_entries:
+                timeline.append({
+                    "week": se.get("week"),
+                    "source": f"Slide Note / Table ({se.get('table_name')})",
+                    "region": se.get("region") or se.get("slide_id"),
+                    "summary": se.get("text")[:250]
+                })
+            for cr in crm_records:
+                timeline.append({
+                    "week": cr.get("week"),
+                    "source": f"CRM Opportunity ({cr.get('stage')})",
+                    "region": cr.get("region"),
+                    "summary": f"{cr.get('opportunity_name')} | Amount: ${cr.get('amount', 0) or 0:,.0f} | Category: {cr.get('category')} | FY: {cr.get('fy')}"
+                })
+            for wa in whales:
+                timeline.append({
+                    "week": wa.get("week_updated"),
+                    "source": "Whale Account Status",
+                    "region": wa.get("region"),
+                    "summary": wa.get("notes")[:250]
+                })
+            timeline.sort(key=lambda x: (x.get("week") is not None, x.get("week") or 0))
+
             total_found = len(slide_entries) + len(crm_records) + len(backlogs) + len(whales)
             return {
                 "searched_query": query,
                 "total_matches": total_found,
+                "chronological_timeline": timeline,
                 "slide_entries_and_tables": slide_entries,
                 "crm_opportunities": crm_records,
                 "order_backlogs": backlogs,
@@ -387,15 +514,11 @@ async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
                     "error": f"Collection '{collection_name}' is not allowed. Must be one of: {sorted(list(ALLOWED_COLLECTIONS))}"
                 }
 
-            if isinstance(raw_pipeline, str):
-                try:
-                    pipeline = json.loads(raw_pipeline)
-                except Exception as e:
-                    return {"error": f"Invalid JSON string in pipeline: {str(e)}"}
-            elif isinstance(raw_pipeline, list):
-                pipeline = raw_pipeline
-            else:
-                return {"error": "Pipeline must be a list of MongoDB stage objects or a JSON array string."}
+            # Auto-repair and defensively sanitize pipeline stages, operators, and keys
+            pipeline = sanitize_mongo_pipeline(raw_pipeline)
+
+            if not pipeline:
+                return {"error": "Pipeline must be a valid list of MongoDB stage objects or a JSON array string."}
 
             # Safety checks against write operators
             for stage in pipeline:
@@ -705,10 +828,13 @@ async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
 
             match_clause: Dict[str, Any] = {"week": query_week}
             if region and region.lower() not in ["all", "overall"]:
-                match_clause["$or"] = [
-                    {"region": {"$regex": f"^{re.escape(region)}$", "$options": "i"}},
-                    {"mRegion": {"$regex": f"^{re.escape(region)}$", "$options": "i"}}
-                ]
+                if region.lower() in ["apac", "row"]:
+                    match_clause["mRegion"] = {"$in": ["Japan", "KANZ", "Korea", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}
+                else:
+                    match_clause["$or"] = [
+                        {"region": {"$regex": f"^{re.escape(region)}$", "$options": "i"}},
+                        {"mRegion": {"$regex": f"^{re.escape(region)}$", "$options": "i"}}
+                    ]
 
             # Aggregate by region
             pipeline_reg = [
@@ -980,7 +1106,7 @@ async def get_effective_ai_config(db) -> Dict[str, Any]:
     agent_name = config_doc.get("agent_name", "e-con BD Analyst")
     
     stored_prompt = config_doc.get("system_prompt") or ""
-    if not stored_prompt or "orderbacklogs" not in stored_prompt or "DATABASE SCHEMAS" not in stored_prompt:
+    if not stored_prompt or "orderbacklogs" not in stored_prompt or "DATABASE SCHEMAS" not in stored_prompt or "SINGLE-TURN SYNTHESIS" not in stored_prompt or "search_company_or_deal" not in stored_prompt:
         system_prompt = DEFAULT_SYSTEM_PROMPT
     else:
         system_prompt = stored_prompt
@@ -1491,7 +1617,7 @@ async def handle_ai_chat(payload: ChatMessageRequest, current_user: Optional[dic
     try:
         response = await asyncio.to_thread(chat.send_message, payload.message)
 
-        max_tool_iterations = 3
+        max_tool_iterations = 2
         iteration = 0
 
         while iteration < max_tool_iterations:
@@ -1573,9 +1699,16 @@ async def handle_ai_chat(payload: ChatMessageRequest, current_user: Optional[dic
                     "Please synthesize and provide a comprehensive final markdown answer answering the user's question directly using the retrieved data above."
                 )
                 synth_resp = await asyncio.to_thread(synth_model.generate_content, synth_prompt)
+                synth_text = ""
                 try:
-                    final_response_text = synth_resp.text
+                    synth_text = synth_resp.text
                 except Exception:
+                    if synth_resp and synth_resp.candidates and synth_resp.candidates[0].content and synth_resp.candidates[0].content.parts:
+                        text_parts = [p.text for p in synth_resp.candidates[0].content.parts if hasattr(p, "text") and p.text]
+                        synth_text = "\n".join(text_parts)
+                if synth_text:
+                    final_response_text = synth_text
+                else:
                     final_response_text = "Analysis completed based on the retrieved data."
             except Exception as synth_err:
                 print(f"Fallback synthesis error: {synth_err}")

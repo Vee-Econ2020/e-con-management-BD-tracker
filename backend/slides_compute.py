@@ -1318,16 +1318,14 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
     print(f"✓ Using Week {target_week} data")
 
     # 2. Define region display order
-    # Database regions: 'US West', 'Europe', 'US East', 'Asean', 'Japan', 'KANZ', 'Legacy'
-    # Display order: West, Europe, East, Asean, Japan, KANZ, Legacy
-    region_order = ['US West', 'Europe', 'US East', 'Asean', 'Japan', 'KANZ', 'Legacy']
+    # Database regions: 'US West', 'Europe', 'US East', 'ROW', 'Legacy'
+    # Display order: West, Europe, East, ROW, Management
+    region_order = ['US West', 'Europe', 'US East', 'ROW', 'Legacy']
     region_display_names = {
         'US West': 'US-West',
         'Europe': 'Europe + Israel',
         'US East': 'US-East',
-        'Asean': 'ASEAN',
-        'Japan': 'Japan',
-        'KANZ': 'KANZ',
+        'ROW': 'ROW',
         'Legacy': 'Management'
     }
 
@@ -1353,14 +1351,16 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
     # Structure: region -> { q4_target, current_qtr_target, base_targets: {}, stretch_targets: {} }
     region_targets = {r: {'q4_target': 0, 'current_qtr_target': 0, 'base_targets': {}, 'stretch_targets': {}} for r in region_order}
     
-    # Fetch all relevant targets in one query
+    # Fetch all relevant targets in one query, supporting case-insensitive ROW
+    target_category_query = ["US West", "Europe", "US East", "ROW", "RoW", "row", "Row", "Legacy"]
     async for doc in collection_targets.find({
         "ppt_type": "Weekly Tracker",
         "financial_year": fy,
         "financial_qtr": {"$in": all_quarters},
-        "category_type": {"$in": region_order}
+        "category_type": {"$in": target_category_query}
     }):
-        region = doc.get("category_type")
+        raw_cat = doc.get("category_type", "")
+        region = "ROW" if raw_cat in ["ROW", "RoW", "row", "Row"] else raw_cat
         qtr = doc.get("financial_qtr")
         val = doc.get("target_value", 0.0)
         cat = doc.get("category_value", "").lower()
@@ -1394,19 +1394,25 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
         }
     ]
     
+    def map_to_region(db_region: str) -> str:
+        if db_region in ["Asean", "ASEAN", "Japan", "KANZ", "ROW", "RoW", "row", "Row"]:
+            return "ROW"
+        return db_region
+
     # Initialize with all regions from region_order, but also track ALL regions from DB
     region_week_po = {r: {} for r in region_order}
     all_db_regions = set()
     
     async for doc in collection_data.aggregate(pipeline_all_weeks):
-        r = doc["_id"]["region"]
+        raw_r = doc["_id"]["region"]
         w = doc["_id"]["week"]
-        all_db_regions.add(r)
+        po_sum = doc["po_sum"]
+        all_db_regions.add(raw_r)
         
-        # Include ALL regions, not just those in region_order
-        if r not in region_week_po:
-            region_week_po[r] = {}
-        region_week_po[r][w] = doc["po_sum"]
+        target_r = map_to_region(raw_r)
+        if target_r not in region_week_po:
+            region_week_po[target_r] = {}
+        region_week_po[target_r][w] = region_week_po[target_r].get(w, 0.0) + po_sum
 
     # Fill in missing weeks with previous week's value (cumulative)
     # Do this for ALL regions found in database
@@ -1906,42 +1912,42 @@ async def compute_slide27_data(db: AsyncIOMotorDatabase, week: int = None, fy: s
 
 async def compute_slide28_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> Dict:
     """
-    Compute data for Slide 28 (APAC Cumulative Performance vs Targets).
-    Combined data for Japan, Korea (KANZ), and ASEAN.
+    Compute data for Slide 28 (ROW Cumulative Performance vs Targets).
+    Targets are loaded directly from target_settings config where category_type is 'ROW'.
     """
     return await _compute_cumulative_generic(
         db,
         region_name="APAC",
-        target_category={"$in": ["Japan", "KANZ", "Asean", "ASEAN"]},
-        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}},
+        target_category={"$in": ["ROW", "RoW", "row", "Row"]},
+        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}},
         fy=fy
     )
 
 
 async def compute_slide29_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
-    Compute data for Slide 29 (APAC Pipeline Tracking Over Time).
-    Combined data for Japan, Korea (KANZ), and ASEAN.
+    Compute data for Slide 29 (ROW Pipeline Tracking Over Time).
+    Targets are loaded directly from target_settings config where category_type is 'ROW'.
     """
     return await _compute_trend_generic(
         db,
         region_name="APAC",
-        target_category={"$in": ["Japan", "KANZ", "Asean", "ASEAN"]},
-        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}},
+        target_category={"$in": ["ROW", "RoW", "row", "Row"]},
+        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}},
         fy=fy
     )
 
 
 async def compute_slide30_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
     """
-    Compute data for Slide 30 (APAC Actuals vs Pipeline Weekly Bars).
-    Combined data for Japan, Korea (KANZ), and ASEAN.
+    Compute data for Slide 30 (ROW Actuals vs Pipeline Weekly Bars).
+    Targets are loaded directly from target_settings config where category_type is 'ROW'.
     """
     return await _compute_pipeline_generic(
         db,
         region_name="APAC",
-        target_category={"$in": ["Japan", "KANZ", "Asean", "ASEAN"]},
-        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}},
+        target_category={"$in": ["ROW", "RoW", "row", "Row"]},
+        filter_query={"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}},
         fy=fy
     )
 
@@ -1976,8 +1982,8 @@ async def compute_order_backlog_data(
     
     # 1. Pipeline to get aggregated data
     match_stage = {}
-    if region_name == "APAC":
-        match_stage["mRegion"] = {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}
+    if region_name in ["APAC", "ROW", "RoW", "row", "Row"]:
+        match_stage["mRegion"] = {"$in": ["Japan", "KANZ", "Korea", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}
     elif region_name != "Overall":
         match_stage["mRegion"] = region_name
     if opp_type_filter:
@@ -2024,7 +2030,7 @@ async def compute_order_backlog_data(
         ph_backlogs = [2496000, 2552000, 2556000, 2463000, 2438000, 2436000, 2430000, 2386000]
     elif region_name == "KANZ":
         ph_backlogs = [447000, 453000, 454000, 451000, 449000, 443000, 435000, 453000]
-    elif region_name == "APAC":
+    elif region_name in ["APAC", "ROW", "RoW", "row", "Row"]:
         ph_backlogs = [3442000, 3480000, 3443000, 4004000, 3960000, 3903000, 3990000, 3917000]
     elif region_name == "Legacy":
         ph_backlogs = [3148000, 3139000, 3123000, 2543000, 3137000, 3198000, 3151000, 3263000]
@@ -2042,7 +2048,7 @@ async def compute_order_backlog_data(
     final_backlogs = combined_backlogs[-8:] if len(combined_backlogs) >= 8 else combined_backlogs
 
     # NEW: Compute FY breakdown for each week to create stacked bars
-    print(f"  → Computing FY breakdown for stacked bar chart...")
+    print(f"  -> Computing FY breakdown for stacked bar chart...")
     
     # Get all weeks that have real data (not placeholders)
     real_db_weeks = [w for w in db_weeks if w > 10]
@@ -2053,8 +2059,8 @@ async def compute_order_backlog_data(
     
     for week_num in real_db_weeks:
         fy_match = {"week": week_num}
-        if region_name == "APAC":
-            fy_match["mRegion"] = {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}
+        if region_name in ["APAC", "ROW", "RoW", "row", "Row"]:
+            fy_match["mRegion"] = {"$in": ["Japan", "KANZ", "Korea", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}
         elif region_name != "Overall":
             fy_match["mRegion"] = region_name
         if opp_type_filter:
@@ -2081,7 +2087,7 @@ async def compute_order_backlog_data(
     
     # Sort fiscal years
     sorted_fiscal_years = sorted(list(all_fiscal_years))
-    print(f"  ✓ Found backlog data for {len(sorted_fiscal_years)} fiscal years across {len(fy_by_week)} weeks")
+    print(f"  [OK] Found backlog data for {len(sorted_fiscal_years)} fiscal years across {len(fy_by_week)} weeks")
     
     # Build series data for each FY
     fy_series = {}
@@ -2135,6 +2141,8 @@ async def compute_order_backlog_data(
         "KANZ": "base",
         "Asean": "base",
         "Legacy": "base",
+        "ROW": "base",
+        "APAC": "base",
     }
     desired_target_type = region_target_types.get(region_name, "base")
 
@@ -2145,10 +2153,12 @@ async def compute_order_backlog_data(
             "Europe": "Europe - Services",
             "US East": "US East - Services"
         }
-        target_category = target_category_map.get(region_name, region_name)
+        target_category = target_category_map.get(region_name, f"{region_name} - Services")
     else:
         target_category_map = {
-            "Overall": "Overall - region"
+            "Overall": "Overall - region",
+            "ROW": {"$in": ["ROW", "RoW", "row", "Row"]},
+            "APAC": {"$in": ["ROW", "RoW", "row", "Row"]},
         }
         target_category = target_category_map.get(region_name, region_name)
 
@@ -2187,11 +2197,13 @@ async def compute_order_backlog_data(
                 "Asean": 3500000.0,
                 "Japan": 2800000.0,
                 "KANZ": 2000000.0,
-                "Legacy": 5000000.0
+                "Legacy": 5000000.0,
+                "ROW": 7800000.0,
+                "APAC": 7800000.0,
             }
         q4_target_val = fallback_map.get(region_name, 0.0)
 
-    backlog_target = q4_target_val * 1.30
+    backlog_target = q4_target_val * 1.30 if not opp_type_filter else 0.0
 
     return {
         "weeks": final_weeks,
@@ -2249,10 +2261,10 @@ _SERVICES_SLIDE_CONFIGS: Dict[int, tuple] = {
     25: ("cumulative", "Legacy",  "Legacy",  {"mRegion": "Legacy"}),
     26: ("trend",      "Legacy",  "Legacy",  {"mRegion": "Legacy"}),
     27: ("pipeline",   "Legacy",  "Legacy",  {"mRegion": "Legacy"}),
-    # APAC
-    28: ("cumulative", "APAC",    {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}, {"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}),
-    29: ("trend",      "APAC",    {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}, {"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}),
-    30: ("pipeline",   "APAC",    {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}, {"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN"]}}),
+    # APAC / ROW
+    28: ("cumulative", "APAC",    {"$in": ["ROW", "RoW", "row", "Row"]}, {"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}}),
+    29: ("trend",      "APAC",    {"$in": ["ROW", "RoW", "row", "Row"]}, {"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}}),
+    30: ("pipeline",   "APAC",    {"$in": ["ROW", "RoW", "row", "Row"]}, {"mRegion": {"$in": ["Japan", "KANZ", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}}),
 }
 
 

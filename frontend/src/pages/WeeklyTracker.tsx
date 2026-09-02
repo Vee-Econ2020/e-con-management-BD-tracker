@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { Download, Loader2, Plus, Play, Eye, EyeOff, Pencil, Trash2, PartyPopper, Image as ImageIcon, Type, Folder, FolderOpen, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Building2, ExternalLink } from 'lucide-react';
+import { Download, Loader2, Plus, Play, Eye, EyeOff, Pencil, Trash2, PartyPopper, Image as ImageIcon, Type, Folder, FolderOpen, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Building2, ExternalLink, Layers } from 'lucide-react';
 import { ConfettiSideCannons } from '../components/ConfettiSideCannons';
 import { useWeek } from '../context/WeekContext';
 import { useAuth } from '../context/AuthContext';
@@ -953,6 +953,7 @@ export default function WeeklyTracker() {
     const [editedTitle, setEditedTitle] = useState(""); // For custom slide title editing
     // Track hidden slides
     const [hiddenSlides, setHiddenSlides] = useState<Set<string>>(new Set());
+    const [isBulkHideExpanded, setIsBulkHideExpanded] = useState(false);
 
     // Confetti slides
     const [confettiSlides, setConfettiSlides] = useState<Set<string>>(new Set());
@@ -1010,9 +1011,14 @@ export default function WeeklyTracker() {
     ];
 
     // Helper to determine region
-    const getSlideRegion = (slideId: string | number) => {
-        const idStr = String(slideId);
-        const mainId = parseInt(idStr.split('.')[0]); // Get integer part
+    const getSlideRegion = (slideId: string | number, parentId?: string | number) => {
+        let idStr = String(slideId);
+        let mainId = parseInt(idStr.split('.')[0]); // Get integer part
+
+        if (isNaN(mainId) && parentId !== undefined) {
+            idStr = String(parentId);
+            mainId = parseInt(idStr.split('.')[0]);
+        }
 
         if (mainId <= 6) return 'Overall';
         if (mainId <= 9) return 'USA West';
@@ -1335,7 +1341,7 @@ export default function WeeklyTracker() {
         ALL_CLUSTERS.forEach(c => { groups[c] = []; });
 
         displaySlides.forEach((slideItem, slideIndex) => {
-            const reg = getSlideRegion(slideItem.id);
+            const reg = getSlideRegion(slideItem.id, slideItem.data?.parentId);
             if (groups[reg]) {
                 groups[reg].push({ slideItem, slideIndex });
             } else {
@@ -1436,6 +1442,9 @@ export default function WeeklyTracker() {
                     const hasGif = isCustom
                         ? (customSlideData?.gifEnabled ?? false)
                         : getStandardSlideGif(slideId).enabled;
+                    if (!isAdmin && isHidden) {
+                        return null;
+                    }
                     const isHighlighted = highlightedSlides.has(String(slideId));
 
                     return (
@@ -1464,8 +1473,8 @@ export default function WeeklyTracker() {
                                             placeholder="Enter Slide Title"
                                         />
                                     ) : (
-                                        <h3 style={{ fontSize: '1.3rem', fontWeight: '800', color: isHidden ? '#9ca3af' : '#4a4a55', textDecoration: isHidden ? 'line-through' : 'none', margin: 0 }}>
-                                            {isCustom ? title : `Slide ${slideId} - ${getSlideRegion(slideId)} - ${getSlideTitle(slideId)}`} {isHidden && <span style={{ fontSize: '0.8rem', color: '#ef4444', textDecoration: 'none', marginLeft: '0.5rem' }}>(Hidden)</span>}
+                                        <h3 style={{ fontSize: '1.3rem', fontWeight: '800', color: (isAdmin && isHidden) ? '#9ca3af' : '#4a4a55', textDecoration: (isAdmin && isHidden) ? 'line-through' : 'none', margin: 0 }}>
+                                            {isCustom ? title : `Slide ${slideId} - ${getSlideRegion(slideId)} - ${getSlideTitle(slideId)}`} {isAdmin && isHidden && <span style={{ fontSize: '0.8rem', color: '#ef4444', textDecoration: 'none', marginLeft: '0.5rem' }}>(Hidden)</span>}
                                         </h3>
                                     )}
                                 </div>
@@ -1546,24 +1555,26 @@ export default function WeeklyTracker() {
                                         {exportingImageSlideId === slideId ? 'Exporting...' : 'Export as Image'}
                                     </button>
 
-                                    {/* Visibility Toggle */}
-                                    <button
-                                        onClick={() => toggleVisibility(slideId)}
-                                        style={{
-                                            backgroundColor: '#f3f4f6',
-                                            border: '1px solid #d1d5db',
-                                            padding: '0.3rem 0.6rem',
-                                            borderRadius: '20px',
-                                            color: isHidden ? '#6b7280' : '#374151',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        title={isHidden ? "Show in presentation" : "Hide from presentation"}
-                                    >
-                                        {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
-                                    </button>
+                                    {/* Visibility Toggle (Admin Only) */}
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => toggleVisibility(slideId)}
+                                            style={{
+                                                backgroundColor: '#f3f4f6',
+                                                border: '1px solid #d1d5db',
+                                                padding: '0.3rem 0.6rem',
+                                                borderRadius: '20px',
+                                                color: isHidden ? '#6b7280' : '#374151',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            title={isHidden ? "Show in presentation" : "Hide from presentation"}
+                                        >
+                                            {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    )}
 
                                     {/* Confetti Toggle */}
                                     <button
@@ -3130,124 +3141,184 @@ export default function WeeklyTracker() {
                     borderRadius: '16px',
                     border: '2px solid #cbd5e1',
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-                    padding: '1.5rem'
+                    overflow: 'hidden',
+                    transition: 'all 0.2s ease'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-                        <div>
-                            <h3 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <EyeOff size={22} color="#475569" /> Bulk Hide / Unhide Section
-                            </h3>
-                            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: '500' }}>
-                                Hide or unhide specific slide groups in bulk before exporting PDF or viewing presentation.
-                            </p>
+                    <div
+                        onClick={() => setIsBulkHideExpanded(prev => !prev)}
+                        style={{
+                            padding: '1.15rem 1.5rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '1rem',
+                            cursor: 'pointer',
+                            backgroundColor: isBulkHideExpanded ? '#f8fafc' : '#ffffff',
+                            borderBottom: isBulkHideExpanded ? '1px solid #e2e8f0' : 'none'
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{
+                                width: '36px', height: '36px', borderRadius: '10px',
+                                backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                                <EyeOff size={20} color="#475569" />
+                            </div>
+                            <div>
+                                <h3 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    Bulk Hide / Unhide Section
+                                </h3>
+                                <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: '500' }}>
+                                    Hide or unhide specific slide categories in bulk before exporting PDF or viewing presentation.
+                                </p>
+                            </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                            <span style={{
+                                fontSize: '0.8rem',
+                                fontWeight: '700',
+                                color: hiddenSlides.size > 0 ? '#dc2626' : '#16a34a',
+                                backgroundColor: hiddenSlides.size > 0 ? '#fee2e2' : '#dcfce7',
+                                padding: '0.25rem 0.65rem',
+                                borderRadius: '12px'
+                            }}>
+                                {hiddenSlides.size > 0 ? `${hiddenSlides.size} slides hidden` : 'All slides visible'}
+                            </span>
+
                             <button
-                                onClick={handleHideAllSlides}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleHideAllSlides();
+                                }}
                                 style={{
                                     backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5',
-                                    padding: '0.45rem 1rem', borderRadius: '8px', fontWeight: '700', fontSize: '0.85rem',
-                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem'
+                                    padding: '0.4rem 0.85rem', borderRadius: '8px', fontWeight: '700', fontSize: '0.8rem',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem'
                                 }}
                                 title="Hide all slides in presentation"
                             >
-                                <EyeOff size={15} /> Hide All Slides
+                                <EyeOff size={14} /> Hide All
                             </button>
                             <button
-                                onClick={handleUnhideAllSlides}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnhideAllSlides();
+                                }}
                                 style={{
                                     backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac',
-                                    padding: '0.45rem 1rem', borderRadius: '8px', fontWeight: '700', fontSize: '0.85rem',
-                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem'
+                                    padding: '0.4rem 0.85rem', borderRadius: '8px', fontWeight: '700', fontSize: '0.8rem',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem'
                                 }}
                                 title="Unhide all slides in presentation"
                             >
-                                <Eye size={15} /> Unhide All Slides
+                                <Eye size={14} /> Unhide All
                             </button>
+
+                            <div style={{
+                                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                color: '#475569', fontWeight: '700', fontSize: '0.82rem',
+                                marginLeft: '0.35rem', padding: '0.35rem 0.65rem', borderRadius: '8px',
+                                backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1'
+                            }}>
+                                {isBulkHideExpanded ? (
+                                    <>Collapse <ChevronDown size={16} style={{ transform: 'rotate(180deg)', transition: 'transform 0.2s' }} /></>
+                                ) : (
+                                    <>Expand <ChevronDown size={16} style={{ transition: 'transform 0.2s' }} /></>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                        gap: '1rem'
-                    }}>
-                        {BULK_SLIDE_CATEGORIES.map(cat => {
-                            const strIds = cat.slideIds.map(String);
-                            const hiddenCount = strIds.filter(id => hiddenSlides.has(id)).length;
-                            const isAllHidden = strIds.length > 0 && hiddenCount === strIds.length;
-                            const isNoneHidden = hiddenCount === 0;
+                    {isBulkHideExpanded && (
+                        <div style={{ padding: '1.5rem' }}>
+                            <div style={{ fontSize: '0.92rem', fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <Layers size={17} color="#475569" /> By Slide Topic / Category
+                            </div>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                                gap: '1rem'
+                            }}>
+                                {BULK_SLIDE_CATEGORIES.map(cat => {
+                                    const strIds = cat.slideIds.map(String);
+                                    const hiddenCount = strIds.filter(id => hiddenSlides.has(id)).length;
+                                    const isAllHidden = strIds.length > 0 && hiddenCount === strIds.length;
+                                    const isNoneHidden = hiddenCount === 0;
 
-                            return (
-                                <div
-                                    key={cat.id}
-                                    style={{
-                                        backgroundColor: '#f8fafc',
-                                        borderRadius: '12px',
-                                        border: '1px solid #cbd5e1',
-                                        padding: '1rem',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        justifyContent: 'space-between',
-                                        gap: '0.75rem'
-                                    }}
-                                >
-                                    <div>
-                                        <div style={{ fontWeight: '800', fontSize: '0.95rem', color: '#1e293b', marginBottom: '0.25rem' }}>
-                                            {cat.name}
-                                        </div>
-                                        <div style={{ fontSize: '0.8rem', fontWeight: '600', color: hiddenCount > 0 ? '#dc2626' : '#16a34a' }}>
-                                            {hiddenCount} of {strIds.length} hidden
-                                        </div>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '0.4rem' }}>
-                                        <button
-                                            onClick={() => handleBulkVisibilityChange(cat.slideIds, true)}
-                                            disabled={isAllHidden}
+                                    return (
+                                        <div
+                                            key={cat.id}
                                             style={{
-                                                flex: 1,
-                                                backgroundColor: isAllHidden ? '#e2e8f0' : '#fee2e2',
-                                                color: isAllHidden ? '#94a3b8' : '#b91c1c',
-                                                border: 'none',
-                                                padding: '0.35rem 0.6rem',
-                                                borderRadius: '6px',
-                                                fontWeight: '700',
-                                                fontSize: '0.78rem',
-                                                cursor: isAllHidden ? 'default' : 'pointer',
+                                                backgroundColor: '#f8fafc',
+                                                borderRadius: '12px',
+                                                border: '1px solid #cbd5e1',
+                                                padding: '1rem',
                                                 display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                gap: '0.25rem'
+                                                flexDirection: 'column',
+                                                justifyContent: 'space-between',
+                                                gap: '0.75rem'
                                             }}
                                         >
-                                            <EyeOff size={13} /> Hide Group
-                                        </button>
-                                        <button
-                                            onClick={() => handleBulkVisibilityChange(cat.slideIds, false)}
-                                            disabled={isNoneHidden}
-                                            style={{
-                                                flex: 1,
-                                                backgroundColor: isNoneHidden ? '#e2e8f0' : '#dcfce7',
-                                                color: isNoneHidden ? '#94a3b8' : '#15803d',
-                                                border: 'none',
-                                                padding: '0.35rem 0.6rem',
-                                                borderRadius: '6px',
-                                                fontWeight: '700',
-                                                fontSize: '0.78rem',
-                                                cursor: isNoneHidden ? 'default' : 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                gap: '0.25rem'
-                                            }}
-                                        >
-                                            <Eye size={13} /> Unhide Group
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                            <div>
+                                                <div style={{ fontWeight: '800', fontSize: '0.95rem', color: '#1e293b', marginBottom: '0.25rem' }}>
+                                                    {cat.name}
+                                                </div>
+                                                <div style={{ fontSize: '0.8rem', fontWeight: '600', color: hiddenCount > 0 ? '#dc2626' : '#16a34a' }}>
+                                                    {hiddenCount} of {strIds.length} hidden
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                                <button
+                                                    onClick={() => handleBulkVisibilityChange(cat.slideIds, true)}
+                                                    disabled={isAllHidden}
+                                                    style={{
+                                                        flex: 1,
+                                                        backgroundColor: isAllHidden ? '#e2e8f0' : '#fee2e2',
+                                                        color: isAllHidden ? '#94a3b8' : '#b91c1c',
+                                                        border: 'none',
+                                                        padding: '0.35rem 0.6rem',
+                                                        borderRadius: '6px',
+                                                        fontWeight: '700',
+                                                        fontSize: '0.78rem',
+                                                        cursor: isAllHidden ? 'default' : 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '0.25rem'
+                                                    }}
+                                                >
+                                                    <EyeOff size={13} /> Hide Group
+                                                </button>
+                                                <button
+                                                    onClick={() => handleBulkVisibilityChange(cat.slideIds, false)}
+                                                    disabled={isNoneHidden}
+                                                    style={{
+                                                        flex: 1,
+                                                        backgroundColor: isNoneHidden ? '#e2e8f0' : '#dcfce7',
+                                                        color: isNoneHidden ? '#94a3b8' : '#15803d',
+                                                        border: 'none',
+                                                        padding: '0.35rem 0.6rem',
+                                                        borderRadius: '6px',
+                                                        fontWeight: '700',
+                                                        fontSize: '0.78rem',
+                                                        cursor: isNoneHidden ? 'default' : 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '0.25rem'
+                                                    }}
+                                                >
+                                                    <Eye size={13} /> Unhide Group
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -3325,13 +3396,80 @@ export default function WeeklyTracker() {
                                 </span>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                             <span style={{
                                 backgroundColor: '#2563eb', color: '#ffffff', fontSize: '0.85rem',
                                 fontWeight: 700, padding: '0.25rem 0.75rem', borderRadius: '9999px'
                             }}>
-                                {groupedSlides['Overall'].length} Slides
+                                {isAdmin ? `${groupedSlides['Overall'].length} Slides` : `${(groupedSlides['Overall'] || []).filter(s => !hiddenSlides.has(String(s.slideItem.id))).length} Slides`}
                             </span>
+                            {isAdmin && (() => {
+                                const overallSlideIds = (groupedSlides['Overall'] || []).map(s => String(s.slideItem.id));
+                                const overallHiddenCount = overallSlideIds.filter(id => hiddenSlides.has(id)).length;
+                                const isOverallAllHidden = overallSlideIds.length > 0 && overallHiddenCount === overallSlideIds.length;
+                                const isOverallNoneHidden = overallHiddenCount === 0;
+
+                                return (
+                                    <>
+                                        {overallHiddenCount > 0 && (
+                                            <span style={{
+                                                backgroundColor: '#fee2e2', color: '#dc2626', fontSize: '0.78rem',
+                                                fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: '12px'
+                                            }}>
+                                                {overallHiddenCount === overallSlideIds.length ? 'All Hidden' : `${overallHiddenCount} hidden`}
+                                            </span>
+                                        )}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleBulkVisibilityChange(overallSlideIds, true);
+                                            }}
+                                            disabled={isOverallAllHidden}
+                                            style={{
+                                                backgroundColor: isOverallAllHidden ? '#e2e8f0' : '#fee2e2',
+                                                color: isOverallAllHidden ? '#94a3b8' : '#b91c1c',
+                                                border: `1px solid ${isOverallAllHidden ? '#cbd5e1' : '#fca5a5'}`,
+                                                padding: '0.35rem 0.75rem',
+                                                borderRadius: '20px',
+                                                fontWeight: 700,
+                                                fontSize: '0.78rem',
+                                                cursor: isOverallAllHidden ? 'default' : 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.25rem',
+                                                transition: 'all 0.15s'
+                                            }}
+                                            title="Hide all slides in Overall cluster"
+                                        >
+                                            <EyeOff size={13} /> Hide Overall
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleBulkVisibilityChange(overallSlideIds, false);
+                                            }}
+                                            disabled={isOverallNoneHidden}
+                                            style={{
+                                                backgroundColor: isOverallNoneHidden ? '#e2e8f0' : '#dcfce7',
+                                                color: isOverallNoneHidden ? '#94a3b8' : '#15803d',
+                                                border: `1px solid ${isOverallNoneHidden ? '#cbd5e1' : '#86efac'}`,
+                                                padding: '0.35rem 0.75rem',
+                                                borderRadius: '20px',
+                                                fontWeight: 700,
+                                                fontSize: '0.78rem',
+                                                cursor: isOverallNoneHidden ? 'default' : 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.25rem',
+                                                transition: 'all 0.15s'
+                                            }}
+                                            title="Unhide all slides in Overall cluster"
+                                        >
+                                            <Eye size={13} /> Unhide
+                                        </button>
+                                    </>
+                                );
+                            })()}
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -3373,6 +3511,10 @@ export default function WeeklyTracker() {
                         const slides = groupedSlides[regName] || [];
                         const isExpanded = expandedClusters.has(regName);
                         const firstIdx = slides[0]?.slideIndex;
+                        const slideIds = slides.map(s => String(s.slideItem.id));
+                        const hiddenCount = slideIds.filter(id => hiddenSlides.has(id)).length;
+                        const isAllHidden = slideIds.length > 0 && hiddenCount === slideIds.length;
+                        const isNoneHidden = hiddenCount === 0;
 
                         return (
                             <div
@@ -3408,14 +3550,28 @@ export default function WeeklyTracker() {
                                         {isExpanded ? <ChevronDown size={18} color="#7c3aed" /> : <ChevronRight size={18} color="#9ca3af" />}
                                     </div>
 
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.4rem' }}>
-                                        <span style={{
-                                            backgroundColor: isExpanded ? '#ddd6fe' : '#f1f5f9',
-                                            color: isExpanded ? '#5b21b6' : '#475569',
-                                            fontSize: '0.78rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '12px'
-                                        }}>
-                                            {slides.length} Slides
-                                        </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.4rem', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                            <span style={{
+                                                backgroundColor: isExpanded ? '#ddd6fe' : '#f1f5f9',
+                                                color: isExpanded ? '#5b21b6' : '#475569',
+                                                fontSize: '0.78rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '12px'
+                                            }}>
+                                                {isAdmin ? `${slides.length} Slides` : `${slides.filter(s => !hiddenSlides.has(String(s.slideItem.id))).length} Slides`}
+                                            </span>
+                                            {isAdmin && hiddenCount > 0 && (
+                                                <span style={{
+                                                    backgroundColor: '#fee2e2',
+                                                    color: '#dc2626',
+                                                    fontSize: '0.72rem',
+                                                    fontWeight: 700,
+                                                    padding: '0.15rem 0.45rem',
+                                                    borderRadius: '10px'
+                                                }}>
+                                                    {hiddenCount === slides.length ? 'All Hidden' : `${hiddenCount} hidden`}
+                                                </span>
+                                            )}
+                                        </div>
                                         {firstIdx !== undefined && (
                                             <button
                                                 onClick={(e) => {
@@ -3432,6 +3588,71 @@ export default function WeeklyTracker() {
                                             </button>
                                         )}
                                     </div>
+
+                                    {/* Region Cluster Visibility Controls (Admin Only) */}
+                                    {isAdmin && (
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.35rem',
+                                            marginTop: '0.65rem',
+                                            paddingTop: '0.5rem',
+                                            borderTop: isExpanded ? '1px solid #e9d5ff' : '1px solid #f1f5f9'
+                                        }}>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleBulkVisibilityChange(slideIds, true);
+                                                }}
+                                                disabled={isAllHidden || slideIds.length === 0}
+                                                style={{
+                                                    flex: 1,
+                                                    backgroundColor: isAllHidden ? '#f1f5f9' : '#fee2e2',
+                                                    color: isAllHidden ? '#94a3b8' : '#b91c1c',
+                                                    border: `1px solid ${isAllHidden ? '#e2e8f0' : '#fca5a5'}`,
+                                                    padding: '0.28rem 0.4rem',
+                                                    borderRadius: '6px',
+                                                    fontWeight: 700,
+                                                    fontSize: '0.74rem',
+                                                    cursor: (isAllHidden || slideIds.length === 0) ? 'default' : 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '0.25rem',
+                                                    transition: 'all 0.15s'
+                                                }}
+                                                title={`Hide all ${slides.length} slides in ${regName}`}
+                                            >
+                                                <EyeOff size={12} /> Hide Region
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleBulkVisibilityChange(slideIds, false);
+                                                }}
+                                                disabled={isNoneHidden || slideIds.length === 0}
+                                                style={{
+                                                    flex: 1,
+                                                    backgroundColor: isNoneHidden ? '#f1f5f9' : '#dcfce7',
+                                                    color: isNoneHidden ? '#94a3b8' : '#15803d',
+                                                    border: `1px solid ${isNoneHidden ? '#e2e8f0' : '#86efac'}`,
+                                                    padding: '0.28rem 0.4rem',
+                                                    borderRadius: '6px',
+                                                    fontWeight: 700,
+                                                    fontSize: '0.74rem',
+                                                    cursor: (isNoneHidden || slideIds.length === 0) ? 'default' : 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '0.25rem',
+                                                    transition: 'all 0.15s'
+                                                }}
+                                                title={`Unhide all ${slides.length} slides in ${regName}`}
+                                            >
+                                                <Eye size={12} /> Unhide
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         );
@@ -3443,6 +3664,11 @@ export default function WeeklyTracker() {
                     const slides = groupedSlides[regName] || [];
                     const isExpanded = expandedClusters.has(regName);
                     if (!isExpanded || slides.length === 0) return null;
+
+                    const slideIds = slides.map(s => String(s.slideItem.id));
+                    const hiddenCount = slideIds.filter(id => hiddenSlides.has(id)).length;
+                    const isAllHidden = slideIds.length > 0 && hiddenCount === slideIds.length;
+                    const isNoneHidden = hiddenCount === 0;
 
                     return (
                         <div
@@ -3457,22 +3683,75 @@ export default function WeeklyTracker() {
                                 boxShadow: '0 8px 20px rgba(167, 139, 250, 0.15)'
                             }}
                         >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', borderBottom: '1px solid #ddd6fe', paddingBottom: '0.75rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', borderBottom: '1px solid #ddd6fe', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                                     <FolderOpen size={22} color="#7c3aed" />
                                     <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#5b21b6' }}>
-                                        {regName} Cluster Slides ({slides.length})
+                                        {regName} Cluster Slides ({isAdmin ? slides.length : slides.filter(s => !hiddenSlides.has(String(s.slideItem.id))).length})
                                     </h3>
+                                    {isAdmin && hiddenCount > 0 && (
+                                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#dc2626', backgroundColor: '#fee2e2', padding: '0.2rem 0.6rem', borderRadius: '12px' }}>
+                                            {hiddenCount === slides.length ? 'All slides hidden' : `${hiddenCount} of ${slides.length} hidden`}
+                                        </span>
+                                    )}
                                 </div>
-                                <button
-                                    onClick={() => toggleCluster(regName)}
-                                    style={{
-                                        backgroundColor: '#ede9fe', border: 'none', padding: '0.35rem 0.8rem',
-                                        borderRadius: '8px', color: '#6d28d9', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer'
-                                    }}
-                                >
-                                    Close Folder
-                                </button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    {isAdmin && (
+                                        <>
+                                            <button
+                                                onClick={() => handleBulkVisibilityChange(slideIds, true)}
+                                                disabled={isAllHidden}
+                                                style={{
+                                                    backgroundColor: isAllHidden ? '#f1f5f9' : '#fee2e2',
+                                                    color: isAllHidden ? '#94a3b8' : '#b91c1c',
+                                                    border: `1px solid ${isAllHidden ? '#e2e8f0' : '#fca5a5'}`,
+                                                    padding: '0.35rem 0.8rem',
+                                                    borderRadius: '8px',
+                                                    fontWeight: 700,
+                                                    fontSize: '0.8rem',
+                                                    cursor: isAllHidden ? 'default' : 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.35rem',
+                                                    transition: 'all 0.15s'
+                                                }}
+                                                title={`Hide all slides in ${regName} cluster`}
+                                            >
+                                                <EyeOff size={14} /> Hide Region Cluster
+                                            </button>
+                                            <button
+                                                onClick={() => handleBulkVisibilityChange(slideIds, false)}
+                                                disabled={isNoneHidden}
+                                                style={{
+                                                    backgroundColor: isNoneHidden ? '#f1f5f9' : '#dcfce7',
+                                                    color: isNoneHidden ? '#94a3b8' : '#15803d',
+                                                    border: `1px solid ${isNoneHidden ? '#e2e8f0' : '#86efac'}`,
+                                                    padding: '0.35rem 0.8rem',
+                                                    borderRadius: '8px',
+                                                    fontWeight: 700,
+                                                    fontSize: '0.8rem',
+                                                    cursor: isNoneHidden ? 'default' : 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.35rem',
+                                                    transition: 'all 0.15s'
+                                                }}
+                                                title={`Unhide all slides in ${regName} cluster`}
+                                            >
+                                                <Eye size={14} /> Unhide Region Cluster
+                                            </button>
+                                        </>
+                                    )}
+                                    <button
+                                        onClick={() => toggleCluster(regName)}
+                                        style={{
+                                            backgroundColor: '#ede9fe', border: 'none', padding: '0.35rem 0.8rem',
+                                            borderRadius: '8px', color: '#6d28d9', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer'
+                                        }}
+                                    >
+                                        Close Folder
+                                    </button>
+                                </div>
                             </div>
                             {renderSlideGroupItems(slides)}
                         </div>

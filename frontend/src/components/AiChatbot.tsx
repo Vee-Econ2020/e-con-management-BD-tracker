@@ -353,26 +353,27 @@ export function AiChatbot({ currentWeek, activeRegion, activeSlideId, fy = 'FY20
     // Dynamic Example Question Chips
     const promptChips = useMemo(() => {
         const reg = activeRegion && activeRegion !== 'Overall' ? activeRegion : null;
+        const currentFy = fy || 'FY2027';
         return [
+            {
+                label: '📊 Executive KPI Summary & Targets',
+                prompt: `What is the total PO won, pipeline forecast, base vs stretch targets, and invoiced revenue in ${currentFy}?`
+            },
+            {
+                label: reg ? `🐋 Whale Accounts in ${reg}` : '🐋 Major Whale Accounts Status',
+                prompt: reg ? `Summarize the Whale accounts status, latest executive notes, and updates for ${reg}.` : 'What is the latest status of major Whale Accounts across all regions?'
+            },
             {
                 label: reg ? `🏆 POs Won (>50K) in ${reg}` : '🏆 Key POs Won Across Regions',
                 prompt: reg ? `Show all PO's Won (>50K) and recent deals in ${reg} for week ${currentWeek || 'current'}.` : `What are the key PO's Won (>50K) across all regions for week ${currentWeek || 'current'}?`
             },
             {
-                label: '📊 Overall Revenue vs FY2027 Targets',
-                prompt: `Compare current revenue vs target settings for FY2027 across regions.`
+                label: '📦 Order Backlog Summary',
+                prompt: `What is the current total and regional order backlog for week ${currentWeek || 'current'}?`
             },
             {
-                label: reg ? `🐋 Whale Accounts in ${reg}` : '🐋 Key Whale Accounts Summary',
-                prompt: reg ? `Summarize the Whale accounts status, latest executive notes, and updates for ${reg}.` : 'What is the latest status of major Whale Accounts across all regions?'
-            },
-            {
-                label: '🔍 Search notes for a company name',
-                prompt: 'Search the slide notes and manual inputs for any mentions of client updates.'
-            },
-            {
-                label: '📦 Order Backlog Status',
-                prompt: `What is the current order backlog by region for week ${currentWeek || 'current'}?`
+                label: '🔍 Customer & Opportunity Search',
+                prompt: 'Search all slide notes, CRM deals, and whale accounts for updates on Exotec, Liebherr, and Cubic.'
             },
             {
                 label: '📨 RFQs & Proposals Summary',
@@ -1209,11 +1210,56 @@ export function AiChatbot({ currentWeek, activeRegion, activeSlideId, fy = 'FY20
 
                             {/* Bottom Input Workspace Bar */}
                             <div style={{
-                                padding: '1.25rem 2rem 1.5rem 2rem',
+                                padding: '1rem 2rem 1.5rem 2rem',
                                 borderTop: '1px solid #e2e8f0',
                                 backgroundColor: '#ffffff',
                                 flexShrink: 0
                             }}>
+                                {/* Quick Follow-Up Suggestion Pills when chat is active */}
+                                {messages.length > 0 && !isLoading && (
+                                    <div style={{
+                                        display: 'flex',
+                                        gap: '0.45rem',
+                                        overflowX: 'auto',
+                                        paddingBottom: '0.65rem',
+                                        marginBottom: '0.4rem',
+                                        whiteSpace: 'nowrap',
+                                        scrollbarWidth: 'none'
+                                    }}>
+                                        {promptChips.slice(0, 4).map((chip, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => handleSendMessage(chip.prompt)}
+                                                style={{
+                                                    backgroundColor: '#f1f5f9',
+                                                    border: '1px solid #cbd5e1',
+                                                    borderRadius: '20px',
+                                                    padding: '0.3rem 0.75rem',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '700',
+                                                    color: '#334155',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.15s ease',
+                                                    flexShrink: 0
+                                                }}
+                                                onMouseOver={(e) => {
+                                                    e.currentTarget.style.backgroundColor = '#eef3ff';
+                                                    e.currentTarget.style.borderColor = '#3a549c';
+                                                    e.currentTarget.style.color = '#3a549c';
+                                                }}
+                                                onMouseOut={(e) => {
+                                                    e.currentTarget.style.backgroundColor = '#f1f5f9';
+                                                    e.currentTarget.style.borderColor = '#cbd5e1';
+                                                    e.currentTarget.style.color = '#334155';
+                                                }}
+                                            >
+                                                {chip.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
                                 <div style={{
                                     backgroundColor: '#f8fafc',
                                     borderRadius: '16px',

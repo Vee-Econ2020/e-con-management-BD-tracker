@@ -54,13 +54,8 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
         const { weeks, backlog_data, fy_series, fiscal_years, fy_colors, default_colors, weeks_with_fy_data, enable_animation } = data;
         const backlog_target = getBacklogTarget(data, title);
         
-        if (!fy_series || !fiscal_years || fiscal_years.length === 0) {
-            // Fallback to simple bar if no FY data
-            console.warn('No FY breakdown data available, using simple bars');
-            return;
-        }
-
         const xNumeric = weeks.map((_: any, i: number) => i);
+        const hasFiscalYears = Boolean(fy_series && fiscal_years && fiscal_years.length > 0);
 
         // Create target line trace if backlog_target is available
         const targetLineTrace = backlog_target > 0 ? {
@@ -73,45 +68,66 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
             hoverinfo: 'name+y',
         } : null;
 
-        // Create a trace for each fiscal year (stacked bars)
-        const initialData = fiscal_years.map((fy: string, fyIdx: number) => {
-            const color = fy_colors[fy] || default_colors[fyIdx % default_colors.length];
-            const values = fy_series[fy];
-            
-            return {
-                x: enable_animation === false ? xNumeric : [0],
-                y: enable_animation === false ? values : [values[0]],
-                type: 'bar',
-                name: fy,
-                marker: { color },
-                text: enable_animation === false 
-                    ? values.map((v: number) => v > 0 ? `$${(v / 1e6).toFixed(2)}M` : '')
-                    : [values[0] > 0 ? `$${(values[0] / 1e6).toFixed(2)}M` : ''],
-                textposition: 'inside',
-                textfont: { size: 16, color: '#fff', weight: 'bold' },
-                hovertemplate: `${fy}<br>%{y:$,.0f}<extra></extra>`,
-            };
-        });
-        
-        // Add a trace for placeholder weeks (weeks without FY data)
-        const placeholderValues = weeks.map((_: any, idx: number) => 
-            weeks_with_fy_data && !weeks_with_fy_data[idx] ? backlog_data[idx] : 0
-        );
-        
-        if (placeholderValues.some((v: number) => v > 0)) {
+        let initialData: any[] = [];
+        let placeholderValues: number[] = [];
+
+        if (!hasFiscalYears) {
+            // Fallback to simple bar if no FY data
+            console.warn('No FY breakdown data available, using simple bars');
             initialData.push({
                 x: enable_animation === false ? xNumeric : [0],
-                y: enable_animation === false ? placeholderValues : [placeholderValues[0]],
+                y: enable_animation === false ? backlog_data : [backlog_data[0]],
                 type: 'bar',
-                name: 'Historical Total',
+                name: 'Order Backlog',
                 marker: { color: '#1f6e8c' },
                 text: enable_animation === false 
-                    ? placeholderValues.map((v: number) => v > 0 ? `$${(v / 1e6).toFixed(2)}M` : '')
-                    : [placeholderValues[0] > 0 ? `$${(placeholderValues[0] / 1e6).toFixed(2)}M` : ''],
+                    ? backlog_data.map((v: number) => v > 0 ? `$${(v / 1e6).toFixed(2)}M` : '')
+                    : [backlog_data[0] > 0 ? `$${(backlog_data[0] / 1e6).toFixed(2)}M` : ''],
                 textposition: 'inside',
                 textfont: { size: 16, color: '#fff', weight: 'bold' },
-                hovertemplate: 'Total<br>%{y:$,.0f}<extra></extra>',
+                hovertemplate: 'Backlog<br>%{y:$,.0f}<extra></extra>',
             });
+        } else {
+            // Create a trace for each fiscal year (stacked bars)
+            initialData = fiscal_years.map((fy: string, fyIdx: number) => {
+                const color = fy_colors[fy] || default_colors[fyIdx % default_colors.length];
+                const values = fy_series[fy];
+                
+                return {
+                    x: enable_animation === false ? xNumeric : [0],
+                    y: enable_animation === false ? values : [values[0]],
+                    type: 'bar',
+                    name: fy,
+                    marker: { color },
+                    text: enable_animation === false 
+                        ? values.map((v: number) => v > 0 ? `$${(v / 1e6).toFixed(2)}M` : '')
+                        : [values[0] > 0 ? `$${(values[0] / 1e6).toFixed(2)}M` : ''],
+                    textposition: 'inside',
+                    textfont: { size: 16, color: '#fff', weight: 'bold' },
+                    hovertemplate: `${fy}<br>%{y:$,.0f}<extra></extra>`,
+                };
+            });
+            
+            // Add a trace for placeholder weeks (weeks without FY data)
+            placeholderValues = weeks.map((_: any, idx: number) => 
+                weeks_with_fy_data && !weeks_with_fy_data[idx] ? backlog_data[idx] : 0
+            );
+            
+            if (placeholderValues.some((v: number) => v > 0)) {
+                initialData.push({
+                    x: enable_animation === false ? xNumeric : [0],
+                    y: enable_animation === false ? placeholderValues : [placeholderValues[0]],
+                    type: 'bar',
+                    name: 'Historical Total',
+                    marker: { color: '#1f6e8c' },
+                    text: enable_animation === false 
+                        ? placeholderValues.map((v: number) => v > 0 ? `$${(v / 1e6).toFixed(2)}M` : '')
+                        : [placeholderValues[0] > 0 ? `$${(placeholderValues[0] / 1e6).toFixed(2)}M` : ''],
+                    textposition: 'inside',
+                    textfont: { size: 16, color: '#fff', weight: 'bold' },
+                    hovertemplate: 'Total<br>%{y:$,.0f}<extra></extra>',
+                });
+            }
         }
 
         // Add static target line trace to initialData
@@ -123,30 +139,43 @@ export function OrderBacklogChart({ data, title }: BacklogChartProps) {
         const frames: any[] = [];
         if (enable_animation !== false) {
             for (let i = 0; i < weeks.length; i++) {
-                const frameData = fiscal_years.map((fy: string) => {
-                    const values = fy_series[fy];
+                let frameData: any[] = [];
+
+                if (!hasFiscalYears) {
                     const frameX = xNumeric.slice(0, i + 1);
-                    const frameY = values.slice(0, i + 1);
+                    const frameY = backlog_data.slice(0, i + 1);
                     const frameText = frameY.map((v: number) => v > 0 ? `$${(v / 1e6).toFixed(2)}M` : '');
-                    
-                    return {
-                        x: frameX,
-                        y: frameY,
-                        text: frameText,
-                    };
-                });
-                
-                // Add placeholder frame if needed
-                if (placeholderValues.some((v: number) => v > 0)) {
-                    const frameX = xNumeric.slice(0, i + 1);
-                    const frameY = placeholderValues.slice(0, i + 1);
-                    const frameText = frameY.map((v: number) => v > 0 ? `$${(v / 1e6).toFixed(2)}M` : '');
-                    
                     frameData.push({
                         x: frameX,
                         y: frameY,
                         text: frameText,
                     });
+                } else {
+                    frameData = fiscal_years.map((fy: string) => {
+                        const values = fy_series[fy];
+                        const frameX = xNumeric.slice(0, i + 1);
+                        const frameY = values.slice(0, i + 1);
+                        const frameText = frameY.map((v: number) => v > 0 ? `$${(v / 1e6).toFixed(2)}M` : '');
+                        
+                        return {
+                            x: frameX,
+                            y: frameY,
+                            text: frameText,
+                        };
+                    });
+                    
+                    // Add placeholder frame if needed
+                    if (placeholderValues.some((v: number) => v > 0)) {
+                        const frameX = xNumeric.slice(0, i + 1);
+                        const frameY = placeholderValues.slice(0, i + 1);
+                        const frameText = frameY.map((v: number) => v > 0 ? `$${(v / 1e6).toFixed(2)}M` : '');
+                        
+                        frameData.push({
+                            x: frameX,
+                            y: frameY,
+                            text: frameText,
+                        });
+                    }
                 }
 
                 // Add static target line frame trace so it stays visible
