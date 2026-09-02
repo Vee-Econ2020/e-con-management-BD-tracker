@@ -1491,8 +1491,8 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
             if val <= 0: continue
             
             # Historical quarters (QP1, QP2, QP3) are assumed automatically achieved
-            # on time since they are from preceding years
-            if qtr in ['QP1', 'QP2', 'QP3']:
+            # on time for FY2027 since they are from preceding years
+            if qtr in ['QP1', 'QP2', 'QP3'] and fy == "FY2027":
                 status = "green"
             else:
                 if po_current >= val:
@@ -1505,19 +1505,9 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
         for qtr, val in region_targets[r]['stretch_targets'].items():
             if val <= 0: continue
             
-            if qtr in ['QP1', 'QP2', 'QP3']:
+            if qtr in ['QP1', 'QP2', 'QP3'] and fy == "FY2027":
                 status = "green"  # Using green universally for all achieved
             else:
-                # end_week = qtr_end_weeks.get(qtr, 52)
-                # eval_week = min(end_week, target_week)
-                # po_at_qtr_end = region_week_po[r].get(eval_week, 0)
-                
-                # if po_at_qtr_end >= val:
-                #     status = "purple"
-                # elif po_current >= val:
-                #     status = "red"
-                # else:
-                #     status = "none"
                 if po_current >= val:
                     status = "green"
                 else:
@@ -1589,7 +1579,7 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
     for qtr, val in total_base_targets.items():
         if val <= 0: continue
         
-        if qtr in ['QP1', 'QP2', 'QP3']:
+        if qtr in ['QP1', 'QP2', 'QP3'] and fy == "FY2027":
              status = "green"
         else:
             if total_po >= val:
@@ -1601,16 +1591,9 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
     for qtr, val in total_stretch_targets.items():
         if val <= 0: continue
         
-        if qtr in ['QP1', 'QP2', 'QP3']:
+        if qtr in ['QP1', 'QP2', 'QP3'] and fy == "FY2027":
             status = "green" # Using green universally for all achieved
         else:
-            # end_week = qtr_end_weeks.get(qtr, 52)
-            # eval_week = min(end_week, target_week)
-            # po_at_qtr_end = total_week_po.get(eval_week, 0)
-            
-            # if po_at_qtr_end >= val:
-            #     status = "purple"
-            # elif total_po >= val:
             #     status = "red"
             # else:
             #     status = "none"
