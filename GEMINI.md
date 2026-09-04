@@ -22,6 +22,17 @@
   * Total PO Won = Sum of `Weighted Amount` where `projection - category == 'Closed Won'` (~$67.67M).
   * Pipeline Forecast = Sum of `Weighted Amount` where `projection - category == 'Pipeline'` (~$10.73M).
   * Invoiced = Sum of `grand_total` from `invoice_data` (~$20.26M).
+- **Multi-FY Slide State Isolation**:
+  * **Hidden Slides (`weekly_tracker_settings`)**: Must be stored and queried per financial year (`{"type": "hidden_slides", "fy": fy}`). Documents missing `fy` fall back to `"FY2027"`.
+  * **Custom Slides (`weekly_tracker_custom_slides`)**: Must store `"fy"` on creation and filter by `fy` on retrieval and rendering.
+  * **Frontend Synchronization**: Any slide visibility or custom slide fetching hook must include `[selectedFY]` in dependencies and pass `?fy=${selectedFY}` to prevent cross-FY state bleeding.
+- **Fiscal Year Quarter Mapping & Milestone Invariants**:
+  * **Active FY (FY2027)**: Week 14-26 is `Q1`, 27-39 is `Q2`, 40-52 is `Q3`.
+  * **Future FY (FY2028)**: Current dates fall in prior-year quarters relative to FY2028 (`Q1 → QP1`, `Q2 → QP2`, `Q3 → QP3`, `Q4 → QP4`).
+  * **Milestone Status (`status = "green"`)**: Never hardcode `QP1`, `QP2`, `QP3` as automatically achieved across all FYs. For `FY2028`, `QP2` is the active target and must strictly be evaluated against actual POs (`po_current >= val`) to avoid false-positive purple/green target-achieved glows.
+  * **Cumulative Vertical Progress Line (`current_progress_x`)**:
+    - For `FY2027` in Q2: positioned at `3.0 + fraction` (between `Q1` and `Q2`).
+    - For `FY2028` in QP2: positioned at `0.0 + fraction` (progressing from tick `0` `QP2` towards `1` `QP3`).
 
 ## 4. Frontend & Admin UI Standards
 - **Chat UI (`AiChatbot.tsx`)**:

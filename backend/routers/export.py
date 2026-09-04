@@ -23,6 +23,7 @@ class ExportRequest(BaseModel):
     regions: Optional[List[str]] = None
     frontend_url: Optional[str] = None
     fy: Optional[str] = "FY2027"
+    hidden_slides: Optional[List[str]] = None
 
 
 def cleanup_old_exports():
@@ -39,7 +40,7 @@ def cleanup_old_exports():
         print(f"[PDF Export Cleanup] Error cleaning exports: {e}")
 
 
-def spawn_pdf_worker(job_id: str, week: Optional[int], start_slide: Optional[int], end_slide: Optional[int], frontend_url: Optional[str], regions: Optional[List[str]] = None, fy: str = "FY2027"):
+def spawn_pdf_worker(job_id: str, week: Optional[int], start_slide: Optional[int], end_slide: Optional[int], frontend_url: Optional[str], regions: Optional[List[str]] = None, fy: str = "FY2027", hidden_slides: Optional[List[str]] = None):
     """Launch export_worker.py as an independent background process"""
     status_file = os.path.join(EXPORTS_DIR, f"{job_id}.json")
     pdf_filename = f"weekly-tracker-week-{week or 'current'}-{job_id[:8]}.pdf"
@@ -49,6 +50,7 @@ def spawn_pdf_worker(job_id: str, week: Optional[int], start_slide: Optional[int
     python_exe = sys.executable
 
     regions_str = ",".join(regions) if regions else "None"
+    hidden_slides_str = ",".join(hidden_slides) if hidden_slides else "None"
 
     cmd = [
         python_exe,
@@ -60,7 +62,8 @@ def spawn_pdf_worker(job_id: str, week: Optional[int], start_slide: Optional[int
         str(end_slide) if end_slide is not None else "None",
         frontend_url or "http://localhost:5173",
         regions_str,
-        fy
+        fy,
+        hidden_slides_str
     ]
 
     try:
@@ -99,7 +102,8 @@ async def start_pdf_export_job(req: ExportRequest, background_tasks: BackgroundT
         end_slide=req.end_slide,
         frontend_url=req.frontend_url,
         regions=req.regions,
-        fy=req.fy
+        fy=req.fy,
+        hidden_slides=req.hidden_slides
     )
 
     return {

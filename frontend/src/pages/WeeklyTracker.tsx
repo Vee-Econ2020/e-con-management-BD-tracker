@@ -953,7 +953,25 @@ export default function WeeklyTracker() {
     const [editingSlide, setEditingSlide] = useState<number | string | null>(null);
     const [editedTitle, setEditedTitle] = useState(""); // For custom slide title editing
     // Track hidden slides
-    const [hiddenSlides, setHiddenSlides] = useState<Set<string>>(new Set());
+    const [hiddenSlides, setHiddenSlides] = useState<Set<string>>(() => {
+        if (typeof window !== 'undefined') {
+            const hiddenParam = new URLSearchParams(window.location.search).get('hidden_slides');
+            if (hiddenParam && hiddenParam !== 'None') {
+                return new Set(hiddenParam.split(','));
+            }
+        }
+        return new Set();
+    });
+    const [hiddenSlidesLoaded, setHiddenSlidesLoaded] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            const hiddenParam = new URLSearchParams(window.location.search).get('hidden_slides');
+            if (hiddenParam && hiddenParam !== 'None') {
+                return true;
+            }
+        }
+        return false;
+    });
+    const [customSlidesLoaded, setCustomSlidesLoaded] = useState<boolean>(false);
     const [isBulkHideExpanded, setIsBulkHideExpanded] = useState(false);
 
     // Confetti slides
@@ -2142,10 +2160,12 @@ export default function WeeklyTracker() {
                 } else {
                     setCustomSlides([]);
                 }
+                setCustomSlidesLoaded(true);
             })
             .catch(err => {
                 if (!isCurrent) return;
                 console.error(err);
+                setCustomSlidesLoaded(true);
             });
         return () => { isCurrent = false; };
     }, [selectedFY]);
@@ -2162,10 +2182,12 @@ export default function WeeklyTracker() {
                 } else {
                     setHiddenSlides(new Set());
                 }
+                setHiddenSlidesLoaded(true);
             })
             .catch(err => {
                 if (!isCurrent) return;
                 console.error("Failed to fetch hidden slides", err);
+                setHiddenSlidesLoaded(true);
             });
         return () => { isCurrent = false; };
     }, [selectedFY]);
@@ -2415,7 +2437,8 @@ export default function WeeklyTracker() {
                     week: currentWeek,
                     regions: selectedExportRegions.size > 0 ? Array.from(selectedExportRegions) : null,
                     frontend_url: window.location.origin,
-                    fy: selectedFY
+                    fy: selectedFY,
+                    hidden_slides: Array.from(hiddenSlides)
                 })
             });
 
@@ -2783,6 +2806,27 @@ export default function WeeklyTracker() {
     const isExportServer = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('export_server') === 'true';
 
     if (isExportServer) {
+        // Ensure hidden slides and custom slides have loaded before rendering or counting
+        if (!hiddenSlidesLoaded || !customSlidesLoaded) {
+            return (
+                <div
+                    id="export-single-slide"
+                    style={{
+                        width: '1920px',
+                        height: '1080px',
+                        backgroundColor: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
+                >
+                    <div style={{ color: '#64748b', fontSize: '1.5rem', fontWeight: 700 }}>
+                        Loading presentation slides...
+                    </div>
+                </div>
+            );
+        }
+
         let exportSlides = displaySlides.filter(s => !hiddenSlides.has(String(s.id)));
         const startParam = new URLSearchParams(window.location.search).get('start');
         const endParam = new URLSearchParams(window.location.search).get('end');
