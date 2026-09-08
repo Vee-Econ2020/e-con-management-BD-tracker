@@ -142,7 +142,7 @@ DATABASE SCHEMAS & KEY FIELD NAMES:
 - `target_settings`:
   * `financial_year` ('FY2027', 'FY2028'), `financial_qtr` ('overall', 'Q1'..), `category_type` ('Overall - region'), `category_value` ('Stretch Target', 'base target'), `target_value` (numeric).
 - `invoice_data` / `invoicing_data`:
-  * `week`: integer, `grand_total`: numeric, `Account Name`: string, `econ-Region`: string, `Invoice Date`: string.
+  * `week`: integer, `grand_total`: numeric, `account_name`: string, `econ_region` / `mRegion`: string, `invoice_date`: string, `fy` / `closing date Fy`: string ('FY2027', 'FY2028' based on April-March cycle). Always filter by `fy` or `closing date Fy` when querying invoices.
 """
 
 

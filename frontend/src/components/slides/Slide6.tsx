@@ -11,6 +11,8 @@ interface Slide6Row {
     current_qtr_stretch_target: number;
     po_achieved: number;
     prev_po_achieved?: number;
+    invoiced?: number;
+    prev_invoiced?: number;
     percentage: number;
     milestones: { [key: string]: MilestoneData };
 }
@@ -55,6 +57,14 @@ export default function Slide6({ fy = "FY2027" }: { fy?: string }) {
 
     const formatCurrency = (value: number) => {
         return `$${(value / 1e6).toFixed(2)}M`;
+    };
+
+    const formatDiffAmount = (val: number) => {
+        const abs = Math.abs(val);
+        if (abs >= 1e6) return `$${(abs / 1e6).toFixed(2)}M`;
+        if (abs >= 1e3) return `$${Math.round(abs / 1e3)}K`;
+        if (abs > 0) return `$${abs.toFixed(0)}`;
+        return `$0.00M`;
     };
 
     const getProgressGradient = () => {
@@ -168,7 +178,7 @@ export default function Slide6({ fy = "FY2027" }: { fy?: string }) {
                 minHeight: 0
             }}>
                 {firstRow.map((row, index) => (
-                    <Card key={index} row={row} qtr={data.current_quarter} enableAnimation={data.enable_animation !== false} formatCurrency={formatCurrency} gradient={getProgressGradient()} />
+                    <Card key={index} row={row} qtr={data.current_quarter} enableAnimation={data.enable_animation !== false} formatCurrency={formatCurrency} formatDiffAmount={formatDiffAmount} gradient={getProgressGradient()} />
                 ))}
             </div>
 
@@ -196,6 +206,7 @@ export default function Slide6({ fy = "FY2027" }: { fy?: string }) {
                             qtr={data.current_quarter}
                             enableAnimation={data.enable_animation !== false}
                             formatCurrency={formatCurrency}
+                            formatDiffAmount={formatDiffAmount}
                             gradient={getProgressGradient()}
                             isSmaller={secondRow.length > 2}
                         />
@@ -204,7 +215,7 @@ export default function Slide6({ fy = "FY2027" }: { fy?: string }) {
             </div>
 
             {/* Total Section (Isolated Component) */}
-            <OverallTotalBanner data={data.total} enableAnimation={data.enable_animation !== false} formatCurrency={formatCurrency} getProgressGradient={getProgressGradient} />
+            <OverallTotalBanner data={data.total} enableAnimation={data.enable_animation !== false} formatCurrency={formatCurrency} formatDiffAmount={formatDiffAmount} getProgressGradient={getProgressGradient} />
         </div>
     );
 }
@@ -327,10 +338,11 @@ function BoxConfettiShower({ active, color }: { active: boolean; color: string }
     );
 }
 
-function OverallTotalBanner({ data, enableAnimation, formatCurrency, getProgressGradient }: {
+function OverallTotalBanner({ data, enableAnimation, formatCurrency, formatDiffAmount, getProgressGradient }: {
     data: Slide6Row,
     enableAnimation: boolean,
     formatCurrency: (v: number) => string,
+    formatDiffAmount: (v: number) => string,
     getProgressGradient: () => string
 }) {
     // Animation isolated to this component (capped at 100% for milestone progress bar)
@@ -342,7 +354,14 @@ function OverallTotalBanner({ data, enableAnimation, formatCurrency, getProgress
     const isDip = diff < 0;
     const diffColor = isGrowth ? '#10b981' : (isDip ? '#ef4444' : '#64748b');
     const diffIcon = isGrowth ? '▲' : (isDip ? '▼' : '');
-    const diffText = diff !== 0 ? formatCurrency(Math.abs(diff)) : '';
+    const diffText = diff !== 0 ? formatDiffAmount(Math.abs(diff)) : '';
+
+    const invDiff = data.prev_invoiced !== undefined ? (data.invoiced || 0) - data.prev_invoiced : 0;
+    const isInvGrowth = invDiff > 0;
+    const isInvDip = invDiff < 0;
+    const invDiffColor = isInvGrowth ? '#10b981' : (isInvDip ? '#ef4444' : '#94a3b8');
+    const invDiffIcon = isInvGrowth ? '▲' : (isInvDip ? '▼' : '');
+    const invDiffText = invDiff !== 0 ? formatDiffAmount(Math.abs(invDiff)) : '';
 
     return (
         <div style={{
@@ -363,20 +382,38 @@ function OverallTotalBanner({ data, enableAnimation, formatCurrency, getProgress
                     <div style={{ fontSize: '3.5rem', fontWeight: '950', letterSpacing: '-0.02em', color: '#ffffff' }}>{formatCurrency(data.po_achieved)}</div>
                     <span style={{ fontSize: '3rem', fontWeight: '950', color: '#38bdf8', lineHeight: 1 }}>{data.percentage}%</span>
                 </div>
-                {diff !== 0 && (
-                    <div style={{
-                        fontSize: '1.25rem',
-                        fontWeight: 'bold',
-                        color: diffColor,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.2rem',
-                        marginTop: '0.25rem'
-                    }}>
-                        {diffText} {diffIcon}
-                    </div>
-                )}
-                <div style={{ fontSize: '1rem', color: '#cbd5e1', fontWeight: '600', marginTop: '0.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                    {diff !== 0 && (
+                        <div style={{
+                            fontSize: '1.15rem',
+                            fontWeight: 'bold',
+                            color: diffColor,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.2rem'
+                        }}>
+                            {diffText} {diffIcon}
+                        </div>
+                    )}
+                    {data.invoiced !== undefined && (
+                        <div style={{
+                            fontSize: '1.15rem',
+                            fontWeight: 'bold',
+                            color: '#34d399',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem'
+                        }}>
+                            <span>Invoiced: {formatCurrency(data.invoiced)}</span>
+                            {invDiff !== 0 && (
+                                <span style={{ fontSize: '0.95rem', color: invDiffColor }}>
+                                    ({invDiffText} {invDiffIcon})
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+                <div style={{ fontSize: '0.95rem', color: '#cbd5e1', fontWeight: '600', marginTop: '0.25rem' }}>
                     vs Stretch Target of {formatCurrency(data.q4_stretch_target)}
                 </div>
             </div>
@@ -561,11 +598,12 @@ function OverallTotalBanner({ data, enableAnimation, formatCurrency, getProgress
     );
 }
 
-const Card = memo(function Card({ row, qtr, enableAnimation, formatCurrency, gradient, isSmaller = false }: {
+const Card = memo(function Card({ row, qtr, enableAnimation, formatCurrency, formatDiffAmount, gradient, isSmaller = false }: {
     row: Slide6Row,
     qtr: string,
     enableAnimation: boolean,
     formatCurrency: (v: number) => string,
+    formatDiffAmount: (v: number) => string,
     gradient: string,
     isSmaller?: boolean
 }) {
@@ -590,7 +628,15 @@ const Card = memo(function Card({ row, qtr, enableAnimation, formatCurrency, gra
     const isDip = diff < 0;
     const diffColor = isGrowth ? '#10b981' : (isDip ? '#ef4444' : '#64748b');
     const diffIcon = isGrowth ? '▲' : (isDip ? '▼' : '');
-    const diffText = diff !== 0 ? formatCurrency(Math.abs(diff)) : '';
+    const diffText = diff !== 0 ? formatDiffAmount(Math.abs(diff)) : '';
+
+    // Invoiced growth indicator logic
+    const invDiff = row.prev_invoiced !== undefined ? (row.invoiced || 0) - row.prev_invoiced : 0;
+    const isInvGrowth = invDiff > 0;
+    const isInvDip = invDiff < 0;
+    const invDiffColor = isInvGrowth ? '#10b981' : (isInvDip ? '#ef4444' : '#64748b');
+    const invDiffIcon = isInvGrowth ? '▲' : (isInvDip ? '▼' : '');
+    const invDiffText = invDiff !== 0 ? formatDiffAmount(Math.abs(invDiff)) : '';
 
     return (
         <div style={{
@@ -639,27 +685,44 @@ const Card = memo(function Card({ row, qtr, enableAnimation, formatCurrency, gra
                         <div style={{ fontSize: isSmaller ? '1.1rem' : '1.35rem', fontWeight: '900', color: '#1e293b' }}>{formatCurrency(row.q4_stretch_target)}</div>
                     </div>
 
-                    <div style={{ marginTop: '0.5rem' }}>
-                        <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.1em' }}>PO Achieved</div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
-                            <div style={{ fontSize: isSmaller ? '2rem' : '3rem', fontWeight: '1000', color: '#0f172a', margin: '-0.2rem 0', letterSpacing: '-0.03em' }}>{formatCurrency(row.po_achieved)}</div>
+                    <div style={{ marginTop: '0.4rem' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>PO Achieved</div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                            <div style={{ fontSize: isSmaller ? '1.75rem' : '2.35rem', fontWeight: '1000', color: '#0f172a', margin: '-0.2rem 0', letterSpacing: '-0.03em', lineHeight: 1.1 }}>{formatCurrency(row.po_achieved)}</div>
                         </div>
                         {diff !== 0 && (
                             <div style={{
-                                fontSize: isSmaller ? '0.9rem' : '1.1rem',
+                                fontSize: isSmaller ? '0.85rem' : '1rem',
                                 fontWeight: 'bold',
                                 color: diffColor,
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '0.2rem',
-                                marginTop: '0.25rem'
+                                marginTop: '0.2rem'
                             }}>
                                 {diffText} {diffIcon}
                             </div>
                         )}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', marginTop: '0.5rem', paddingBottom: isSmaller ? '0' : '0.2rem' }}>
-                        <span style={{ fontSize: isSmaller ? '1.5rem' : '2.2rem', fontWeight: '1000', color: '#1e293b', lineHeight: 1 }}>{row.percentage}%</span>
+
+                    <div style={{ marginTop: '0.4rem' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Invoiced</div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                            <div style={{ fontSize: isSmaller ? '1.75rem' : '2.35rem', fontWeight: '1000', color: '#0f172a', margin: '-0.2rem 0', letterSpacing: '-0.03em', lineHeight: 1.1 }}>{formatCurrency(row.invoiced || 0)}</div>
+                        </div>
+                        {invDiff !== 0 && (
+                            <div style={{
+                                fontSize: isSmaller ? '0.85rem' : '1rem',
+                                fontWeight: 'bold',
+                                color: invDiffColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.2rem',
+                                marginTop: '0.2rem'
+                            }}>
+                                {invDiffText} {invDiffIcon}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -667,7 +730,7 @@ const Card = memo(function Card({ row, qtr, enableAnimation, formatCurrency, gra
 
             {/* Heatmap progress bar */}
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', width: '100%' }}>
-                <div style={{ paddingTop: '1.5rem', paddingBottom: '1.5rem', width: '100%' }}>
+                <div style={{ paddingTop: '1.25rem', paddingBottom: '1.25rem', width: '100%' }}>
                     <div style={{
                         height: '12px',
                         position: 'relative',
@@ -843,6 +906,34 @@ const Card = memo(function Card({ row, qtr, enableAnimation, formatCurrency, gra
                     </div>
                 </div>
             </div >
+
+            {/* Percentage Completed below milestone line */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '0.25rem',
+                paddingTop: '0.35rem',
+                borderTop: '1px solid #f1f5f9'
+            }}>
+                <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: '800',
+                    color: '#64748b',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                }}>
+                    Completed
+                </span>
+                <span style={{
+                    fontSize: isSmaller ? '1.35rem' : '1.85rem',
+                    fontWeight: '1000',
+                    color: '#1e293b',
+                    lineHeight: 1
+                }}>
+                    {row.percentage}%
+                </span>
+            </div>
         </div >
     );
 });

@@ -831,6 +831,18 @@ async def _process_invoice_upload(
         df_clean['week'] = df_clean['Invoice Date Parsed'].apply(extract_week)
         df_clean['week_label'] = df_clean['week'].apply(lambda w: f"Week {str(w).zfill(2)}")
 
+        def extract_fy(dt):
+            if pd.isna(dt):
+                return "FY2027"
+            try:
+                year = dt.year
+                month = dt.month
+                return f"FY{year + 1}" if month >= 4 else f"FY{year}"
+            except Exception:
+                return "FY2027"
+
+        df_clean['fy'] = df_clean['Invoice Date Parsed'].apply(extract_fy)
+
         progress_update(upload_id, 4, total_steps, "Saving Data", f"Saving {len(df_clean)} invoice records to database...", "processing")
 
         invoice_coll = _db["invoice_data"]
@@ -846,6 +858,8 @@ async def _process_invoice_upload(
                 "nRegion": str(row['nRegion']),
                 "mRegion": str(row['mRegion']),
                 "invoice_date": row['Invoice Date Parsed'].isoformat() if not pd.isna(row['Invoice Date Parsed']) else str(row[date_col]),
+                "fy": str(row['fy']),
+                "closing date Fy": str(row['fy']),
                 "week": int(row['week']),
                 "week_label": str(row['week_label']),
                 "upload_id": upload_id,
@@ -1623,12 +1637,12 @@ from slides_compute import (
 )
 
 @router.get("/slides/invoice")
-async def get_invoice_slide_data(region: str = "Overall"):
+async def get_invoice_slide_data(region: str = "Overall", fy: str = "FY2027"):
     """
     Get computed invoicing trend data for Overall or a specific region.
     """
     try:
-        result = await compute_invoice_slide_data(db, region_name=region)
+        result = await compute_invoice_slide_data(db, region_name=region, fy=fy)
         return clean_json_nan(result)
     except Exception as e:
         import traceback

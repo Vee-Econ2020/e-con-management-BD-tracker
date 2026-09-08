@@ -49,8 +49,9 @@ const InvoicedCard = ({
     growthAmount?: number;
     growthPct?: number;
 }) => {
-    const isGrowth = growthAmount >= 0;
-    const growthColor = isGrowth ? '#2a9d8f' : '#e76f51';
+    const isGrowth = growthAmount > 0;
+    const isDip = growthAmount < 0;
+    const growthColor = isGrowth ? '#2a9d8f' : (isDip ? '#e76f51' : '#6b7280');
     const sign = isGrowth ? '+' : '';
 
     const formattedTotal = (totalInvoiced / 1e6).toFixed(2) + 'M';

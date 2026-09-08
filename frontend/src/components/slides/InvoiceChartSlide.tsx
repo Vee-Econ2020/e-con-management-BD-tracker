@@ -79,7 +79,7 @@ export default function InvoiceChartSlide({ regionLabel,
         return () => {
             cancelled = true;
         };
-    }, [region]);
+    }, [region, fy]);
 
     if (loading) {
         return (

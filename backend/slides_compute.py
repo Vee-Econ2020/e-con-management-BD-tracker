@@ -6,6 +6,7 @@ Each slide has its own computation function that queries MongoDB and returns for
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any, Dict, Optional
 import pandas as pd
@@ -15,6 +16,44 @@ from context import target_week_var
 # so static type checkers (Pylance) flag it as "variable not allowed in type
 # expression". We alias to `Any` for annotations; runtime behaviour is unchanged.
 AsyncIOMotorDatabase = Any
+
+
+def extract_invoice_fy(doc: dict) -> str:
+    """
+    Determine the fiscal year (April-March cycle) of an invoice record.
+    e.g. 2026-04-01 to 2027-03-31 -> FY2027
+         2027-04-01 to 2028-03-31 -> FY2028
+    """
+    fy = doc.get("fy") or doc.get("closing date Fy")
+    if fy and isinstance(fy, str) and fy.strip():
+        return fy.strip()
+    
+    date_val = doc.get("invoice_date") or doc.get("Invoice Date")
+    if not date_val:
+        return "FY2027"
+    
+    if isinstance(date_val, datetime):
+        month = date_val.month
+        year = date_val.year
+        return f"FY{year + 1}" if month >= 4 else f"FY{year}"
+    
+    date_str = str(date_val).strip()
+    match = re.match(r"^(\d{4})-(\d{2})", date_str)
+    if match:
+        year = int(match.group(1))
+        month = int(match.group(2))
+        return f"FY{year + 1}" if month >= 4 else f"FY{year}"
+    
+    try:
+        dt = pd.to_datetime(date_str)
+        if not pd.isna(dt):
+            month = dt.month
+            year = dt.year
+            return f"FY{year + 1}" if month >= 4 else f"FY{year}"
+    except Exception:
+        pass
+    
+    return "FY2027"
 
 # Global switch for slide chart animations
 # Set to True to enable animations, or False to just show the chart statically
@@ -1177,25 +1216,30 @@ async def compute_slide2_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> D
     prev_total = prev_po_sum + prev_pipeline_sum
     prev_base_deficit = base_target - prev_total
     
-    # Compute INVOICED metrics from invoice_data collection using latest invoice week
+    # Compute INVOICED metrics from invoice_data collection filtered strictly by fiscal year
     invoice_coll = db["invoice_data"]
     all_inv_docs = await invoice_coll.find({}).to_list(length=100000)
-    if all_inv_docs:
-        inv_weeks = [doc.get("week", 35) for doc in all_inv_docs if doc.get("week") is not None]
+    # Filter invoice docs for the requested fiscal year (e.g. FY2027 vs FY2028) based on invoice_date/fy
+    fy_inv_docs = [doc for doc in all_inv_docs if extract_invoice_fy(doc) == fy]
+
+    if fy_inv_docs:
+        inv_weeks = [doc.get("week", 35) for doc in fy_inv_docs if doc.get("week") is not None]
         max_inv_week = max(inv_weeks) if inv_weeks else current_week
+        prev_inv_week = max_inv_week - 1
+
+        curr_inv_docs = [doc for doc in fy_inv_docs if doc.get("week") is not None and doc.get("week") <= max_inv_week]
+        prev_inv_docs = [doc for doc in fy_inv_docs if doc.get("week") is not None and doc.get("week") <= prev_inv_week]
+
+        current_invoiced = sum(float(doc.get("grand_total", 0.0)) for doc in curr_inv_docs)
+        last_week_invoiced = sum(float(doc.get("grand_total", 0.0)) for doc in prev_inv_docs)
+
+        growth_amount = current_invoiced - last_week_invoiced
+        growth_pct = (growth_amount / last_week_invoiced * 100.0) if last_week_invoiced > 0 else 0.0
     else:
-        max_inv_week = current_week
-
-    prev_inv_week = max_inv_week - 1
-
-    curr_inv_docs = [doc for doc in all_inv_docs if doc.get("week") is not None and doc.get("week") <= max_inv_week]
-    prev_inv_docs = [doc for doc in all_inv_docs if doc.get("week") is not None and doc.get("week") <= prev_inv_week]
-
-    current_invoiced = sum(float(doc.get("grand_total", 0.0)) for doc in curr_inv_docs)
-    last_week_invoiced = sum(float(doc.get("grand_total", 0.0)) for doc in prev_inv_docs)
-
-    growth_amount = current_invoiced - last_week_invoiced
-    growth_pct = (growth_amount / last_week_invoiced * 100.0) if last_week_invoiced > 0 else 0.0
+        current_invoiced = 0.0
+        last_week_invoiced = 0.0
+        growth_amount = 0.0
+        growth_pct = 0.0
 
     # Prepare result with all three pie charts and invoiced metrics
     result = {
@@ -1516,6 +1560,44 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
             
         region_targets[r]['milestones'] = milestones
 
+    # 5.5 Aggregate Invoicing by region from invoice_data
+    invoice_coll = db["invoice_data"]
+    all_inv_docs = await invoice_coll.find({}).to_list(length=100000)
+    fy_inv_docs = [doc for doc in all_inv_docs if extract_invoice_fy(doc) == fy]
+
+    def map_invoice_to_region(db_region: str) -> str:
+        if not db_region:
+            return "ROW"
+        r = str(db_region).strip()
+        if r in ["US West", "USA West"]:
+            return "US West"
+        if r in ["US East", "USA East"]:
+            return "US East"
+        if r in ["Europe"]:
+            return "Europe"
+        if r in ["Asean", "ASEAN", "Japan", "KANZ", "ROW", "RoW", "row", "Row"]:
+            return "ROW"
+        if r in ["Legacy"]:
+            return "Legacy"
+        return r
+
+    inv_weeks = [doc.get("week", 35) for doc in fy_inv_docs if doc.get("week") is not None and doc.get("week") <= target_week]
+    if not inv_weeks and fy_inv_docs:
+        inv_weeks = [doc.get("week", 35) for doc in fy_inv_docs if doc.get("week") is not None]
+    max_inv_week = max(inv_weeks) if inv_weeks else target_week
+    prev_inv_week = max_inv_week - 1
+
+    region_invoiced = {}
+    region_prev_invoiced = {}
+    for r in region_order:
+        curr_val = sum(float(doc.get("grand_total", 0.0)) for doc in fy_inv_docs if map_invoice_to_region(doc.get("mRegion") or doc.get("nRegion") or doc.get("econ_region")) == r and doc.get("week") is not None and doc.get("week") <= max_inv_week)
+        prev_val = sum(float(doc.get("grand_total", 0.0)) for doc in fy_inv_docs if map_invoice_to_region(doc.get("mRegion") or doc.get("nRegion") or doc.get("econ_region")) == r and doc.get("week") is not None and doc.get("week") <= prev_inv_week)
+        region_invoiced[r] = curr_val
+        region_prev_invoiced[r] = prev_val
+
+    total_invoiced = sum(float(doc.get("grand_total", 0.0)) for doc in fy_inv_docs if doc.get("week") is not None and doc.get("week") <= max_inv_week)
+    total_prev_invoiced = sum(float(doc.get("grand_total", 0.0)) for doc in fy_inv_docs if doc.get("week") is not None and doc.get("week") <= prev_inv_week)
+
     # 6. Build result rows
     rows = []
     total_q4 = 0
@@ -1553,6 +1635,8 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
             "milestones": region_targets[region_db]['milestones'],
             "po_achieved": po_achieved,
             "prev_po_achieved": prev_po_achieved,
+            "invoiced": region_invoiced.get(region_db, 0.0),
+            "prev_invoiced": region_prev_invoiced.get(region_db, 0.0),
             "percentage": round(percentage)
         })
     
@@ -1594,9 +1678,6 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
         if qtr in ['QP1', 'QP2', 'QP3'] and fy == "FY2027":
             status = "green" # Using green universally for all achieved
         else:
-            #     status = "red"
-            # else:
-            #     status = "none"
             if total_po >= val:
                 status = "green"
             else:
@@ -1610,6 +1691,8 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
         "milestones": total_milestones,
         "po_achieved": total_po,
         "prev_po_achieved": total_prev_po,
+        "invoiced": total_invoiced,
+        "prev_invoiced": total_prev_invoiced,
         "percentage": round(total_percentage)
     }
 
@@ -3154,13 +3237,13 @@ async def compute_region_services_cy_gm_data(
     }
 
 
-async def compute_invoice_slide_data(db: AsyncIOMotorDatabase, region_name: str = "Overall") -> Dict:
+async def compute_invoice_slide_data(db: AsyncIOMotorDatabase, region_name: str = "Overall", fy: str = "FY2027") -> Dict:
     """
     Compute data for Invoicing Trend Slide across Overall or individual regions.
     Generates 8-week historical trend of weekly and cumulative invoiced amount.
     """
     print("\n" + "=" * 70)
-    print(f"COMPUTING INVOICE SLIDE DATA FOR REGION: {region_name}")
+    print(f"COMPUTING INVOICE SLIDE DATA FOR REGION: {region_name} | FY: {fy}")
     print("=" * 70)
 
     invoice_coll = db["invoice_data"]
@@ -3193,6 +3276,9 @@ async def compute_invoice_slide_data(db: AsyncIOMotorDatabase, region_name: str 
     if not all_docs and match_query:
         # Fallback to all invoice docs if specific filter returns no match
         all_docs = await invoice_coll.find({}).to_list(length=100000)
+
+    # Filter documents by fiscal year based on invoice_date / fy
+    all_docs = [doc for doc in all_docs if extract_invoice_fy(doc) == fy]
 
     weeks_present = [doc.get("week", 35) for doc in all_docs if doc.get("week") is not None]
     max_week = max(weeks_present) if weeks_present else 35
@@ -3285,6 +3371,8 @@ async def compute_invoice_slide_data(db: AsyncIOMotorDatabase, region_name: str 
     try:
         wt_data = await get_current_or_closest_week_data(db)
         if wt_data is not None and not wt_data.empty:
+            if "closing date Fy" in wt_data.columns:
+                wt_data = wt_data[wt_data["closing date Fy"] == fy].copy()
             category_col = "projection - category" if "projection - category" in wt_data.columns else ("Projection - Category" if "Projection - Category" in wt_data.columns else None)
             region_col = "mRegion" if "mRegion" in wt_data.columns else ("Region" if "Region" in wt_data.columns else None)
             amount_col = "Weighted Amount" if "Weighted Amount" in wt_data.columns else ("Amount" if "Amount" in wt_data.columns else None)
