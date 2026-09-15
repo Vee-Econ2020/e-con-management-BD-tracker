@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, X, Table, Activity, Calendar } from 'lucide-react';
+import { ArrowLeft, RefreshCw, X, Table, Activity, Calendar, ChevronUp } from 'lucide-react';
 import '../index.css';
 import SymbTrackerUpdate from '../components/SymbTrackerUpdate';
 import SymbPipelineView from '../components/SymbPipelineView';
@@ -47,6 +47,27 @@ export default function SymbTracker() {
     const [selectedMonth] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [activeSubTab, setActiveSubTab] = useState<'symb_plan_pipeline' | 'tracker_update' | 'overall_plan'>('symb_plan_pipeline');
+    const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            if (window.scrollY > 250) {
+                setShowScrollTop(true);
+            } else {
+                setShowScrollTop(false);
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    const scrollToTop = () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    };
 
     const activeRecords = useMemo(() => {
         if (!selectedFileDate || selectedFileDate === fileDate) {
@@ -550,6 +571,48 @@ export default function SymbTracker() {
             {activeSubTab === 'tracker_update' && (
                 <SymbTrackerUpdate />
             )}
+
+            {/* Floating Scroll to Top Button */}
+            <button
+                onClick={scrollToTop}
+                aria-label="Scroll to top"
+                title="Scroll to top"
+                style={{
+                    position: 'fixed',
+                    bottom: '2.5rem',
+                    right: '2.5rem',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    padding: '0.7rem 1.15rem',
+                    backgroundColor: '#1e293b',
+                    color: '#ffffff',
+                    border: '1px solid #334155',
+                    borderRadius: '30px',
+                    boxShadow: '0 6px 20px rgba(0, 0, 0, 0.28)',
+                    cursor: 'pointer',
+                    fontWeight: 700,
+                    fontSize: '0.88rem',
+                    opacity: showScrollTop ? 1 : 0,
+                    transform: showScrollTop ? 'translateY(0) scale(1)' : 'translateY(16px) scale(0.9)',
+                    pointerEvents: showScrollTop ? 'auto' : 'none',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
+                onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#0f172a';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.4)';
+                    e.currentTarget.style.transform = 'translateY(-3px) scale(1.04)';
+                }}
+                onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = '#1e293b';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.28)';
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                }}
+            >
+                <ChevronUp size={18} style={{ color: '#f5ad42' }} />
+                <span>Top</span>
+            </button>
         </div>
     );
 }

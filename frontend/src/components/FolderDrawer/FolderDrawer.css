@@ -1,0 +1,692 @@
+/* ==========================================================================
+   Modern 3D Filing Cabinet Folder Drawer CSS
+   Inspired by physical hanging folder cabinets with staggered tabs
+   ========================================================================== */
+
+:root {
+  --drawer-depth: 1200px;
+  --folder-width: 960px;
+  --folder-height: 480px;
+  --folder-manila-top: #fbf7ee;
+  --folder-manila-body: #f4ecdc;
+  --folder-manila-dark: #e5dac4;
+  --folder-border: #d6c7ab;
+  --drawer-rail: #334155;
+  --drawer-rail-glow: #64748b;
+}
+
+/* Cabinet Container */
+.cabinet-wrapper {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  user-select: none;
+}
+
+/* Cabinet Frame Header / Top Info bar */
+.cabinet-status-bar {
+  width: 100%;
+  max-width: var(--folder-width);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 14px;
+  box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.04);
+}
+
+.cabinet-counter {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.counter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.75rem;
+  background: #0f172a;
+  color: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 9999px;
+  letter-spacing: 0.05em;
+}
+
+.cabinet-title-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cabinet-keyboard-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.key-badge {
+  padding: 0.2rem 0.45rem;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #334155;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* 3D Drawer Viewport */
+.drawer-viewport {
+  width: 100%;
+  max-width: var(--folder-width);
+  height: 560px;
+  position: relative;
+  perspective: var(--drawer-depth);
+  perspective-origin: 50% 30%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 50px;
+  overflow: visible;
+  touch-action: pan-y;
+}
+
+/* Drawer Mechanical Rails (Left and Right) */
+.drawer-rail-left,
+.drawer-rail-right {
+  position: absolute;
+  top: 15px;
+  bottom: 20px;
+  width: 18px;
+  background: linear-gradient(90deg, #1e293b 0%, #334155 40%, #64748b 70%, #1e293b 100%);
+  border-radius: 6px;
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.2), 0 8px 16px rgba(0, 0, 0, 0.25);
+  z-index: 5;
+}
+
+.drawer-rail-left {
+  left: -22px;
+}
+
+.drawer-rail-right {
+  right: -22px;
+}
+
+/* Rail Notch Marks for physical file-hanging look */
+.drawer-rail-left::after,
+.drawer-rail-right::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 5px;
+  right: 5px;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.15) 0px,
+    rgba(255, 255, 255, 0.15) 2px,
+    transparent 2px,
+    transparent 18px
+  );
+  border-radius: 3px;
+}
+
+/* Drawer Lip Front Rim (Cabinet front face) */
+.drawer-front-lip {
+  position: absolute;
+  bottom: 0;
+  left: -28px;
+  right: -28px;
+  height: 24px;
+  background: linear-gradient(180deg, #475569 0%, #1e293b 60%, #0f172a 100%);
+  border-top: 2px solid #94a3b8;
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 16px 28px -4px rgba(0, 0, 0, 0.4);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drawer-handle {
+  width: 140px;
+  height: 8px;
+  background: linear-gradient(180deg, #e2e8f0 0%, #94a3b8 100%);
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+}
+
+/* 3D Folder Stage Container */
+.folders-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+/* Individual Hanging Folder Wrapper */
+.folder-unit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--folder-height);
+  transform-style: preserve-3d;
+  transform-origin: bottom center;
+  transition: transform 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.45s ease,
+              filter 0.45s ease;
+  pointer-events: none;
+}
+
+/* Hanger Rod & Hooks extending over side rails */
+.hanger-rod {
+  position: absolute;
+  top: 0;
+  left: -18px;
+  right: -18px;
+  height: 8px;
+  background: linear-gradient(180deg, #cbd5e1 0%, #64748b 60%, #475569 100%);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+}
+
+.hanger-hook-left,
+.hanger-hook-right {
+  position: absolute;
+  top: -4px;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.hanger-hook-left {
+  left: 0;
+}
+
+.hanger-hook-right {
+  right: 0;
+}
+
+/* Folder Tab - Raised Plastic Tab with Label Insert */
+.folder-tab-container {
+  position: absolute;
+  top: -38px;
+  height: 38px;
+  padding: 0 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
+  z-index: 25;
+  box-shadow: 0 -3px 8px -1px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  border-top: 1px solid rgba(255, 255, 255, 0.7);
+  border-left: 1px solid rgba(255, 255, 255, 0.5);
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* Clear Plastic Tab Sleeve reflection effect */
+.folder-tab-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 45%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.05) 100%);
+  border-radius: 8px 8px 0 0;
+  pointer-events: none;
+}
+
+/* Tab Hover Lift */
+.folder-tab-container:hover {
+  transform: translateY(-4px) !important;
+  filter: brightness(1.04);
+}
+
+.tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.tab-label-text {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tab-notch {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.8;
+}
+
+/* Stagger Slot Alignments along Folder Top Edge */
+.tab-slot-0 { left: 4%; }
+.tab-slot-1 { left: 20%; }
+.tab-slot-2 { left: 36%; }
+.tab-slot-3 { left: 52%; }
+.tab-slot-4 { left: 68%; }
+.tab-slot-5 { left: 82%; }
+
+/* Folder Main Jacket / Sleeve (Manila cardstock styling) */
+.folder-jacket {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, var(--folder-manila-top) 0%, var(--folder-manila-body) 65%, var(--folder-manila-dark) 100%);
+  border: 1px solid var(--folder-border);
+  border-top: none;
+  border-radius: 0 0 16px 16px;
+  box-shadow: 0 18px 36px -8px rgba(0, 0, 0, 0.18), inset 0 2px 0 rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Authentic Paper Cut-Out Slots on Folder Top Rim */
+.folder-slots-rim {
+  width: 100%;
+  height: 14px;
+  background: #ede3ce;
+  border-bottom: 1px solid #d6c7ab;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 30px;
+}
+
+.slot-cutout {
+  width: 18px;
+  height: 4px;
+  background: #bcab8f;
+  border-radius: 1px;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.3);
+}
+
+/* Inside Document Sheet peeking out */
+.folder-document-container {
+  margin: 12px 20px 20px 20px;
+  flex: 1;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  padding: 2rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: auto;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Document Top Accent Bar matching tab color */
+.document-accent-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+}
+
+/* Document Content Sections */
+.doc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.doc-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.doc-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.doc-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.doc-category-tag {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.doc-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  margin-top: 0.2rem;
+  line-height: 1.1;
+}
+
+.doc-subtitle {
+  font-size: 1.05rem;
+  color: #475569;
+  line-height: 1.45;
+  max-width: 620px;
+}
+
+.doc-action-stamp {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+}
+
+/* Document Stats & Highlights Grid */
+.doc-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin: 1.25rem 0;
+  padding: 1.25rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
+}
+
+.metric-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.metric-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.metric-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.metric-sub {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* Document Bottom Action Bar */
+.doc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.doc-shortcuts-list {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.shortcut-tag {
+  padding: 0.35rem 0.75rem;
+  background: #f1f5f9;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.shortcut-tag:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.launch-folder-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.85rem;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.launch-folder-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+}
+
+.launch-folder-btn:active {
+  transform: translateY(0);
+}
+
+.launch-folder-btn.restricted {
+  background: #94a3b8 !important;
+  cursor: not-allowed;
+  opacity: 0.75;
+  box-shadow: none;
+}
+
+/* ==========================================================================
+   3D Folder Dynamic States
+   Past (Flipped forward/down) | Active (Raised/Upright) | Future (Deep in drawer)
+   ========================================================================== */
+
+/* 1. PAST FOLDERS: Leafed past, tilted forward down against front drawer lip */
+.folder-unit.state-past {
+  opacity: 0.35;
+  filter: blur(0.5px);
+}
+
+.folder-unit.state-past:hover {
+  opacity: 0.8;
+  filter: none;
+}
+
+/* 2. ACTIVE FOLDER: Raised prominently, fully upright and interactive */
+.folder-unit.state-active {
+  opacity: 1;
+  filter: none;
+}
+
+.folder-unit.state-active .folder-jacket {
+  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.3),
+              0 18px 36px -18px rgba(0, 0, 0, 0.25),
+              inset 0 2px 0 rgba(255, 255, 255, 0.9);
+}
+
+.folder-unit.state-active .folder-tab-container {
+  box-shadow: 0 -4px 14px -1px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* 3. FUTURE FOLDERS: Stacked behind in drawer depth */
+.folder-unit.state-future {
+  filter: brightness(0.96);
+}
+
+.folder-unit.state-future:hover {
+  filter: brightness(1.02);
+}
+
+/* Navigation Controls */
+.drawer-nav-controls {
+  width: 100%;
+  max-width: calc(var(--folder-width) + 90px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+  padding: 0 1rem;
+}
+
+.drawer-stepper-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.drawer-stepper-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.drawer-stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Dots Progress Indicator */
+.drawer-dots-container {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.drawer-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.drawer-dot.active {
+  width: 28px;
+  background: #0f172a;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  :root {
+    --folder-width: 95vw;
+    --folder-height: 490px;
+  }
+
+  .doc-title {
+    font-size: 1.8rem;
+  }
+
+  .doc-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --folder-height: 520px;
+  }
+
+  .drawer-viewport {
+    height: 580px;
+    padding-top: 30px;
+  }
+
+  .drawer-rail-left,
+  .drawer-rail-right,
+  .drawer-front-lip {
+    display: none;
+  }
+
+  .folder-document-container {
+    margin: 8px;
+    padding: 1.5rem 1rem;
+  }
+
+  .doc-title {
+    font-size: 1.5rem;
+  }
+
+  .doc-metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .tab-label-text {
+    font-size: 0.75rem;
+  }
+
+  .cabinet-keyboard-hint {
+    display: none;
+  }
+}

@@ -13,6 +13,7 @@ interface SymbPlanRow {
     "Delayed by days": number;
     "Delayed by weeks": number;
     "Estimated Completion Date"?: string;
+    "Actual Completed Date"?: string;
     is_autofilled?: boolean;
     unplanned_qty?: number;
     warning_msg?: string;
@@ -104,8 +105,8 @@ const SymbPipelineView: React.FC = () => {
 
     const MILESTONE_STAGES = useMemo(() => [
         { key: 'EBOM covered', title: 'EBOM covered', eventMatch: ['EBOM covered'], color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe' },
-        { key: 'All Material Available', title: 'All Material Available', eventMatch: ['All Material Available'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
         { key: 'PCBA', title: 'PCBA', eventMatch: ['PCBA covered', 'PCBA Ready'], color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+        { key: 'All Material Available', title: 'All Material Available', eventMatch: ['All Material Available'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
         { key: 'Materials Issued', title: 'Materials Issued', eventMatch: ['Materials Issued'], color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' },
         { key: 'Active Alignment', title: 'Active Alignment', eventMatch: ['Active alignment'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
         { key: 'Production / Assembly', title: 'Production / Assembly', eventMatch: ['Production/Assembly'], color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' },
@@ -197,7 +198,7 @@ const SymbPipelineView: React.FC = () => {
     }, [filteredAndSortedData]);
 
     const getWeekBackfillInfo = (rows: SymbPlanRow[]) => {
-        const variants = ["Varient 1", "Varient 2"];
+        const variants = ["Variant 1", "Variant 2"];
         const maxNativeCompletedIdxMap: Record<string, number> = {};
         const maxNativeCompletedStageNameMap: Record<string, string> = {};
 
@@ -216,7 +217,9 @@ const SymbPipelineView: React.FC = () => {
                 }
             });
 
+            maxNativeCompletedIdxMap[variantKey] = maxIdx;
             maxNativeCompletedIdxMap[variantKey.toLowerCase()] = maxIdx;
+            maxNativeCompletedStageNameMap[variantKey] = stageName;
             maxNativeCompletedStageNameMap[variantKey.toLowerCase()] = stageName;
         });
 
@@ -311,8 +314,8 @@ const SymbPipelineView: React.FC = () => {
             // Count how many shipment weeks have this stage covered
             let coveredWeeksCount = 0;
             sortedShipmentWeeks.forEach(weekStr => {
-                const v1Covered = isStageCoveredForWeekVariant(weekStr, 'Varient 1', selectedCoverageStage);
-                const v2Covered = isStageCoveredForWeekVariant(weekStr, 'Varient 2', selectedCoverageStage);
+                const v1Covered = isStageCoveredForWeekVariant(weekStr, 'Variant 1', selectedCoverageStage);
+                const v2Covered = isStageCoveredForWeekVariant(weekStr, 'Variant 2', selectedCoverageStage);
                 if (v1Covered || v2Covered) {
                     coveredWeeksCount++;
                 }
@@ -353,16 +356,6 @@ const SymbPipelineView: React.FC = () => {
                 subTextColor: '#6366f1'
             },
             { 
-                key: 'All Material Available', 
-                title: 'All Material Available', 
-                eventMatch: ['All Material Available'],
-                bgColor: '#fffbeb',
-                borderColor: '#fde68a',
-                titleColor: '#92400e',
-                numColor: '#b45309',
-                subTextColor: '#d97706'
-            },
-            { 
                 key: 'PCBA', 
                 title: 'PCBA', 
                 eventMatch: ['PCBA covered', 'PCBA Ready'],
@@ -371,6 +364,16 @@ const SymbPipelineView: React.FC = () => {
                 titleColor: '#1e40af',
                 numColor: '#1d4ed8',
                 subTextColor: '#2563eb'
+            },
+            { 
+                key: 'All Material Available', 
+                title: 'All Material Available', 
+                eventMatch: ['All Material Available'],
+                bgColor: '#fffbeb',
+                borderColor: '#fde68a',
+                titleColor: '#92400e',
+                numColor: '#b45309',
+                subTextColor: '#d97706'
             },
             { 
                 key: 'Materials Issued', 
@@ -470,13 +473,14 @@ const SymbPipelineView: React.FC = () => {
         }, 2500);
     };
 
-    const renderVariantSection = (row: SymbPlanRow, isBackfilled: boolean, backfillSourceStage?: string) => {
+    const renderVariantSection = (row: SymbPlanRow, isBackfilled: boolean, backfillSourceStage?: string, backfillActualCompDate?: string) => {
         const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
         const isCompleted = isNativeCompleted || isBackfilled;
         const isDelayed = !isCompleted && row["Delayed by days"] > 0;
         const isAutofilled = Boolean(row.is_autofilled || row["is_autofilled"]);
         const unplannedQty = Number(row.unplanned_qty || row["unplanned_qty"] || 0);
         const warningMsg = row.warning_msg || row["warning_msg"] || (unplannedQty > 0 ? `There is no plan for remaining qty (${unplannedQty.toLocaleString()} units). Please update!` : '');
+        const actualCompDate = row["Actual Completed Date"] || row["actual_completed_date"] || backfillActualCompDate;
         
         return (
             <div key={row.id} style={{ 
@@ -540,6 +544,13 @@ const SymbPipelineView: React.FC = () => {
                         Will complete on: <strong>{row["Estimated Completion Date"]}</strong>
                     </div>
                 )}
+
+                {(isCompleted && actualCompDate) && (
+                    <div style={{ color: '#166534', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.3rem', backgroundColor: '#dcfce7', padding: '0.25rem 0.4rem', borderRadius: '4px' }}>
+                        <CheckCircle2 size={12} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        Actual completed date: <strong>{actualCompDate}</strong>
+                    </div>
+                )}
             </div>
         );
     };
@@ -548,8 +559,8 @@ const SymbPipelineView: React.FC = () => {
         const isComplete = pct === 100;
         const { maxNativeCompletedIdxMap, maxNativeCompletedStageNameMap } = getWeekBackfillInfo(rows);
 
-        const v1MaxIdx = maxNativeCompletedIdxMap['varient 1'] ?? -1;
-        const v2MaxIdx = maxNativeCompletedIdxMap['varient 2'] ?? -1;
+        const v1MaxIdx = maxNativeCompletedIdxMap['Variant 1'] ?? maxNativeCompletedIdxMap['variant 1'] ?? -1;
+        const v2MaxIdx = maxNativeCompletedIdxMap['Variant 2'] ?? maxNativeCompletedIdxMap['variant 2'] ?? -1;
 
         let quickSummaryText = '';
         if (v1MaxIdx >= 0 && v2MaxIdx >= 0) {
@@ -644,9 +655,20 @@ const SymbPipelineView: React.FC = () => {
                             criticalMsg = `${eventType} Plan not available for ${variantStr}`;
                         }
 
-                        const cardBatchDate = eventRows.find(r => r["Last Batch Date"])?.["Last Batch Date"] 
-                            ? String(eventRows.find(r => r["Last Batch Date"])?.["Last Batch Date"]).split(' ')[0] 
-                            : '';
+                        const rawBatchDate = eventRows.find(r => r["Last Batch Date"])?.["Last Batch Date"];
+                        let cardBatchDate = '';
+                        if (rawBatchDate) {
+                            try {
+                                const d = new Date(rawBatchDate);
+                                if (!isNaN(d.getTime())) {
+                                    cardBatchDate = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                                } else {
+                                    cardBatchDate = String(rawBatchDate).split(' ')[0];
+                                }
+                            } catch {
+                                cardBatchDate = String(rawBatchDate).split(' ')[0];
+                            }
+                        }
 
                         return (
                             <React.Fragment key={eventType}>
@@ -664,7 +686,7 @@ const SymbPipelineView: React.FC = () => {
                                         {cardBatchDate && (
                                             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginTop: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
                                                 <Clock size={12} style={{ color: '#0284c7' }} />
-                                                Should be completed by : <span style={{ color: '#0284c7', fontWeight: 700 }}>{cardBatchDate}</span>
+                                                Should be completed on : <span style={{ color: '#0284c7', fontWeight: 700 }}>{cardBatchDate}</span>
                                             </div>
                                         )}
                                     </div>
@@ -678,8 +700,14 @@ const SymbPipelineView: React.FC = () => {
                                                 const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
                                                 const isBackfilled = !isNativeCompleted && idx < maxCompletedIdx;
                                                 const backfillSourceStage = isBackfilled ? maxNativeCompletedStageNameMap[variantKey] : '';
+                                                const backfillSourceRow = isBackfilled && backfillSourceStage 
+                                                    ? rows.find(r => r["Event Type"] === backfillSourceStage && (r["Variant Type"] || "").toLowerCase() === variantKey) 
+                                                    : null;
+                                                const backfillActualCompDate = backfillSourceRow 
+                                                    ? (backfillSourceRow["Actual Completed Date"] || backfillSourceRow["actual_completed_date"]) 
+                                                    : undefined;
 
-                                                return renderVariantSection(row, isBackfilled, backfillSourceStage);
+                                                return renderVariantSection(row, isBackfilled, backfillSourceStage, backfillActualCompDate);
                                             })
                                         )}
 
@@ -750,8 +778,8 @@ const SymbPipelineView: React.FC = () => {
                         style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
                     >
                         <option value="All">All Variants</option>
-                        <option value="Varient 1">Variant 1</option>
-                        <option value="Varient 2">Variant 2</option>
+                        <option value="Variant 1">Variant 1</option>
+                        <option value="Variant 2">Variant 2</option>
                     </select>
                 </div>
 
@@ -974,7 +1002,7 @@ const SymbPipelineView: React.FC = () => {
                     {selectedCoverageStage ? (
                         // Render single stage milestone line when stage coverage card is clicked
                         MILESTONE_STAGES.filter(s => s.title === selectedCoverageStage).map(stage => {
-                            const variants = ['Varient 1', 'Varient 2'];
+                            const variants = ['Variant 1', 'Variant 2'];
                             return (
                                 <div key={stage.title} style={{
                                     backgroundColor: stage.bg,
@@ -1102,7 +1130,7 @@ const SymbPipelineView: React.FC = () => {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                                {['Varient 1', 'Varient 2'].map(variantName => (
+                                {['Variant 1', 'Variant 2'].map(variantName => (
                                     <div key={variantName} style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '0.85rem 1rem', border: '1px solid #e2e8f0' }}>
                                         <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155', marginBottom: '0.75rem' }}>
                                             {variantName}

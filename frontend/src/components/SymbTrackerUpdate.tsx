@@ -1205,12 +1205,12 @@ export default function SymbTrackerUpdate() {
 
     const isVariant1 = (v: any) => {
         const s = String(v ?? '').trim().toLowerCase();
-        return s === '1' || s === '1.0' || s === 'v1' || s.includes('variant 1') || s.includes('varient 1');
+        return s === '1' || s === '1.0' || s === 'v1' || s.includes('variant 1') || s.includes('Variant 1');
     };
 
     const isVariant2 = (v: any) => {
         const s = String(v ?? '').trim().toLowerCase();
-        return s === '2' || s === '2.0' || s === 'v2' || s.includes('variant 2') || s.includes('varient 2');
+        return s === '2' || s === '2.0' || s === 'v2' || s.includes('variant 2') || s.includes('Variant 2');
     };
 
     const allV1Records = useMemo(() => records.filter((r: TrackerRecord) => isVariant1(r.variant)), [records]);

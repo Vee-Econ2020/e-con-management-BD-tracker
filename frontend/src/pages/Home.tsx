@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
-import { Info } from 'lucide-react'
-import '../index.css'
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Info } from 'lucide-react';
+import { SkeuoFolderStack } from '../components/FolderDrawer/SkeuoFolderStack';
+import '../index.css';
 
 interface WeekData {
     week: number;
@@ -38,13 +39,66 @@ function Home() {
     };
 
     return (
-        <div className="app-container">
-            <header className="header-container">
-                <div className="title-section">
-                    <h1>e-con<br />Business<br />Development<br />tracker</h1>
+        <div className="app-container" style={{ paddingBottom: '0.75rem' }}>
+            <header className="header-container" style={{ marginBottom: '2rem' }}>
+                <div className="title-section" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <img
+                        src="/econ-logo.png"
+                        alt="e-con Systems"
+                        style={{
+                            maxHeight: '44px',
+                            width: 'auto',
+                            objectFit: 'contain',
+                            alignSelf: 'flex-start',
+                            marginBottom: '0.6rem',
+                        }}
+                    />
+                    <h1 style={{ fontSize: '3.2rem', lineHeight: 1.1, whiteSpace: 'nowrap', margin: 0 }}>
+                        e-con Business Development tracker
+                    </h1>
+
+                    {/* Date, Week, and Role data positioned on the left end below the title */}
+                    <div className="header-meta-left" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1.25rem',
+                        marginTop: '0.5rem',
+                        flexWrap: 'wrap'
+                    }}>
+                        <div className="week-display" style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                            Week : {weekData?.week || '...'}
+                        </div>
+                        <span style={{ color: '#cbd5e1', fontSize: '1.2rem', fontWeight: 300 }}>|</span>
+                        <div className="current-date" style={{ fontSize: '1.05rem', fontWeight: 600, color: '#64748b' }}>
+                            {currentDate}
+                        </div>
+                        {user && (
+                            <>
+                                <span style={{ color: '#cbd5e1', fontSize: '1.2rem', fontWeight: 300 }}>|</span>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
+                                    <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+                                        {user.email ? user.email.split('@')[0] : ''}
+                                    </span>
+                                    <span style={{
+                                        display: 'inline-block',
+                                        padding: '0.2rem 0.75rem',
+                                        backgroundColor: '#e0e7ff',
+                                        color: '#3730a3',
+                                        borderRadius: '9999px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 700,
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                    }}>
+                                        {user.role}{user.sub_role && user.sub_role !== 'None' && user.sub_role !== 'undefined' ? ` - ${user.sub_role}` : ''}
+                                    </span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
                     {!user && (
                         <div style={{
-                            marginTop: '1.25rem',
+                            marginTop: '0.75rem',
                             padding: '0.85rem 1.25rem',
                             backgroundColor: '#f8fafc',
                             border: '1px solid #cbd5e1',
@@ -87,7 +141,7 @@ function Home() {
                     )}
                 </div>
 
-                <div className="date-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
+                <div className="header-user-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                     {!user && (
                         <button
                             onClick={() => navigate('/login')}
@@ -101,114 +155,46 @@ function Home() {
                                 fontSize: '1rem',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s',
-                                marginBottom: '0.4rem',
                                 boxShadow: '0 2px 6px rgba(0,0,0,0.12)'
                             }}
                         >
                             Login
                         </button>
                     )}
-
-                    <div className="current-date">{currentDate}</div>
-                    <div className="week-display">
-                        Week : {weekData?.week || '...'}
-                    </div>
-                    {user && (
-                        <>
-                            <div style={{ fontSize: '1.3rem', fontWeight: '800', color: '#1f2937', marginTop: '0.25rem' }}>
-                                {user.email ? user.email.split('@')[0] : ''}
-                            </div>
-                            <div style={{
-                                display: 'inline-block',
-                                padding: '0.25rem 0.85rem',
-                                backgroundColor: '#e0e7ff',
-                                color: '#3730a3',
-                                borderRadius: '9999px',
-                                fontSize: '0.85rem',
-                                fontWeight: '700',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                                marginTop: '0.1rem'
-                            }}>
-                                {user.role}{user.sub_role && user.sub_role !== 'None' && user.sub_role !== 'undefined' ? ` - ${user.sub_role}` : ''}
-                            </div>
-                        </>
-                    )}
                 </div>
             </header>
 
-            <div className="buttons-container">
-                {(!user || user.tracker_access?.includes('Weekly') || user.role === 'Admin') && (
-                    <button
-                        className="nav-button"
-                        onClick={() => navigate('/weekly')}
-                        style={{
-                            borderLeft: '12px solid #3c6cb3ff', // Blue
-                            '--hover-bg-color': '#3c6cb3ff'
-                        } as React.CSSProperties}
-                    >
-                        <span className="btn-title">Weekly</span>
-                        <span className="btn-subtitle">Tracker</span>
-                    </button>
-                )}
+            {/* Skeuomorphic 3D Clay Folder Stack with 36vh white space buffer so folders peek half-visible at bottom fold */}
+            <main style={{ marginTop: '36vh', width: '100%' }}>
+                <SkeuoFolderStack currentWeek={weekData?.week || 36} user={user} />
+            </main>
 
-                {(!user || user.tracker_access?.includes('Revenue') || user.role === 'Admin') && (
-                    <button
-                        className="nav-button"
-                        onClick={() => navigate('/revenue')}
-                        style={{
-                            borderLeft: '12px solid #1f9e62ff', // Emerald
-                            '--hover-bg-color': '#1f9e62ff'
-                        } as React.CSSProperties}
-                    >
-                        <span className="btn-title">Revenue</span>
-                        <span className="btn-subtitle">Tracker</span>
-                    </button>
-                )}
-
-                {(!user || user.tracker_access?.includes('SYMB') || user.role === 'Admin') && (
-                    <button
-                        className="nav-button"
-                        onClick={() => navigate('/symb')}
-                        style={{
-                            borderLeft: '12px solid #f5ad42', // Yellow folder accent
-                            '--hover-bg-color': '#f5ad42'
-                        } as React.CSSProperties}
-                    >
-                        <span className="btn-title">SYMB</span>
-                        <span className="btn-subtitle">Tracker</span>
-                    </button>
-                )}
-
-                {(!user || user.role === 'Admin') && (
-                    <button
-                        className="nav-button"
-                        onClick={() => navigate('/admin')}
-                        style={{
-                            borderLeft: '12px solid #8a55b3ff', // Purple
-                            '--hover-bg-color': '#8a55b3ff'
-                        } as React.CSSProperties}
-                    >
-                        <span className="btn-title">Admin</span>
-                        <span className="btn-subtitle">data upload</span>
-                    </button>
-                )}
-
-                {user && (
-                    <button
-                        className="nav-button"
-                        onClick={() => navigate('/profile')}
-                        style={{
-                            borderLeft: '12px solid #10B981', // Emerald
-                            '--hover-bg-color': '#10B981'
-                        } as React.CSSProperties}
-                    >
-                        <span className="btn-title">Profile</span>
-                        <span className="btn-subtitle">account settings</span>
-                    </button>
-                )}
-            </div>
-        </div >
-    )
+            {/* Post-scroll footer below the tracker */}
+            <footer style={{
+                padding: '4rem 2rem 6rem 2rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderTop: '1px solid #e2e8f0',
+                marginTop: '4rem',
+                color: '#64748b',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    <img src="/econ-logo.png" alt="e-con Systems" style={{ maxHeight: '24px', opacity: 0.85 }} />
+                    <span style={{ color: '#1e293b', fontWeight: 700 }}>e-con Systems</span>
+                    <span style={{ color: '#cbd5e1' }}>|</span>
+                    <span>Management Business Development Tracker</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', color: '#94a3b8' }}>
+                    <span>Week {weekData?.week || '36'}</span>
+                    <span>•</span>
+                    <span>All Trackers Synchronized</span>
+                </div>
+            </footer>
+        </div>
+    );
 }
 
-export default Home
+export default Home;

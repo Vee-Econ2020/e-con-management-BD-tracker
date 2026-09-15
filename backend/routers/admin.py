@@ -1408,6 +1408,69 @@ class UpdateWeeklyPlanPayload(BaseModel):
     v1_planned: int
     v2_planned: int
 
+class SymbStageLeadTime(BaseModel):
+    stage: str
+    weeks: int = 0
+    days: int = 0
+    order: Optional[int] = 0
+
+class SymbStageLeadTimesUpdatePayload(BaseModel):
+    stages: List[SymbStageLeadTime]
+
+@router.get("/symb-stage-lead-times")
+async def get_symb_stage_lead_times():
+    try:
+        from SYMB_plan_transformation import DEFAULT_STAGE_LEAD_TIMES
+        coll = get_collection("symb_stage_lead_times")
+        cursor = coll.find({}).sort("order", 1)
+        saved_items = {}
+        async for doc in cursor:
+            doc["id"] = str(doc["_id"])
+            del doc["_id"]
+            if "stage" in doc:
+                saved_items[doc["stage"]] = doc
+
+        result = []
+        for def_item in DEFAULT_STAGE_LEAD_TIMES:
+            st_name = def_item["stage"]
+            if st_name in saved_items:
+                merged = {**def_item, **saved_items[st_name]}
+                result.append(merged)
+            else:
+                result.append(dict(def_item))
+        return result
+    except Exception as e:
+        print(f"Error fetching symb stage lead times: {e}")
+        from SYMB_plan_transformation import DEFAULT_STAGE_LEAD_TIMES
+        return DEFAULT_STAGE_LEAD_TIMES
+
+@router.post("/symb-stage-lead-times")
+async def update_symb_stage_lead_times(payload: SymbStageLeadTimesUpdatePayload, authorization: Optional[str] = Header(None)):
+    from SYMB_plan_transformation import run_symb_plan_pipeline
+    from routers.auth import get_optional_current_user
+    user_sess = await get_optional_current_user(authorization)
+    await check_symb_time_lock(user_sess)
+    try:
+        coll = get_collection("symb_stage_lead_times")
+        for idx, item in enumerate(payload.stages):
+            await coll.update_one(
+                {"stage": item.stage},
+                {"$set": {
+                    "stage": item.stage,
+                    "weeks": int(item.weeks),
+                    "days": int(item.days),
+                    "order": item.order if item.order is not None else idx
+                }},
+                upsert=True
+            )
+        await run_symb_plan_pipeline(db)
+        return {"status": "success", "message": "Successfully updated stage lead times and recalculated plan pipeline."}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error updating symb stage lead times: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/symb-plan/update-weekly-plan")
 async def update_weekly_plan(payload: UpdateWeeklyPlanPayload, authorization: Optional[str] = Header(None)):
     import pandas as pd
@@ -1443,13 +1506,13 @@ async def update_weekly_plan(payload: UpdateWeeklyPlanPayload, authorization: Op
             doc_var = str(doc.get("Variant Type", "")).strip()
 
             if doc_week_key == target_week_key:
-                if doc_var in ["V1", "v1", "Variant 1", "Varient 1"]:
+                if doc_var in ["V1", "v1", "Variant 1", "Variant 1"]:
                     await coll.update_one(
                         {"_id": doc["_id"]},
                         {"$set": {"planned Value": payload.v1_planned}}
                     )
                     v1_updated = True
-                elif doc_var in ["V2", "v2", "Variant 2", "Varient 2"]:
+                elif doc_var in ["V2", "v2", "Variant 2", "Variant 2"]:
                     await coll.update_one(
                         {"_id": doc["_id"]},
                         {"$set": {"planned Value": payload.v2_planned}}
@@ -1459,7 +1522,7 @@ async def update_weekly_plan(payload: UpdateWeeklyPlanPayload, authorization: Op
         if not v1_updated:
             await coll.insert_one({
                 "Shipment Week": payload.shipment_week,
-                "Variant Type": "Varient 1",
+                "Variant Type": "Variant 1",
                 "Event Type": "Finished goods",
                 "planned Value": payload.v1_planned,
                 "Last Batch Date": payload.shipment_week
@@ -1468,7 +1531,7 @@ async def update_weekly_plan(payload: UpdateWeeklyPlanPayload, authorization: Op
         if not v2_updated:
             await coll.insert_one({
                 "Shipment Week": payload.shipment_week,
-                "Variant Type": "Varient 2",
+                "Variant Type": "Variant 2",
                 "Event Type": "Finished goods",
                 "planned Value": payload.v2_planned,
                 "Last Batch Date": payload.shipment_week
@@ -3429,9 +3492,9 @@ async def get_stage_target_qty(variant: str, event_type: str) -> int:
             vs = str(v_val or "").strip().lower()
             ts = str(target_v or "").strip().lower()
             if ts in ["1", "v1", "variant 1"]:
-                return vs in ["1", "1.0", "v1"] or "variant 1" in vs or "varient 1" in vs
+                return vs in ["1", "1.0", "v1"] or "variant 1" in vs or "Variant 1" in vs
             if ts in ["2", "v2", "variant 2"]:
-                return vs in ["2", "2.0", "v2"] or "variant 2" in vs or "varient 2" in vs
+                return vs in ["2", "2.0", "v2"] or "variant 2" in vs or "Variant 2" in vs
             return vs == ts
 
         seq_stages = [

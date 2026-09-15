@@ -32,8 +32,8 @@ body {
   max-width: 1600px;
   /* Increased width to accommodate larger elements */
   margin: 0 auto;
-  padding: 5rem 4rem;
-  /* Increased padding */
+  padding: 1.5rem 3.5rem;
+  /* Compact vertical padding to ensure entire UI fits above taskbar */
 }
 
 /* Header Section */
