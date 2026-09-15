@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Calendar, Filter, AlertCircle, CalendarDays, ArrowRight, RefreshCw, Clock, 
     CheckCircle2, ChevronDown, Eye, Check, Layers, X, ShieldAlert,
-    MessageSquare, History, Send, Edit2, Trash2, Plus, Maximize2
+    MessageSquare, History, Send, Edit2, Trash2, Plus, Maximize2,
+    ShieldCheck, TrendingDown, ArrowUpRight, Activity, ChevronUp
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -110,6 +111,58 @@ const ProgressRing: React.FC<{ percentage: number; size?: number; strokeWidth?: 
         </svg>
     );
 };
+
+function parseDateSafe(val: any): Date | null {
+    if (!val) return null;
+    const str = String(val).trim();
+    if (!str || ['none', 'nan', 'nat', 'null', '-', 'unknown'].includes(str.toLowerCase())) return null;
+
+    const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (isoMatch) {
+        return new Date(parseInt(isoMatch[1], 10), parseInt(isoMatch[2], 10) - 1, parseInt(isoMatch[3], 10));
+    }
+
+    const match = str.match(/^(\d{1,2})[-/\s]+([A-Za-z]+)[-/\s]+(\d{2,4})/);
+    if (match) {
+        const day = parseInt(match[1], 10);
+        const monthStr = match[2].toLowerCase();
+        let year = parseInt(match[3], 10);
+        if (year < 100) year += 2000;
+        const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+        const monthIdx = months.findIndex(m => monthStr.startsWith(m));
+        if (!isNaN(day) && monthIdx >= 0 && !isNaN(year)) {
+            return new Date(year, monthIdx, day);
+        }
+    }
+
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+interface WeekBufferAnalysis {
+    weekStr: string;
+    shipDate: Date;
+    targetFgDate: Date;
+    projectedFgDate: Date;
+    actualFgDate: Date | null;
+    isFgCompleted: boolean;
+    maxSlippageDays: number;
+    bufferDays: number;
+    bufferWeeks: number;
+    status: 'healthy' | 'consumed' | 'at_risk' | 'breached';
+    primaryEaterStage: string;
+    stageBreakdowns: {
+        stage: string;
+        targetDate: Date | null;
+        actualDate: Date | null;
+        estDate: Date | null;
+        slippageDays: number;
+        isCompleted: boolean;
+    }[];
+    v1Planned: number;
+    v2Planned: number;
+    totalPlanned: number;
+}
 
 interface StageRemarksModalProps {
     weekStr: string;
@@ -508,6 +561,13 @@ const SymbPipelineView: React.FC = () => {
     const [toDate, setToDate] = useState('');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [selectedVariant, setSelectedVariant] = useState<string>('All');
+    const isAdmin = user?.role === 'Admin';
+
+    // Buffer Analysis State (Admin Only)
+    const [bufferFilter, setBufferFilter] = useState<'all' | 'at_risk' | 'breached' | 'healthy'>('all');
+    const [bufferSortMode, setBufferSortMode] = useState<'least_buffer' | 'chronological'>('least_buffer');
+    const [isBufferSectionOpen, setIsBufferSectionOpen] = useState<boolean>(true);
+    const [selectedBufferStage, setSelectedBufferStage] = useState<string | null>(null);
 
     const MILESTONE_STAGES = useMemo(() => [
         { key: 'EBOM covered', title: 'EBOM covered', eventMatch: ['EBOM covered'], color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe' },
@@ -974,6 +1034,330 @@ const SymbPipelineView: React.FC = () => {
         });
     }, [data]);
 
+    // Buffer Stages Tracked (from EBOM covered to Finished goods)
+    const BUFFER_STAGES = useMemo(() => [
+        "EBOM covered",
+        "PCBA covered",
+        "All Material Available",
+        "Materials Issued",
+        "Active alignment",
+        "Production/Assembly",
+        "FQC",
+        "Finished goods"
+    ], []);
+
+    // Comprehensive Weekly Buffer Analysis (Evaluated against 4-Week Finished Goods cushion)
+    const weeklyBufferData = useMemo(() => {
+        const today = new Date();
+        const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+        const list: WeekBufferAnalysis[] = [];
+
+        sortedShipmentWeeks.forEach(weekStr => {
+            const rows = groupedByWeek[weekStr] || [];
+            const shipDate = parseDateSafe(weekStr) || new Date();
+            
+            // Standard target is 4 weeks (28 days) before shipment date
+            const targetFgDate = new Date(shipDate.getTime() - (28 * 86400000));
+
+            // Find Finished goods row
+            const fgRows = rows.filter(r => r["Event Type"] === "Finished goods");
+            const isFgCompleted = fgRows.length > 0 && fgRows.every(r => 
+                r["Material Covered"] === "Yes" || (Number(r["planned Value"] || 0) > 0 && Number(r.completed || 0) >= Number(r["planned Value"] || 0))
+            );
+
+            let actualFgDate: Date | null = null;
+            if (isFgCompleted && fgRows.length > 0) {
+                const dates = fgRows.map(r => parseDateSafe(r["Actual Completed Date"] || r.actual_completed_date)).filter(Boolean) as Date[];
+                if (dates.length > 0) {
+                    actualFgDate = new Date(Math.max(...dates.map(d => d.getTime())));
+                }
+            }
+
+            let maxSlippageDays = 0;
+            let primaryEaterStage = 'All on track';
+
+            const stageBreakdowns = BUFFER_STAGES.map(stageName => {
+                const stageRows = rows.filter(r => r["Event Type"] === stageName);
+                if (stageRows.length === 0) {
+                    return {
+                        stage: stageName,
+                        targetDate: null,
+                        actualDate: null,
+                        estDate: null,
+                        slippageDays: 0,
+                        isCompleted: false
+                    };
+                }
+
+                // Target date from Last Batch Date
+                const targetDates = stageRows.map(r => parseDateSafe(r["Last Batch Date"])).filter(Boolean) as Date[];
+                const targetDate = targetDates.length > 0 ? targetDates[0] : null;
+
+                const isCompleted = stageRows.every(r => 
+                    r["Material Covered"] === "Yes" || (Number(r["planned Value"] || 0) > 0 && Number(r.completed || 0) >= Number(r["planned Value"] || 0))
+                );
+
+                const actualDates = stageRows.map(r => parseDateSafe(r["Actual Completed Date"] || r.actual_completed_date)).filter(Boolean) as Date[];
+                const actualDate = actualDates.length > 0 ? new Date(Math.max(...actualDates.map(d => d.getTime()))) : null;
+
+                const estDates = stageRows.map(r => parseDateSafe(r["Estimated Completion Date"])).filter(Boolean) as Date[];
+                const estDate = estDates.length > 0 ? new Date(Math.max(...estDates.map(d => d.getTime()))) : null;
+
+                let slippageDays = 0;
+                if (targetDate) {
+                    if (isCompleted) {
+                        if (actualDate) {
+                            slippageDays = Math.max(0, Math.round((actualDate.getTime() - targetDate.getTime()) / 86400000));
+                        }
+                    } else {
+                        if (estDate) {
+                            slippageDays = Math.max(0, Math.round((estDate.getTime() - targetDate.getTime()) / 86400000));
+                        } else if (todayMid > targetDate.getTime()) {
+                            slippageDays = Math.max(0, Math.round((todayMid - targetDate.getTime()) / 86400000));
+                        }
+                    }
+                }
+
+                if (slippageDays > maxSlippageDays) {
+                    maxSlippageDays = slippageDays;
+                    primaryEaterStage = stageName;
+                }
+
+                return {
+                    stage: stageName,
+                    targetDate,
+                    actualDate,
+                    estDate,
+                    slippageDays,
+                    isCompleted
+                };
+            });
+
+            const bufferDays = 28 - maxSlippageDays;
+            const bufferWeeks = Number((bufferDays / 7.0).toFixed(1));
+            const projectedFgDate = new Date(targetFgDate.getTime() + (maxSlippageDays * 86400000));
+
+            let status: 'healthy' | 'consumed' | 'at_risk' | 'breached';
+            if (bufferWeeks >= 3.5) status = 'healthy';
+            else if (bufferWeeks >= 2.0) status = 'consumed';
+            else if (bufferWeeks > 0.0) status = 'at_risk';
+            else status = 'breached';
+
+            let v1Planned = 0;
+            let v2Planned = 0;
+            rows.forEach(r => {
+                const v = (r["Variant Type"] || "").toLowerCase();
+                const p = Number(r["planned Value"] || 0);
+                if (v.includes("1") && p > v1Planned) v1Planned = p;
+                if (v.includes("2") && p > v2Planned) v2Planned = p;
+            });
+
+            list.push({
+                weekStr,
+                shipDate,
+                targetFgDate,
+                projectedFgDate,
+                actualFgDate,
+                isFgCompleted,
+                maxSlippageDays,
+                bufferDays,
+                bufferWeeks,
+                status,
+                primaryEaterStage: maxSlippageDays > 0 ? primaryEaterStage : 'All on track',
+                stageBreakdowns,
+                v1Planned,
+                v2Planned,
+                totalPlanned: v1Planned + v2Planned
+            });
+        });
+
+        return list;
+    }, [sortedShipmentWeeks, groupedByWeek, BUFFER_STAGES]);
+
+    // Fast Lookup Map for Header Pills & Card Badges
+    const weeklyBufferMap = useMemo(() => {
+        const map = new Map<string, WeekBufferAnalysis & {
+            statusBg: string;
+            statusColor: string;
+            statusBorder: string;
+            statusLabel: string;
+            targetFgFormatted: string;
+            projectedFgFormatted: string;
+        }>();
+
+        weeklyBufferData.forEach(item => {
+            let statusBg = '#ecfdf5';
+            let statusColor = '#065f46';
+            let statusBorder = '#a7f3d0';
+            let statusLabel = 'Healthy (Full Cushion)';
+
+            if (item.status === 'consumed') {
+                statusBg = '#fffbeb';
+                statusColor = '#92400e';
+                statusBorder = '#fde68a';
+                statusLabel = 'Buffer Consumed';
+            } else if (item.status === 'at_risk') {
+                statusBg = '#fff7ed';
+                statusColor = '#9a3412';
+                statusBorder = '#fed7aa';
+                statusLabel = 'At Risk (< 2 wks)';
+            } else if (item.status === 'breached') {
+                statusBg = '#fef2f2';
+                statusColor = '#991b1b';
+                statusBorder = '#fecaca';
+                statusLabel = 'Breached (Overdue)';
+            }
+
+            const targetFgFormatted = item.targetFgDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            const projectedFgFormatted = item.isFgCompleted && item.actualFgDate
+                ? item.actualFgDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                : item.projectedFgDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+            map.set(item.weekStr, {
+                ...item,
+                statusBg,
+                statusColor,
+                statusBorder,
+                statusLabel,
+                targetFgFormatted,
+                projectedFgFormatted
+            });
+        });
+
+        return map;
+    }, [weeklyBufferData]);
+
+    // High-level Executive KPIs for Buffer Dashboard
+    const bufferExecutiveKPIs = useMemo(() => {
+        if (weeklyBufferData.length === 0) {
+            return {
+                avgBufferWeeks: 4.0,
+                avgBufferDays: 28,
+                healthyCount: 0,
+                consumedCount: 0,
+                atRiskCount: 0,
+                breachedCount: 0,
+                totalWeeks: 0,
+                topBottleneckStage: 'None',
+                topBottleneckDays: 0
+            };
+        }
+
+        const totalWeeks = weeklyBufferData.length;
+        const totalBufferDays = weeklyBufferData.reduce((sum, w) => sum + w.bufferDays, 0);
+        const avgBufferDays = Math.round(totalBufferDays / totalWeeks);
+        const avgBufferWeeks = Number((avgBufferDays / 7.0).toFixed(1));
+
+        let healthyCount = 0;
+        let consumedCount = 0;
+        let atRiskCount = 0;
+        let breachedCount = 0;
+
+        weeklyBufferData.forEach(w => {
+            if (w.status === 'healthy') healthyCount++;
+            else if (w.status === 'consumed') consumedCount++;
+            else if (w.status === 'at_risk') atRiskCount++;
+            else if (w.status === 'breached') breachedCount++;
+        });
+
+        // Stage attribution: sum of slippage per stage across all weeks
+        const stageSums: Record<string, number> = {};
+        BUFFER_STAGES.forEach(s => { stageSums[s] = 0; });
+
+        weeklyBufferData.forEach(w => {
+            w.stageBreakdowns.forEach(sb => {
+                if (sb.slippageDays > 0) {
+                    stageSums[sb.stage] = (stageSums[sb.stage] || 0) + sb.slippageDays;
+                }
+            });
+        });
+
+        let topBottleneckStage = 'All on track';
+        let topBottleneckDays = 0;
+        Object.entries(stageSums).forEach(([stg, days]) => {
+            if (days > topBottleneckDays) {
+                topBottleneckDays = days;
+                topBottleneckStage = stg;
+            }
+        });
+
+        return {
+            avgBufferWeeks,
+            avgBufferDays,
+            healthyCount,
+            consumedCount,
+            atRiskCount,
+            breachedCount,
+            totalWeeks,
+            topBottleneckStage,
+            topBottleneckDays
+        };
+    }, [weeklyBufferData, BUFFER_STAGES]);
+
+    // Stage Buffer Attribution Ranking (Which stage is eating the most cushion?)
+    const stageBufferAttribution = useMemo(() => {
+        const list: { stage: string; totalDaysEaten: number; impactedWeeksCount: number; pctShare: number }[] = [];
+        let totalPipelineDaysLost = 0;
+
+        BUFFER_STAGES.forEach(stageName => {
+            let totalDaysEaten = 0;
+            let impactedWeeksCount = 0;
+
+            weeklyBufferData.forEach(w => {
+                const sb = w.stageBreakdowns.find(s => s.stage === stageName);
+                if (sb && sb.slippageDays > 0) {
+                    totalDaysEaten += sb.slippageDays;
+                    impactedWeeksCount++;
+                }
+            });
+
+            totalPipelineDaysLost += totalDaysEaten;
+            list.push({
+                stage: stageName,
+                totalDaysEaten,
+                impactedWeeksCount,
+                pctShare: 0
+            });
+        });
+
+        if (totalPipelineDaysLost > 0) {
+            list.forEach(item => {
+                item.pctShare = Math.round((item.totalDaysEaten / totalPipelineDaysLost) * 100);
+            });
+        }
+
+        return list.sort((a, b) => b.totalDaysEaten - a.totalDaysEaten);
+    }, [weeklyBufferData, BUFFER_STAGES]);
+
+    // Filtered & Sorted Weekly Buffer List for the Buffer Available Grid
+    const filteredWeeklyBufferList = useMemo(() => {
+        let list = [...weeklyBufferData];
+
+        if (selectedBufferStage) {
+            list = list.filter(w => {
+                const sb = w.stageBreakdowns.find(s => s.stage === selectedBufferStage);
+                return sb && sb.slippageDays > 0;
+            });
+        }
+
+        if (bufferFilter === 'at_risk') {
+            list = list.filter(w => w.status === 'at_risk');
+        } else if (bufferFilter === 'breached') {
+            list = list.filter(w => w.status === 'breached');
+        } else if (bufferFilter === 'healthy') {
+            list = list.filter(w => w.status === 'healthy');
+        }
+
+        if (bufferSortMode === 'least_buffer') {
+            list.sort((a, b) => a.bufferDays - b.bufferDays);
+        } else {
+            list.sort((a, b) => a.shipDate.getTime() - b.shipDate.getTime());
+        }
+
+        return list;
+    }, [weeklyBufferData, bufferFilter, bufferSortMode, selectedBufferStage]);
+
     const handleWeekClick = (weekStr: string) => {
         // If the target week is in completedWeeks, ensure accordion is open so card exists in DOM
         const isCompleted = completedWeeks.some(([w]) => w === weekStr);
@@ -1073,12 +1457,43 @@ const SymbPipelineView: React.FC = () => {
                         Actual completed date: <strong>{actualCompDate}</strong>
                     </div>
                 )}
+
+                {(() => {
+                    if (!isAdmin) return null;
+                    const rowLbd = parseDateSafe(row["Last Batch Date"]);
+                    const rowAct = parseDateSafe(actualCompDate);
+                    const rowEst = parseDateSafe(row["Estimated Completion Date"]);
+                    let slip = 0;
+                    if (rowLbd) {
+                        if (isCompleted && rowAct) {
+                            slip = Math.max(0, Math.round((rowAct.getTime() - rowLbd.getTime()) / 86400000));
+                        } else if (!isCompleted) {
+                            if (rowEst) {
+                                slip = Math.max(0, Math.round((rowEst.getTime() - rowLbd.getTime()) / 86400000));
+                            } else {
+                                const nowMid = new Date();
+                                nowMid.setHours(0, 0, 0, 0);
+                                if (nowMid.getTime() > rowLbd.getTime()) {
+                                    slip = Math.max(0, Math.round((nowMid.getTime() - rowLbd.getTime()) / 86400000));
+                                }
+                            }
+                        }
+                    }
+                    if (slip <= 0) return null;
+                    return (
+                        <div style={{ color: '#9a3412', fontSize: '0.73rem', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.3rem', backgroundColor: '#fff7ed', border: '1px solid #fed7aa', padding: '0.2rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
+                            <ShieldAlert size={12} style={{ color: '#ea580c', flexShrink: 0 }} />
+                            <span>Buffer Impact: <strong>-{slip} days</strong> eaten by this stage</span>
+                        </div>
+                    );
+                })()}
             </div>
         );
     };
 
     const renderWeekCardBlock = (weekStr: string, rows: SymbPlanRow[], pct: number) => {
         const isComplete = pct === 100;
+        const weekBufInfo = isAdmin ? weeklyBufferMap.get(weekStr) : undefined;
         const { maxNativeCompletedIdxMap, maxNativeCompletedStageNameMap } = getWeekBackfillInfo(rows);
 
         const v1MaxIdx = maxNativeCompletedIdxMap['Variant 1'] ?? maxNativeCompletedIdxMap['variant 1'] ?? -1;
@@ -1135,6 +1550,27 @@ const SymbPipelineView: React.FC = () => {
                             <CheckCircle2 size={13} />
                             {quickSummaryText}
                         </span>
+
+                        {isAdmin && weekBufInfo && (
+                            <span 
+                                title={`Finished Goods Target: ${weekBufInfo.targetFgFormatted} • Projected/Actual FG: ${weekBufInfo.projectedFgFormatted} • Primary Bottleneck: ${weekBufInfo.primaryEaterStage}`}
+                                style={{
+                                    backgroundColor: weekBufInfo.statusBg,
+                                    color: weekBufInfo.statusColor,
+                                    border: `1px solid ${weekBufInfo.statusBorder}`,
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: '16px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem'
+                                }}
+                            >
+                                {weekBufInfo.bufferWeeks >= 3.5 ? <ShieldCheck size={13} /> : <ShieldAlert size={13} />}
+                                Buffer: {weekBufInfo.bufferWeeks} wks ({weekBufInfo.bufferDays >= 0 ? `${weekBufInfo.bufferDays}d cushion` : `${Math.abs(weekBufInfo.bufferDays)}d breached`})
+                            </span>
+                        )}
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', backgroundColor: '#0f172a', padding: '0.35rem 0.75rem', borderRadius: '20px', border: '1px solid #334155' }}>
@@ -1900,6 +2336,504 @@ const SymbPipelineView: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* Buffer Available & Risk Analysis Section (Admin Only) */}
+            {isAdmin && (
+                <div style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '12px',
+                    padding: '1.25rem 1.5rem',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    marginBottom: '1.5rem'
+                }}>
+                    {/* Header Banner */}
+                    <div style={{
+                        backgroundColor: '#0f172a',
+                        borderRadius: '10px',
+                        padding: '1rem 1.25rem',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '1rem',
+                        flexWrap: 'wrap',
+                        marginBottom: '1.25rem',
+                        border: '1px solid #334155'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '0.5rem', borderRadius: '8px', display: 'flex' }}>
+                                <ShieldAlert size={22} />
+                            </div>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                        Admin Executive Insight
+                                    </span>
+                                    <span style={{ fontSize: '0.65rem', backgroundColor: '#3b82f6', color: '#ffffff', padding: '0.1rem 0.45rem', borderRadius: '9999px', fontWeight: 800 }}>
+                                        🔒 ADMIN ONLY
+                                    </span>
+                                </div>
+                                <h3 style={{ margin: '0.2rem 0 0 0', fontSize: '1.3rem', fontWeight: 800, color: '#f8fafc' }}>
+                                    Buffer Available & Execution Risk Analysis
+                                </h3>
+                                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                                    Standard Policy: Cameras must reach Finished Goods <strong>4 weeks (28 days)</strong> before customer shipment date.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <button
+                                type="button"
+                                onClick={() => setIsBufferSectionOpen(!isBufferSectionOpen)}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem',
+                                    padding: '0.4rem 0.85rem',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: '#f8fafc',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '6px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {isBufferSectionOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                {isBufferSectionOpen ? 'Collapse Buffer Panel' : 'Expand Buffer Panel'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {isBufferSectionOpen && (
+                        <>
+                            {/* KPI Summary Cards Grid */}
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                                gap: '1rem',
+                                marginBottom: '1.25rem'
+                            }}>
+                                {/* Card 1: Avg Buffer Available */}
+                                <div style={{
+                                    backgroundColor: bufferExecutiveKPIs.avgBufferWeeks >= 3.5 ? '#ecfdf5' : bufferExecutiveKPIs.avgBufferWeeks >= 2.0 ? '#fffbeb' : '#fef2f2',
+                                    border: `1px solid ${bufferExecutiveKPIs.avgBufferWeeks >= 3.5 ? '#a7f3d0' : bufferExecutiveKPIs.avgBufferWeeks >= 2.0 ? '#fde68a' : '#fecaca'}`,
+                                    borderRadius: '10px',
+                                    padding: '1rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.35rem'
+                                }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span>AVG BUFFER IN HAND</span>
+                                        <Clock size={15} style={{ color: bufferExecutiveKPIs.avgBufferWeeks >= 3.5 ? '#059669' : '#d97706' }} />
+                                    </div>
+                                    <div style={{ fontSize: '1.75rem', fontWeight: 900, color: bufferExecutiveKPIs.avgBufferWeeks >= 3.5 ? '#065f46' : bufferExecutiveKPIs.avgBufferWeeks >= 2.0 ? '#92400e' : '#991b1b' }}>
+                                        {bufferExecutiveKPIs.avgBufferWeeks} <span style={{ fontSize: '1rem', fontWeight: 700 }}>weeks</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                        {bufferExecutiveKPIs.avgBufferDays} days avg cushion ({bufferExecutiveKPIs.totalWeeks} total shipment batches)
+                                    </div>
+                                    {/* Mini cushion progress meter */}
+                                    <div style={{ marginTop: '0.3rem', width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
+                                        <div style={{
+                                            width: `${Math.min(100, Math.max(0, Math.round((bufferExecutiveKPIs.avgBufferDays / 28) * 100)))}%`,
+                                            height: '100%',
+                                            backgroundColor: bufferExecutiveKPIs.avgBufferWeeks >= 3.5 ? '#10b981' : bufferExecutiveKPIs.avgBufferWeeks >= 2.0 ? '#f59e0b' : '#ef4444',
+                                            borderRadius: '9999px'
+                                        }} />
+                                    </div>
+                                </div>
+
+                                {/* Card 2: Healthy Weeks */}
+                                <div style={{
+                                    backgroundColor: '#f0fdf4',
+                                    border: '1px solid #bbf7d0',
+                                    borderRadius: '10px',
+                                    padding: '1rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.35rem'
+                                }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#166534', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span>HEALTHY WEEKS</span>
+                                        <ShieldCheck size={16} style={{ color: '#16a34a' }} />
+                                    </div>
+                                    <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#15803d' }}>
+                                        {bufferExecutiveKPIs.healthyCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#166534' }}>/ {bufferExecutiveKPIs.totalWeeks} wks</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.72rem', color: '#166534' }}>
+                                        Full 4-week safety cushion intact (≥ 3.5 wks)
+                                    </div>
+                                </div>
+
+                                {/* Card 3: At Risk & Depleted Weeks */}
+                                <div style={{
+                                    backgroundColor: bufferExecutiveKPIs.atRiskCount > 0 ? '#fff7ed' : '#f8fafc',
+                                    border: `1px solid ${bufferExecutiveKPIs.atRiskCount > 0 ? '#fed7aa' : '#e2e8f0'}`,
+                                    borderRadius: '10px',
+                                    padding: '1rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.35rem'
+                                }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9a3412', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span>BUFFER ERODED (AT RISK)</span>
+                                        <TrendingDown size={16} style={{ color: '#ea580c' }} />
+                                    </div>
+                                    <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#c2410c' }}>
+                                        {bufferExecutiveKPIs.atRiskCount + bufferExecutiveKPIs.consumedCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#9a3412' }}>weeks</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.72rem', color: '#7c2d12' }}>
+                                        {bufferExecutiveKPIs.atRiskCount} critical (&lt; 2 wks) • {bufferExecutiveKPIs.consumedCount} caution (2-3.4 wks)
+                                    </div>
+                                </div>
+
+                                {/* Card 4: Breached & Top Culprit */}
+                                <div style={{
+                                    backgroundColor: bufferExecutiveKPIs.breachedCount > 0 ? '#fef2f2' : '#f8fafc',
+                                    border: `1px solid ${bufferExecutiveKPIs.breachedCount > 0 ? '#fecaca' : '#e2e8f0'}`,
+                                    borderRadius: '10px',
+                                    padding: '1rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.35rem'
+                                }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span>CRITICAL / BREACHED</span>
+                                        <AlertCircle size={16} style={{ color: '#dc2626' }} />
+                                    </div>
+                                    <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#b91c1c' }}>
+                                        {bufferExecutiveKPIs.breachedCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#991b1b' }}>weeks</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.72rem', color: '#7f1d1d' }}>
+                                        Top Eater: <strong>{bufferExecutiveKPIs.topBottleneckStage}</strong> (-{bufferExecutiveKPIs.topBottleneckDays}d)
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Stage Attribution Breakdown ("Which Stage is Eating Buffer?") */}
+                            <div style={{
+                                backgroundColor: '#f8fafc',
+                                borderRadius: '10px',
+                                border: '1px solid #e2e8f0',
+                                padding: '1rem 1.25rem',
+                                marginBottom: '1.25rem'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Activity size={18} style={{ color: '#6366f1' }} />
+                                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
+                                            Which Stage is Eating Buffer Time? (Factory Attribution)
+                                        </h4>
+                                    </div>
+                                    {selectedBufferStage && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedBufferStage(null)}
+                                            style={{
+                                                fontSize: '0.75rem',
+                                                padding: '0.2rem 0.6rem',
+                                                borderRadius: '4px',
+                                                backgroundColor: '#e2e8f0',
+                                                color: '#334155',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            Clear Stage Filter ({selectedBufferStage})
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                                    gap: '0.75rem'
+                                }}>
+                                    {stageBufferAttribution.map(item => {
+                                        const isSelected = selectedBufferStage === item.stage;
+                                        const theme = getStageThemeColor(item.stage);
+                                        const hasDelay = item.totalDaysEaten > 0;
+
+                                        return (
+                                            <div 
+                                                key={item.stage}
+                                                onClick={() => setSelectedBufferStage(isSelected ? null : item.stage)}
+                                                style={{
+                                                    backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
+                                                    border: `1px solid ${isSelected ? '#3b82f6' : hasDelay ? '#fecaca' : '#e2e8f0'}`,
+                                                    borderRadius: '8px',
+                                                    padding: '0.75rem',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.15s ease',
+                                                    boxShadow: isSelected ? '0 0 0 2px #93c5fd' : '0 1px 3px rgba(0,0,0,0.03)'
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: theme.color }}>
+                                                        {item.stage}
+                                                    </span>
+                                                    <span style={{
+                                                        fontSize: '0.7rem',
+                                                        fontWeight: 800,
+                                                        padding: '0.1rem 0.45rem',
+                                                        borderRadius: '9999px',
+                                                        backgroundColor: hasDelay ? '#fee2e2' : '#dcfce7',
+                                                        color: hasDelay ? '#991b1b' : '#166534'
+                                                    }}>
+                                                        {hasDelay ? `-${item.totalDaysEaten} days` : '0 days (On Track)'}
+                                                    </span>
+                                                </div>
+
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', marginBottom: '0.4rem' }}>
+                                                    <span>Impacts: <strong>{item.impactedWeeksCount} shipment batches</strong></span>
+                                                    <span>{item.pctShare}% of total delay</span>
+                                                </div>
+
+                                                {/* Bar */}
+                                                <div style={{ width: '100%', height: '5px', backgroundColor: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                                                    <div style={{
+                                                        width: `${Math.min(100, Math.max(0, item.pctShare))}%`,
+                                                        height: '100%',
+                                                        backgroundColor: hasDelay ? '#ef4444' : '#10b981',
+                                                        borderRadius: '4px'
+                                                    }} />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Weekly Buffer Navigation & Strip Controls */}
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '0.75rem',
+                                flexWrap: 'wrap',
+                                gap: '0.75rem'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Filter Batches:</span>
+                                    
+                                    <button
+                                        type="button"
+                                        onClick={() => setBufferFilter('all')}
+                                        style={{
+                                            padding: '0.25rem 0.7rem',
+                                            fontSize: '0.75rem',
+                                            borderRadius: '6px',
+                                            border: '1px solid #cbd5e1',
+                                            backgroundColor: bufferFilter === 'all' ? '#1e293b' : '#ffffff',
+                                            color: bufferFilter === 'all' ? '#ffffff' : '#475569',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        All Weeks ({weeklyBufferData.length})
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setBufferFilter('at_risk')}
+                                        style={{
+                                            padding: '0.25rem 0.7rem',
+                                            fontSize: '0.75rem',
+                                            borderRadius: '6px',
+                                            border: '1px solid #fed7aa',
+                                            backgroundColor: bufferFilter === 'at_risk' ? '#ea580c' : '#fff7ed',
+                                            color: bufferFilter === 'at_risk' ? '#ffffff' : '#9a3412',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        At Risk (&lt; 2 wks) ({bufferExecutiveKPIs.atRiskCount})
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setBufferFilter('breached')}
+                                        style={{
+                                            padding: '0.25rem 0.7rem',
+                                            fontSize: '0.75rem',
+                                            borderRadius: '6px',
+                                            border: '1px solid #fecaca',
+                                            backgroundColor: bufferFilter === 'breached' ? '#dc2626' : '#fef2f2',
+                                            color: bufferFilter === 'breached' ? '#ffffff' : '#991b1b',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Breached (≤ 0 wks) ({bufferExecutiveKPIs.breachedCount})
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setBufferFilter('healthy')}
+                                        style={{
+                                            padding: '0.25rem 0.7rem',
+                                            fontSize: '0.75rem',
+                                            borderRadius: '6px',
+                                            border: '1px solid #a7f3d0',
+                                            backgroundColor: bufferFilter === 'healthy' ? '#059669' : '#ecfdf5',
+                                            color: bufferFilter === 'healthy' ? '#ffffff' : '#065f46',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Healthy (≥ 3.5 wks) ({bufferExecutiveKPIs.healthyCount})
+                                    </button>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Sort:</span>
+                                    <select
+                                        value={bufferSortMode}
+                                        onChange={e => setBufferSortMode(e.target.value as any)}
+                                        style={{
+                                            padding: '0.25rem 0.6rem',
+                                            fontSize: '0.76rem',
+                                            borderRadius: '6px',
+                                            border: '1px solid #cbd5e1',
+                                            backgroundColor: '#ffffff',
+                                            color: '#334155',
+                                            fontWeight: 600,
+                                            outline: 'none'
+                                        }}
+                                    >
+                                        <option value="least_buffer">Least Buffer First (Highest Risk)</option>
+                                        <option value="chronological">Chronological (Shipment Date)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Horizontal / Grid of Shipment Week Buffer Cards */}
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                gap: '0.85rem',
+                                maxHeight: '420px',
+                                overflowY: 'auto',
+                                padding: '0.5rem',
+                                backgroundColor: '#f1f5f9',
+                                borderRadius: '10px',
+                                border: '1px solid #e2e8f0'
+                            }}>
+                                {filteredWeeklyBufferList.length === 0 ? (
+                                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#64748b', fontSize: '0.85rem' }}>
+                                        No shipment batches match the selected filter criteria.
+                                    </div>
+                                ) : (
+                                    filteredWeeklyBufferList.map(item => {
+                                        const bufInfo = weeklyBufferMap.get(item.weekStr);
+                                        if (!bufInfo) return null;
+
+                                        return (
+                                            <div 
+                                                key={item.weekStr}
+                                                style={{
+                                                    backgroundColor: '#ffffff',
+                                                    borderRadius: '8px',
+                                                    padding: '0.85rem 1rem',
+                                                    border: `1px solid ${bufInfo.statusBorder}`,
+                                                    borderLeft: `5px solid ${bufInfo.statusColor}`,
+                                                    boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '0.45rem'
+                                                }}
+                                            >
+                                                {/* Header row */}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e293b' }}>
+                                                        {item.weekStr}
+                                                    </span>
+                                                    <span style={{
+                                                        fontSize: '0.72rem',
+                                                        fontWeight: 800,
+                                                        padding: '0.15rem 0.5rem',
+                                                        borderRadius: '12px',
+                                                        backgroundColor: bufInfo.statusBg,
+                                                        color: bufInfo.statusColor,
+                                                        border: `1px solid ${bufInfo.statusBorder}`
+                                                    }}>
+                                                        Buffer: {item.bufferWeeks} wks
+                                                    </span>
+                                                </div>
+
+                                                {/* Cushion Details */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.75rem', color: '#475569' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <span>FG Target (S-28d):</span>
+                                                        <strong style={{ color: '#0369a1' }}>{bufInfo.targetFgFormatted}</strong>
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <span>FG Projected / Actual:</span>
+                                                        <strong style={{ color: item.maxSlippageDays > 0 ? '#b91c1c' : '#166534' }}>
+                                                            {bufInfo.projectedFgFormatted}
+                                                        </strong>
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <span>Cushion in Hand:</span>
+                                                        <strong style={{ color: item.bufferDays >= 0 ? '#166534' : '#b91c1c' }}>
+                                                            {item.bufferDays >= 0 ? `${item.bufferDays} days remaining` : `${Math.abs(item.bufferDays)} days overdue`}
+                                                        </strong>
+                                                    </div>
+                                                </div>
+
+                                                {/* Top Eater Tag */}
+                                                <div style={{
+                                                    fontSize: '0.72rem',
+                                                    padding: '0.25rem 0.45rem',
+                                                    borderRadius: '4px',
+                                                    backgroundColor: item.maxSlippageDays > 0 ? '#fff7ed' : '#ecfdf5',
+                                                    border: `1px solid ${item.maxSlippageDays > 0 ? '#fed7aa' : '#a7f3d0'}`,
+                                                    color: item.maxSlippageDays > 0 ? '#9a3412' : '#065f46',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between'
+                                                }}>
+                                                    <span>{item.maxSlippageDays > 0 ? `Top Bottleneck: ${item.primaryEaterStage}` : '✓ All Stages On Track'}</span>
+                                                    {item.maxSlippageDays > 0 && <strong>-{item.maxSlippageDays}d</strong>}
+                                                </div>
+
+                                                {/* Jump to Week Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleWeekClick(item.weekStr)}
+                                                    style={{
+                                                        marginTop: '0.2rem',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '0.35rem',
+                                                        padding: '0.3rem 0.5rem',
+                                                        fontSize: '0.74rem',
+                                                        fontWeight: 700,
+                                                        backgroundColor: '#f8fafc',
+                                                        color: '#2563eb',
+                                                        border: '1px solid #bfdbfe',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    <ArrowUpRight size={13} />
+                                                    Jump to Pipeline Card ↓
+                                                </button>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* Completed in all green Accordion */}
             {completedWeeks.length > 0 && (
