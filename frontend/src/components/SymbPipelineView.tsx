@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Filter, AlertCircle, CalendarDays, ArrowRight, RefreshCw, Clock, CheckCircle2, ChevronDown, Eye, Check, Layers, X, ShieldAlert } from 'lucide-react';
+import { 
+    Calendar, Filter, AlertCircle, CalendarDays, ArrowRight, RefreshCw, Clock, 
+    CheckCircle2, ChevronDown, Eye, Check, Layers, X, ShieldAlert,
+    MessageSquare, History, Send, Edit2, Trash2, Plus, Maximize2
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface SymbPlanRow {
     id: string;
@@ -19,6 +24,25 @@ interface SymbPlanRow {
     warning_msg?: string;
     original_planned_value?: number;
     [key: string]: any;
+}
+
+interface RemarkHistoryEntry {
+    old_text: string;
+    edited_by: string;
+    edited_at: string;
+    edit_number?: number;
+}
+
+interface StageRemark {
+    id: string;
+    shipment_week: string;
+    stage: string;
+    remark: string;
+    created_by: string;
+    created_at: string;
+    updated_by?: string;
+    updated_at?: string;
+    edit_history?: RemarkHistoryEntry[];
 }
 
 const EVENT_ORDER = [
@@ -87,13 +111,395 @@ const ProgressRing: React.FC<{ percentage: number; size?: number; strokeWidth?: 
     );
 };
 
+interface StageRemarksModalProps {
+    weekStr: string;
+    stage: string;
+    remarks: StageRemark[];
+    onClose: () => void;
+    onAddRemark: (text: string) => Promise<void>;
+    onUpdateRemark: (remarkId: string, text: string) => Promise<void>;
+    onDeleteRemark: (remarkId: string) => Promise<void>;
+    formatDateTime: (dateStr?: string) => string;
+    onViewHistory: (remark: StageRemark) => void;
+}
+
+const StageRemarksModal: React.FC<StageRemarksModalProps> = ({
+    weekStr,
+    stage,
+    remarks,
+    onClose,
+    onAddRemark,
+    onUpdateRemark,
+    onDeleteRemark,
+    formatDateTime,
+    onViewHistory
+}) => {
+    const [newRemarkText, setNewRemarkText] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
+    const [editingRemarkText, setEditingRemarkText] = useState('');
+
+    const handlePost = async () => {
+        const text = newRemarkText.trim();
+        if (!text || isSubmitting) return;
+        try {
+            setIsSubmitting(true);
+            await onAddRemark(text);
+            setNewRemarkText('');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSaveEdit = async (id: string) => {
+        const text = editingRemarkText.trim();
+        if (!text) return;
+        await onUpdateRemark(id, text);
+        setEditingRemarkId(null);
+        setEditingRemarkText('');
+    };
+
+    const stageRemarks = useMemo(() => {
+        return remarks
+            .filter(r => r.shipment_week === weekStr && r.stage === stage)
+            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    }, [remarks, weekStr, stage]);
+
+    return (
+        <div style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9998,
+            padding: '1rem'
+        }}>
+            <div style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '12px',
+                width: '100%',
+                maxWidth: '640px',
+                maxHeight: '88vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.25)',
+                overflow: 'hidden'
+            }}>
+                {/* Modal Header */}
+                <div style={{
+                    padding: '1rem 1.25rem',
+                    borderBottom: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    backgroundColor: '#f8fafc'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <div style={{ backgroundColor: '#e0e7ff', color: '#4338ca', padding: '0.45rem', borderRadius: '8px', display: 'flex' }}>
+                            <MessageSquare size={18} />
+                        </div>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                                Stage Remarks: {stage}
+                            </h3>
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
+                                Shipment Week: <strong>{weekStr}</strong> • {stageRemarks.length} Remark{stageRemarks.length !== 1 ? 's' : ''}
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '0.25rem', display: 'flex', borderRadius: '4px' }}
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {/* Modal Body */}
+                <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {/* Add New Remark Input */}
+                    <div style={{
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        padding: '0.75rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem'
+                    }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>
+                            Add New Remark
+                        </div>
+                        <textarea
+                            placeholder="Type a remark for this stage..."
+                            value={newRemarkText}
+                            onChange={e => setNewRemarkText(e.target.value)}
+                            rows={3}
+                            style={{
+                                width: '100%',
+                                padding: '0.5rem 0.65rem',
+                                fontSize: '0.82rem',
+                                border: '1px solid #94a3b8',
+                                borderRadius: '6px',
+                                outline: 'none',
+                                resize: 'vertical',
+                                boxSizing: 'border-box',
+                                fontFamily: 'inherit'
+                            }}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                    handlePost();
+                                }
+                            }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                                Tip: Press Ctrl+Enter to post
+                            </span>
+                            <button
+                                type="button"
+                                onClick={handlePost}
+                                disabled={!newRemarkText.trim() || isSubmitting}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem',
+                                    padding: '0.35rem 0.85rem',
+                                    fontSize: '0.78rem',
+                                    backgroundColor: newRemarkText.trim() && !isSubmitting ? '#4f46e5' : '#a5b4fc',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: newRemarkText.trim() && !isSubmitting ? 'pointer' : 'not-allowed',
+                                    fontWeight: 700
+                                }}
+                            >
+                                <Send size={12} />
+                                <span>{isSubmitting ? 'Posting...' : 'Post Remark'}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Remarks List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Remarks List ({stageRemarks.length})
+                        </div>
+
+                        {stageRemarks.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+                                No remarks posted yet for this stage.
+                            </div>
+                        ) : (
+                            stageRemarks.map(rm => (
+                                <div
+                                    key={rm.id}
+                                    style={{
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '8px',
+                                        padding: '0.75rem 0.9rem',
+                                        backgroundColor: '#ffffff',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '0.4rem',
+                                        minWidth: 0
+                                    }}
+                                >
+                                    {editingRemarkId === rm.id ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                            <textarea
+                                                value={editingRemarkText}
+                                                onChange={e => setEditingRemarkText(e.target.value)}
+                                                rows={3}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '0.45rem 0.6rem',
+                                                    fontSize: '0.82rem',
+                                                    border: '1px solid #818cf8',
+                                                    borderRadius: '6px',
+                                                    resize: 'vertical',
+                                                    boxSizing: 'border-box',
+                                                    fontFamily: 'inherit'
+                                                }}
+                                                autoFocus
+                                            />
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setEditingRemarkId(null); setEditingRemarkText(''); }}
+                                                    style={{
+                                                        padding: '0.25rem 0.65rem',
+                                                        fontSize: '0.74rem',
+                                                        backgroundColor: '#e2e8f0',
+                                                        color: '#475569',
+                                                        border: 'none',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleSaveEdit(rm.id)}
+                                                    style={{
+                                                        padding: '0.25rem 0.75rem',
+                                                        fontSize: '0.74rem',
+                                                        backgroundColor: '#4f46e5',
+                                                        color: '#ffffff',
+                                                        border: 'none',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer',
+                                                        fontWeight: 600
+                                                    }}
+                                                >
+                                                    Save Edit
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', minWidth: 0 }}>
+                                                <div style={{
+                                                    fontSize: '0.84rem',
+                                                    color: '#1e293b',
+                                                    lineHeight: 1.45,
+                                                    whiteSpace: 'pre-wrap',
+                                                    wordBreak: 'break-all',
+                                                    overflowWrap: 'anywhere',
+                                                    flex: 1,
+                                                    minWidth: 0
+                                                }}>
+                                                    {rm.remark}
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setEditingRemarkId(rm.id);
+                                                            setEditingRemarkText(rm.remark);
+                                                        }}
+                                                        title="Edit remark"
+                                                        style={{
+                                                            padding: '0.25rem',
+                                                            color: '#64748b',
+                                                            backgroundColor: '#f1f5f9',
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer',
+                                                            display: 'flex'
+                                                        }}
+                                                    >
+                                                        <Edit2 size={13} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onDeleteRemark(rm.id)}
+                                                        title="Delete remark"
+                                                        style={{
+                                                            padding: '0.25rem',
+                                                            color: '#ef4444',
+                                                            backgroundColor: '#fee2e2',
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer',
+                                                            display: 'flex'
+                                                        }}
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div style={{
+                                                display: 'flex',
+                                                flexWrap: 'wrap',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: '0.35rem',
+                                                marginTop: '0.3rem',
+                                                paddingTop: '0.35rem',
+                                                borderTop: '1px solid #f1f5f9',
+                                                fontSize: '0.7rem',
+                                                color: '#64748b'
+                                            }}>
+                                                <span>
+                                                    By <strong style={{ color: '#334155' }}>{rm.created_by}</strong> • {formatDateTime(rm.created_at)}
+                                                </span>
+                                                {rm.edit_history && rm.edit_history.length > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onViewHistory(rm)}
+                                                        style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.25rem',
+                                                            padding: '0.1rem 0.45rem',
+                                                            backgroundColor: '#fef3c7',
+                                                            color: '#92400e',
+                                                            borderRadius: '9999px',
+                                                            border: '1px solid #fde68a',
+                                                            fontSize: '0.66rem',
+                                                            fontWeight: 700,
+                                                            cursor: 'pointer'
+                                                        }}
+                                                        title="Click to view full revision history"
+                                                    >
+                                                        <History size={11} />
+                                                        <span>Edited ({rm.edit_history.length})</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div style={{ padding: '0.8rem 1.25rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#f8fafc' }}>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        style={{
+                            padding: '0.45rem 1.1rem',
+                            backgroundColor: '#e2e8f0',
+                            color: '#334155',
+                            borderRadius: '6px',
+                            border: 'none',
+                            fontSize: '0.82rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const SymbPipelineView: React.FC = () => {
+    const { user } = useAuth();
     const [data, setData] = useState<SymbPlanRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isCompletedSectionOpen, setIsCompletedSectionOpen] = useState(false);
     const [highlightedWeek, setHighlightedWeek] = useState<string | null>(null);
     
+    // Remarks State
+    const [remarks, setRemarks] = useState<StageRemark[]>([]);
+    const [, setLoadingRemarks] = useState(false);
+    const [activeModalStage, setActiveModalStage] = useState<{ weekStr: string; stage: string } | null>(null);
+    const [activeHistoryRemark, setActiveHistoryRemark] = useState<StageRemark | null>(null);
+
     // Coverage Stage Filter State
     const [selectedCoverageStage, setSelectedCoverageStage] = useState<string | null>(null);
 
@@ -114,8 +520,24 @@ const SymbPipelineView: React.FC = () => {
         { key: 'Finished Goods', title: 'Finished Goods', eventMatch: ['Finished goods'], color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' }
     ], []);
 
+    const fetchRemarks = async () => {
+        try {
+            setLoadingRemarks(true);
+            const res = await fetch('/api/admin/symb-plan/remarks');
+            if (res.ok) {
+                const json = await res.json();
+                setRemarks(json);
+            }
+        } catch (error) {
+            console.error("Error fetching stage remarks:", error);
+        } finally {
+            setLoadingRemarks(false);
+        }
+    };
+
     useEffect(() => {
         fetchData();
+        fetchRemarks();
     }, []);
 
     const fetchData = async () => {
@@ -134,13 +556,113 @@ const SymbPipelineView: React.FC = () => {
     const handleRefresh = async () => {
         try {
             setIsRefreshing(true);
-            const res = await fetch('/api/admin/symb-plan/transformed');
-            const json = await res.json();
-            setData(json);
+            await Promise.all([
+                fetch('/api/admin/symb-plan/transformed').then(r => r.json()).then(json => setData(json)),
+                fetch('/api/admin/symb-plan/remarks').then(r => r.json()).then(json => setRemarks(json))
+            ]);
         } catch (error) {
             console.error("Error refreshing pipeline data:", error);
         } finally {
             setIsRefreshing(false);
+        }
+    };
+
+    const handleAddRemark = async (shipmentWeek: string, stage: string, text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+
+        try {
+            const author = user?.email || (user as any)?.name || 'User';
+            const res = await fetch('/api/admin/symb-plan/remarks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    shipment_week: shipmentWeek,
+                    stage: stage,
+                    remark: trimmed,
+                    user_name: author
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const created: StageRemark = data.remark || data;
+                setRemarks(prev => [created, ...prev.filter(r => r.id !== created.id)]);
+            } else {
+                const err = await res.json();
+                alert(err.detail || 'Failed to save remark');
+            }
+        } catch (err) {
+            console.error("Failed to add remark:", err);
+            alert("Error saving remark");
+        }
+    };
+
+    const handleUpdateRemark = async (remarkId: string, text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+
+        try {
+            const editor = user?.email || (user as any)?.name || 'User';
+            const res = await fetch(`/api/admin/symb-plan/remarks/${remarkId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    remark: trimmed,
+                    user_name: editor
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const updated: StageRemark = data.remark || data;
+                setRemarks(prev => prev.map(r => r.id === remarkId ? updated : r));
+                if (activeHistoryRemark && activeHistoryRemark.id === remarkId) {
+                    setActiveHistoryRemark(updated);
+                }
+            } else {
+                const err = await res.json();
+                alert(err.detail || 'Failed to update remark');
+            }
+        } catch (err) {
+            console.error("Failed to update remark:", err);
+            alert("Error updating remark");
+        }
+    };
+
+    const handleDeleteRemark = async (remarkId: string) => {
+        if (!window.confirm("Are you sure you want to delete this remark?")) return;
+        try {
+            const res = await fetch(`/api/admin/symb-plan/remarks/${remarkId}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                setRemarks(prev => prev.filter(r => r.id !== remarkId));
+                if (activeHistoryRemark && activeHistoryRemark.id === remarkId) {
+                    setActiveHistoryRemark(null);
+                }
+            } else {
+                alert("Failed to delete remark");
+            }
+        } catch (err) {
+            console.error("Failed to delete remark:", err);
+            alert("Error deleting remark");
+        }
+    };
+
+    const formatDateTime = (dateStr?: string) => {
+        if (!dateStr) return '';
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            return d.toLocaleString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+        } catch {
+            return dateStr;
         }
     };
 
@@ -673,13 +1195,16 @@ const SymbPipelineView: React.FC = () => {
                         return (
                             <React.Fragment key={eventType}>
                                 <div style={{ 
-                                    minWidth: '280px', 
-                                    flex: '0 0 auto', 
+                                    width: '330px',
+                                    minWidth: '330px', 
+                                    maxWidth: '330px',
+                                    flex: '0 0 330px', 
                                     backgroundColor: '#ffffff', 
                                     borderRadius: '10px', 
                                     boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                                     display: 'flex',
-                                    flexDirection: 'column'
+                                    flexDirection: 'column',
+                                    overflow: 'hidden'
                                 }}>
                                     <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', color: '#334155', textAlign: 'center' }}>
                                         <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>{eventType}</div>
@@ -690,7 +1215,7 @@ const SymbPipelineView: React.FC = () => {
                                             </div>
                                         )}
                                     </div>
-                                    <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                    <div style={{ padding: '1rem', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
                                         {eventRows.length === 0 ? (
                                             <div style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '0.85rem', marginTop: '1rem' }}>No data</div>
                                         ) : (
@@ -729,6 +1254,155 @@ const SymbPipelineView: React.FC = () => {
                                                 <span>{criticalMsg}</span>
                                             </div>
                                         )}
+
+                                        {/* Remarks Section */}
+                                        {(() => {
+                                            const cardRemarks = remarks
+                                                .filter(r => r.shipment_week === weekStr && r.stage === eventType)
+                                                .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+                                            return (
+                                                <div style={{
+                                                    marginTop: '0.85rem',
+                                                    paddingTop: '0.65rem',
+                                                    borderTop: '1px dashed #e2e8f0',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '0.35rem',
+                                                    minWidth: 0,
+                                                    width: '100%'
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                                                            <MessageSquare size={13} style={{ color: '#6366f1' }} />
+                                                            <span>Remarks</span>
+                                                            {cardRemarks.length > 0 && (
+                                                                <span style={{
+                                                                    fontSize: '0.65rem',
+                                                                    backgroundColor: '#e0e7ff',
+                                                                    color: '#4338ca',
+                                                                    borderRadius: '9999px',
+                                                                    padding: '0.05rem 0.4rem',
+                                                                    fontWeight: 800
+                                                                }}>
+                                                                    {cardRemarks.length}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                                            {cardRemarks.length > 0 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setActiveModalStage({ weekStr, stage: eventType })}
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '0.2rem',
+                                                                        fontSize: '0.7rem',
+                                                                        fontWeight: 600,
+                                                                        color: '#475569',
+                                                                        backgroundColor: '#f1f5f9',
+                                                                        border: '1px solid #cbd5e1',
+                                                                        cursor: 'pointer',
+                                                                        padding: '0.15rem 0.4rem',
+                                                                        borderRadius: '4px'
+                                                                    }}
+                                                                    title="Expand remarks popup"
+                                                                >
+                                                                    <Maximize2 size={11} />
+                                                                    <span>Expand</span>
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setActiveModalStage({ weekStr, stage: eventType })}
+                                                                style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '0.2rem',
+                                                                    fontSize: '0.7rem',
+                                                                    fontWeight: 600,
+                                                                    color: '#4f46e5',
+                                                                    backgroundColor: '#eef2ff',
+                                                                    border: '1px solid #c7d2fe',
+                                                                    cursor: 'pointer',
+                                                                    padding: '0.15rem 0.4rem',
+                                                                    borderRadius: '4px'
+                                                                }}
+                                                                title="Add or view remarks"
+                                                            >
+                                                                <Plus size={11} />
+                                                                <span>Add</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Preview of latest remark if present */}
+                                                    {cardRemarks.length > 0 ? (
+                                                        <div
+                                                            onClick={() => setActiveModalStage({ weekStr, stage: eventType })}
+                                                            style={{
+                                                                backgroundColor: '#f8fafc',
+                                                                border: '1px solid #e2e8f0',
+                                                                borderRadius: '6px',
+                                                                padding: '0.4rem 0.5rem',
+                                                                fontSize: '0.72rem',
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.15s ease',
+                                                                width: '100%',
+                                                                boxSizing: 'border-box',
+                                                                minWidth: 0
+                                                            }}
+                                                            title="Click to expand remarks in pop-up"
+                                                            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                                                            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                                                        >
+                                                            <div style={{
+                                                                color: '#1e293b',
+                                                                lineHeight: 1.35,
+                                                                wordBreak: 'break-all',
+                                                                overflowWrap: 'anywhere',
+                                                                whiteSpace: 'pre-wrap',
+                                                                display: '-webkit-box',
+                                                                WebkitLineClamp: 2,
+                                                                WebkitBoxOrient: 'vertical',
+                                                                overflow: 'hidden'
+                                                            }}>
+                                                                {cardRemarks[cardRemarks.length - 1].remark}
+                                                            </div>
+                                                            <div style={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'space-between',
+                                                                marginTop: '0.25rem',
+                                                                fontSize: '0.64rem',
+                                                                color: '#64748b'
+                                                            }}>
+                                                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
+                                                                    By {cardRemarks[cardRemarks.length - 1].created_by?.split('@')[0]}
+                                                                </span>
+                                                                <span style={{ color: '#4f46e5', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                                                                    {cardRemarks.length > 1 ? `+${cardRemarks.length - 1} more • Expand` : 'Expand'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div 
+                                                            onClick={() => setActiveModalStage({ weekStr, stage: eventType })}
+                                                            style={{ 
+                                                                fontSize: '0.7rem', 
+                                                                color: '#94a3b8', 
+                                                                fontStyle: 'italic', 
+                                                                cursor: 'pointer',
+                                                                padding: '0.2rem 0'
+                                                            }}
+                                                        >
+                                                            + Add remark...
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                                 
@@ -1276,6 +1950,151 @@ const SymbPipelineView: React.FC = () => {
                     activeWeeks.map(([weekStr, rows, pct]) => renderWeekCardBlock(weekStr, rows, pct))
                 )}
             </div>
+
+            {/* Stage Remarks Pop-up Modal */}
+            {activeModalStage && (
+                <StageRemarksModal
+                    weekStr={activeModalStage.weekStr}
+                    stage={activeModalStage.stage}
+                    remarks={remarks}
+                    onClose={() => setActiveModalStage(null)}
+                    onAddRemark={(text) => handleAddRemark(activeModalStage.weekStr, activeModalStage.stage, text)}
+                    onUpdateRemark={(id, text) => handleUpdateRemark(id, text)}
+                    onDeleteRemark={(id) => handleDeleteRemark(id)}
+                    formatDateTime={formatDateTime}
+                    onViewHistory={(rm) => setActiveHistoryRemark(rm)}
+                />
+            )}
+
+            {/* Remark Revision History Modal */}
+            {activeHistoryRemark && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999,
+                    padding: '1rem'
+                }}>
+                    <div style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: '12px',
+                        width: '100%',
+                        maxWidth: '560px',
+                        maxHeight: '85vh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
+                        overflow: 'hidden'
+                    }}>
+                        {/* Modal Header */}
+                        <div style={{
+                            padding: '1rem 1.25rem',
+                            borderBottom: '1px solid #e2e8f0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            backgroundColor: '#f8fafc'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '0.4rem', borderRadius: '8px', display: 'flex' }}>
+                                    <History size={18} />
+                                </div>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
+                                        Remark Revision History
+                                    </h3>
+                                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
+                                        Week: <strong>{activeHistoryRemark.shipment_week}</strong> • Stage: <strong>{activeHistoryRemark.stage}</strong>
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setActiveHistoryRemark(null)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '0.25rem', display: 'flex' }}
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Current Active Remark */}
+                        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f0fdf4' }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                                Current Active Remark
+                            </div>
+                            <div style={{ fontSize: '0.82rem', color: '#1e293b', whiteSpace: 'pre-wrap', wordBreak: 'break-all', overflowWrap: 'anywhere', fontWeight: 500, lineHeight: 1.4 }}>
+                                {activeHistoryRemark.remark}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: '#15803d', marginTop: '0.4rem' }}>
+                                Last updated by <strong>{activeHistoryRemark.updated_by || activeHistoryRemark.created_by}</strong> on {formatDateTime(activeHistoryRemark.updated_at || activeHistoryRemark.created_at)}
+                            </div>
+                        </div>
+
+                        {/* Past Revisions List */}
+                        <div style={{ padding: '1rem 1.25rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                                Past Revisions ({activeHistoryRemark.edit_history?.length || 0})
+                            </div>
+                            {(activeHistoryRemark.edit_history || []).slice().reverse().map((entry, index) => (
+                                <div
+                                    key={index}
+                                    style={{
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '8px',
+                                        padding: '0.75rem',
+                                        backgroundColor: '#ffffff'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                                        <span style={{
+                                            fontSize: '0.68rem',
+                                            fontWeight: 700,
+                                            backgroundColor: '#fef3c7',
+                                            color: '#92400e',
+                                            padding: '0.1rem 0.45rem',
+                                            borderRadius: '9999px'
+                                        }}>
+                                            Edit #{entry.edit_number || ((activeHistoryRemark.edit_history?.length || 0) - index)}
+                                        </span>
+                                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                            {formatDateTime(entry.edited_at)}
+                                        </span>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: '#334155', whiteSpace: 'pre-wrap', wordBreak: 'break-all', overflowWrap: 'anywhere', marginBottom: '0.35rem', lineHeight: 1.4 }}>
+                                        {entry.old_text}
+                                    </div>
+                                    <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                                        Edited by: <strong style={{ color: '#0f172a' }}>{entry.edited_by}</strong>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#f8fafc' }}>
+                            <button
+                                type="button"
+                                onClick={() => setActiveHistoryRemark(null)}
+                                style={{
+                                    padding: '0.4rem 1rem',
+                                    backgroundColor: '#e2e8f0',
+                                    color: '#334155',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

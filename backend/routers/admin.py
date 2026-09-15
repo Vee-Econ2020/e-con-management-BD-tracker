@@ -1562,6 +1562,126 @@ async def get_symb_plan_transformed():
         print(f"Error fetching SYMB plan transformed data: {e}")
         return []
 
+class CreateSymbRemarkPayload(BaseModel):
+    shipment_week: str
+    stage: str
+    remark: str
+    user_name: Optional[str] = None
+
+class UpdateSymbRemarkPayload(BaseModel):
+    remark: str
+    user_name: Optional[str] = None
+
+@router.get("/symb-plan/remarks")
+async def get_symb_plan_remarks(shipment_week: Optional[str] = Query(None)):
+    try:
+        coll = get_collection("symb_plan_remarks")
+        query = {}
+        if shipment_week:
+            query["shipment_week"] = shipment_week
+        cursor = coll.find(query).sort("created_at", 1)
+        remarks = []
+        async for doc in cursor:
+            doc["id"] = str(doc["_id"])
+            del doc["_id"]
+            remarks.append(doc)
+        return clean_json_nan(remarks)
+    except Exception as e:
+        print(f"Error getting symb plan remarks: {e}")
+        return []
+
+@router.post("/symb-plan/remarks")
+async def create_symb_plan_remark(payload: CreateSymbRemarkPayload, authorization: Optional[str] = Header(None)):
+    from routers.auth import get_optional_current_user
+    user_sess = await get_optional_current_user(authorization)
+    user_email = user_sess.get("email") if user_sess else (payload.user_name or "Anonymous")
+    
+    if not payload.remark.strip():
+        raise HTTPException(status_code=400, detail="Remark content cannot be empty")
+        
+    try:
+        coll = get_collection("symb_plan_remarks")
+        now_str = datetime.now().isoformat()
+        doc = {
+            "shipment_week": payload.shipment_week.strip(),
+            "stage": payload.stage.strip(),
+            "remark": payload.remark.strip(),
+            "created_by": user_email,
+            "created_at": now_str,
+            "updated_by": user_email,
+            "updated_at": now_str,
+            "edit_history": []
+        }
+        result = await coll.insert_one(doc)
+        doc["id"] = str(result.inserted_id)
+        if "_id" in doc:
+            del doc["_id"]
+        return {"status": "success", "remark": clean_json_nan(doc)}
+    except Exception as e:
+        print(f"Error creating symb plan remark: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/symb-plan/remarks/{remark_id}")
+async def update_symb_plan_remark(remark_id: str, payload: UpdateSymbRemarkPayload, authorization: Optional[str] = Header(None)):
+    from bson import ObjectId
+    from routers.auth import get_optional_current_user
+    user_sess = await get_optional_current_user(authorization)
+    user_email = user_sess.get("email") if user_sess else (payload.user_name or "Anonymous")
+    
+    if not payload.remark.strip():
+        raise HTTPException(status_code=400, detail="Remark content cannot be empty")
+        
+    try:
+        coll = get_collection("symb_plan_remarks")
+        existing = await coll.find_one({"_id": ObjectId(remark_id)})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Remark not found")
+            
+        old_remark = existing.get("remark", "")
+        history = existing.get("edit_history", [])
+        if old_remark != payload.remark.strip():
+            history.append({
+                "old_text": old_remark,
+                "edited_by": user_email,
+                "edited_at": datetime.now().isoformat(),
+                "edit_number": len(history) + 1
+            })
+            
+        now_str = datetime.now().isoformat()
+        await coll.update_one(
+            {"_id": ObjectId(remark_id)},
+            {"$set": {
+                "remark": payload.remark.strip(),
+                "updated_by": user_email,
+                "updated_at": now_str,
+                "edit_history": history
+            }}
+        )
+        updated = await coll.find_one({"_id": ObjectId(remark_id)})
+        updated["id"] = str(updated["_id"])
+        del updated["_id"]
+        return {"status": "success", "remark": clean_json_nan(updated)}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error updating symb plan remark: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/symb-plan/remarks/{remark_id}")
+async def delete_symb_plan_remark(remark_id: str, authorization: Optional[str] = Header(None)):
+    from bson import ObjectId
+    try:
+        coll = get_collection("symb_plan_remarks")
+        result = await coll.delete_one({"_id": ObjectId(remark_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Remark not found")
+        return {"status": "success", "message": "Remark deleted successfully"}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error deleting symb plan remark: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/symb-plan/upload")
 async def upload_symb_plan(file: UploadFile = File(...), background_tasks: BackgroundTasks = BackgroundTasks()):
     import io
