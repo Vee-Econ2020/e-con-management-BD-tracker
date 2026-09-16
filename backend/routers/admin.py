@@ -3071,229 +3071,20 @@ class WhaleAccountEntry(BaseModel):
     text_data: str
     region: Optional[str] = None
     is_old_data: Optional[bool] = False
-    fy: Optional[str] = "FY2027"
+    fy: Optional[str] = None
 
 @router.get("/whale-accounts/names")
-async def get_whale_account_names(region: Optional[str] = None, fy: str = "FY2027"):
+async def get_whale_account_names(region: Optional[str] = None, fy: Optional[str] = None):
     try:
         coll = get_collection("whale_accounts")
-        fy_condition = {"$or": [{"fy": fy}, {"fy": {"$exists": False}}]} if fy == "FY2027" else {"fy": fy}
         query = {"region": region} if region else {}
-        if query:
-            query = {"$and": [query, fy_condition]}
-        else:
-            query = fy_condition
         names = await coll.distinct("account_name", query)
         return [n for n in names if n]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/whale-accounts/{account_name}")
-async def get_whale_account_entries(account_name: str, fy: str = "FY2027"):
-    try:
-        coll = get_collection("whale_accounts")
-        fy_condition = {"$or": [{"fy": fy}, {"fy": {"$exists": False}}]} if fy == "FY2027" else {"fy": fy}
-        query = {"$and": [{"account_name": account_name}, fy_condition]}
-        cursor = coll.find(query).sort("date_updated", -1)
-        entries = []
-        async for doc in cursor:
-            doc["_id"] = str(doc["_id"])
-            if "variants" not in doc:
-                log_dt = doc.get("updated_at") or doc.get("created_at") or datetime.utcnow()
-                log_str = log_dt.isoformat() + "Z" if isinstance(log_dt, datetime) else str(log_dt)
-                doc["variants"] = [{
-                    "version": "V1",
-                    "text_data": doc.get("text_data", ""),
-                    "log_date": log_str
-                }]
-            entries.append(doc)
-        return entries
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/whale-accounts/{account_name}")
-async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry):
-    try:
-        coll = get_collection("whale_accounts")
-        fy_val = payload.fy or "FY2027"
-        doc = await coll.find_one({
-            "account_name": account_name,
-            "date_updated": payload.date_updated,
-            "fy": fy_val
-        })
-        
-        now = datetime.utcnow()
-        new_variant = {
-            "text_data": payload.text_data,
-            "log_date": now.isoformat() + "Z"
-        }
-        
-        if doc:
-            variants = doc.get("variants", [])
-            if not variants:
-                log_dt = doc.get("updated_at") or doc.get("created_at") or now
-                log_str = log_dt.isoformat() + "Z" if isinstance(log_dt, datetime) else str(log_dt)
-                variants = [{
-                    "version": "V1",
-                    "text_data": doc.get("text_data", ""),
-                    "log_date": log_str
-                }]
-                
-            if len(variants) >= 3:
-                raise HTTPException(status_code=400, detail="Maximum of 3 variants reached for this date.")
-            
-            new_version = f"V{len(variants) + 1}"
-            new_variant["version"] = new_version
-            
-            await coll.update_one(
-                {"_id": doc["_id"]},
-                {
-                    "$set": {
-                        "week_updated": payload.week_updated,
-                        "updated_at": now,
-                        "region": payload.region,
-                        "is_old_data": payload.is_old_data,
-                        "fy": fy_val
-                    },
-                    "$push": {
-                        "variants": new_variant
-                    }
-                }
-            )
-        else:
-            new_variant["version"] = "V1"
-            await coll.insert_one({
-                "account_name": account_name,
-                "date_updated": payload.date_updated,
-                "week_updated": payload.week_updated,
-                "created_at": now,
-                "updated_at": now,
-                "region": payload.region,
-                "is_old_data": payload.is_old_data,
-                "fy": fy_val,
-                "variants": [new_variant]
-            })
-        
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/whale-accounts/stats/{region}/{week}")
-async def get_whale_account_stats(region: str, week: int, fy: str = "FY2027"):
-    try:
-        coll = get_collection("whale_accounts")
-        fy_condition = {"$or": [{"fy": fy}, {"fy": {"$exists": False}}]} if fy == "FY2027" else {"fy": fy}
-        pipeline = [
-            {"$match": {"$and": [{"region": region, "week_updated": week}, fy_condition]}},
-            {"$group": {"_id": "$account_name"}}
-        ]
-        cursor = coll.aggregate(pipeline)
-        names = []
-        async for doc in cursor:
-            names.append(doc["_id"])
-        return {"count": len(names), "names": names}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-class SymbTrackerBulkCreate(BaseModel):
-    variant: str
-    event_type: str
-    start_date: str
-    end_date: str
-    upd: int
-
-class SymbTrackerUpdateRow(BaseModel):
-    plan_date: Optional[str] = None
-    input_qty: Optional[int] = None
-    planned_qty: Optional[int] = None
-    acc_work_qty: Optional[int] = None
-    completed: Optional[int] = None
-
-class SymbTrackerDeletePayload(BaseModel):
-    admin_id: str
-    admin_password: str
-    record_ids: List[str]
-
-@router.get("/symb-updated-tracker")
-async def get_symb_updated_tracker():
-    try:
-        coll = get_collection("SYMB_Updated_progress_tracker")
-        # Clean up any legacy soft-deleted documents
-        await coll.delete_many({"status": "deleted"})
-        cursor = coll.find().sort([("variant", 1), ("event_type", 1), ("plan_date", 1)])
-        records = []
-        async for doc in cursor:
-            doc["_id"] = str(doc["_id"])
-            records.append(doc)
-        return records
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/symb-updated-tracker/delete-bulk")
-async def delete_bulk_symb_updated_tracker(payload: SymbTrackerDeletePayload):
-    from bson.objectid import ObjectId
-    from routers.auth import _verify_password
-    
-    try:
-        auth_coll = get_collection("admin_users")
-        user = await auth_coll.find_one({"username": payload.admin_id})
-        if not user:
-            user = await auth_coll.find_one({"username": {"$regex": f"^{payload.admin_id}$", "$options": "i"}})
-            
-        if not user or not _verify_password(payload.admin_password, user.get("salt", ""), user.get("password_hash", "")):
-            raise HTTPException(status_code=401, detail="Invalid Admin ID or Password")
-            
-        coll = get_collection("SYMB_Updated_progress_tracker")
-        obj_ids = []
-        for r_id in payload.record_ids:
-            try:
-                obj_ids.append(ObjectId(r_id))
-            except Exception:
-                pass
-                
-        deleted_count = 0
-        if obj_ids:
-            res = await coll.delete_many({"_id": {"$in": obj_ids}})
-            deleted_count = res.deleted_count
-            return {"status": "no_change"}
-
-        await coll.update_one(
-            {"_id": ObjectId(slide_id)}, 
-            {"$set": update_data}
-        )
-        return {"status": "success"}
-    except Exception as e:
-        print(f"Error updating custom slide: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# --- WHALE ACCOUNTS API ---
-from datetime import datetime
-from pydantic import BaseModel
-from typing import Optional
-
-class WhaleAccountEntry(BaseModel):
-    account_name: str
-    date_updated: str
-    week_updated: int
-    text_data: str
-    region: Optional[str] = None
-    is_old_data: Optional[bool] = False
-
-@router.get("/whale-accounts/names")
-async def get_whale_account_names(region: Optional[str] = None):
-    try:
-        coll = get_collection("whale_accounts")
-        query = {}
-        if region:
-            query["region"] = region
-        names = await coll.distinct("account_name", query)
-        return [n for n in names if n]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/whale-accounts/{account_name}")
-async def get_whale_account_entries(account_name: str):
+async def get_whale_account_entries(account_name: str, fy: Optional[str] = None):
     try:
         coll = get_collection("whale_accounts")
         cursor = coll.find({"account_name": account_name}).sort("date_updated", -1)
@@ -3345,15 +3136,20 @@ async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry
             new_version = f"V{len(variants) + 1}"
             new_variant["version"] = new_version
             
+            update_data = {
+                "week_updated": payload.week_updated,
+                "updated_at": now,
+                "is_old_data": payload.is_old_data
+            }
+            if payload.region:
+                update_data["region"] = payload.region
+            if payload.fy:
+                update_data["fy"] = payload.fy
+
             await coll.update_one(
                 {"_id": doc["_id"]},
                 {
-                    "$set": {
-                        "week_updated": payload.week_updated,
-                        "updated_at": now,
-                        "region": payload.region,
-                        "is_old_data": payload.is_old_data
-                    },
+                    "$set": update_data,
                     "$push": {
                         "variants": new_variant
                     }
@@ -3361,7 +3157,7 @@ async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry
             )
         else:
             new_variant["version"] = "V1"
-            await coll.insert_one({
+            new_doc = {
                 "account_name": account_name,
                 "date_updated": payload.date_updated,
                 "week_updated": payload.week_updated,
@@ -3370,14 +3166,18 @@ async def save_whale_account_entry(account_name: str, payload: WhaleAccountEntry
                 "region": payload.region,
                 "is_old_data": payload.is_old_data,
                 "variants": [new_variant]
-            })
+            }
+            if payload.fy:
+                new_doc["fy"] = payload.fy
+
+            await coll.insert_one(new_doc)
         
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/whale-accounts/stats/{region}/{week}")
-async def get_whale_account_stats(region: str, week: int):
+async def get_whale_account_stats(region: str, week: int, fy: Optional[str] = None):
     try:
         coll = get_collection("whale_accounts")
         pipeline = [
