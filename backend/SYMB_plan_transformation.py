@@ -295,6 +295,9 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_final, df_tracker, stag
         
         # Calculate Estimated Completion Date
         est_dates = []
+        est_histories = []
+        est_given_by = []
+        est_created_ats = []
         tracker_mapped_event = EVENT_MAP.get(event_type)
         
         if not df_tracker.empty and tracker_mapped_event:
@@ -305,15 +308,60 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_final, df_tracker, stag
         for dmd in cum_demand:
             if tracker_sub.empty or pd.isna(dmd) or dmd <= 0:
                 est_dates.append(np.nan)
+                est_histories.append([])
+                est_given_by.append(None)
+                est_created_ats.append(None)
                 continue
                 
             matching = tracker_sub[tracker_sub["tracker_cum_planned"] >= dmd]
             if not matching.empty:
-                est_dates.append(matching.iloc[0]["plan_date"])
+                match_row = matching.iloc[0]
+                est_dates.append(match_row["plan_date"])
+                
+                # Extract plan given by
+                given_by = match_row.get("created_by")
+                if not given_by or pd.isna(given_by) or str(given_by).strip().lower() in ['none', 'nan', 'nat', 'null', '']:
+                    eh = match_row.get("edit_history")
+                    if isinstance(eh, dict):
+                        for cat in ['planned_qty', 'plan_date', 'completed']:
+                            h_list = eh.get(cat, [])
+                            if isinstance(h_list, list) and h_list and h_list[0].get('edited_by'):
+                                given_by = h_list[0].get('edited_by')
+                                break
+                if not given_by or pd.isna(given_by) or str(given_by).strip().lower() in ['none', 'nan', 'nat', 'null', '']:
+                    given_by = "System Baseline"
+                est_given_by.append(str(given_by))
+
+                # Extract plan created at / timestamp
+                created_at = match_row.get("created_at")
+                if not created_at or pd.isna(created_at) or str(created_at).strip().lower() in ['none', 'nan', 'nat', 'null', '']:
+                    eh = match_row.get("edit_history")
+                    if isinstance(eh, dict):
+                        for cat in ['planned_qty', 'plan_date', 'completed']:
+                            h_list = eh.get(cat, [])
+                            if isinstance(h_list, list) and h_list and h_list[0].get('timestamp'):
+                                created_at = h_list[0].get('timestamp')
+                                break
+                est_created_ats.append(str(created_at) if created_at and pd.notna(created_at) else None)
+
+                # Date history
+                match_hist = match_row.get("edit_history")
+                plan_date_hist = []
+                if isinstance(match_hist, dict):
+                    raw_hist = match_hist.get("plan_date", [])
+                    if isinstance(raw_hist, list):
+                        plan_date_hist = raw_hist
+                est_histories.append(plan_date_hist)
             else:
                 est_dates.append(np.nan)
+                est_histories.append([])
+                est_given_by.append(None)
+                est_created_ats.append(None)
                 
         group["Estimated Completion Date"] = est_dates
+        group["Estimated Completion Date History"] = est_histories
+        group["Estimated Completion Date Given By"] = est_given_by
+        group["Estimated Completion Date Created At"] = est_created_ats
 
         # Calculate Actual Completed Date using waterfall batch allocation
         actual_comp_dates = []
@@ -366,6 +414,9 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_final, df_tracker, stag
     # Assign default 0 for completed initially
     SYMB_PLAN["completed"] = 0.0
     SYMB_PLAN["Estimated Completion Date"] = np.nan
+    SYMB_PLAN["Estimated Completion Date History"] = [[] for _ in range(len(SYMB_PLAN))]
+    SYMB_PLAN["Estimated Completion Date Given By"] = None
+    SYMB_PLAN["Estimated Completion Date Created At"] = None
     SYMB_PLAN["Actual Completed Date"] = None
     
     if not SYMB_PLAN.empty:
@@ -535,14 +586,21 @@ async def run_symb_plan_pipeline(db):
         return False
 
     def sanitize_df(df):
+        import math
         # Convert Timestamp to str and handle NaNs/Infs
         for col in df.columns:
             if pd.api.types.is_datetime64_any_dtype(df[col]):
                 df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-        # replace np.nan and np.inf
-        df = df.replace([np.inf, -np.inf], np.nan)
-        df = df.where(pd.notnull(df), None)
-        return df.to_dict('records')
+        records = df.to_dict('records')
+        def clean_val(v):
+            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                return None
+            if isinstance(v, dict):
+                return {k: clean_val(val) for k, val in v.items()}
+            if isinstance(v, list):
+                return [clean_val(item) for item in v]
+            return v
+        return [clean_val(r) for r in records]
 
     # Save to MongoDB
     async def save_coll(coll_name, df):

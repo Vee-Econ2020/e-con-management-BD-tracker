@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Calendar, Filter, AlertCircle, CalendarDays, ArrowRight, RefreshCw, Clock, 
     CheckCircle2, ChevronDown, Eye, Check, Layers, X, ShieldAlert,
-    MessageSquare, History, Send, Edit2, Trash2, Plus, Maximize2,
-    ShieldCheck, TrendingDown, ArrowUpRight, Activity, ChevronUp
+    MessageSquare, History, Send, Edit2, Trash2,
+    ShieldCheck, User
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,6 +19,16 @@ interface SymbPlanRow {
     "Delayed by days": number;
     "Delayed by weeks": number;
     "Estimated Completion Date"?: string;
+    "Estimated Completion Date History"?: Array<{
+        old_value?: any;
+        new_value?: any;
+        value?: any;
+        edited_by?: string;
+        timestamp?: string;
+        edit?: number;
+    }>;
+    "Estimated Completion Date Given By"?: string;
+    "Estimated Completion Date Created At"?: string;
     "Actual Completed Date"?: string;
     is_autofilled?: boolean;
     unplanned_qty?: number;
@@ -38,6 +48,7 @@ interface StageRemark {
     id: string;
     shipment_week: string;
     stage: string;
+    variant?: string;
     remark: string;
     created_by: string;
     created_at: string;
@@ -164,9 +175,11 @@ interface WeekBufferAnalysis {
     totalPlanned: number;
 }
 
-interface StageRemarksModalProps {
+interface VariantDetailsModalProps {
     weekStr: string;
     stage: string;
+    variant: string;
+    row: SymbPlanRow;
     remarks: StageRemark[];
     onClose: () => void;
     onAddRemark: (text: string) => Promise<void>;
@@ -176,9 +189,11 @@ interface StageRemarksModalProps {
     onViewHistory: (remark: StageRemark) => void;
 }
 
-const StageRemarksModal: React.FC<StageRemarksModalProps> = ({
+const VariantDetailsModal: React.FC<VariantDetailsModalProps> = ({
     weekStr,
     stage,
+    variant,
+    row,
     remarks,
     onClose,
     onAddRemark,
@@ -212,11 +227,35 @@ const StageRemarksModal: React.FC<StageRemarksModalProps> = ({
         setEditingRemarkText('');
     };
 
-    const stageRemarks = useMemo(() => {
+    // Filter remarks strictly for this shipment week, stage, and variant
+    const variantRemarks = useMemo(() => {
         return remarks
-            .filter(r => r.shipment_week === weekStr && r.stage === stage)
+            .filter(r => 
+                r.shipment_week === weekStr && 
+                r.stage === stage && 
+                (r.variant || 'Variant 1').toLowerCase() === variant.toLowerCase()
+            )
             .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    }, [remarks, weekStr, stage]);
+    }, [remarks, weekStr, stage, variant]);
+
+    // Planned date history
+    const dateHistory: Array<{
+        old_value?: any;
+        new_value?: any;
+        value?: any;
+        edited_by?: string;
+        timestamp?: string;
+        edit?: number;
+    }> = useMemo(() => {
+        const h = row["Estimated Completion Date History"];
+        return Array.isArray(h) ? h : [];
+    }, [row]);
+
+    const changeCount = dateHistory.length;
+    const estDate = row["Estimated Completion Date"];
+    const actDate = row["Actual Completed Date"] || row["actual_completed_date"];
+    const planGivenBy = row["Estimated Completion Date Given By"];
+    const planCreatedAt = row["Estimated Completion Date Created At"];
 
     return (
         <div style={{
@@ -231,297 +270,544 @@ const StageRemarksModal: React.FC<StageRemarksModalProps> = ({
         }}>
             <div style={{
                 backgroundColor: '#ffffff',
-                borderRadius: '12px',
+                borderRadius: '14px',
                 width: '100%',
-                maxWidth: '640px',
-                maxHeight: '88vh',
+                maxWidth: '680px',
+                maxHeight: '90vh',
                 display: 'flex',
                 flexDirection: 'column',
-                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.25)',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
                 overflow: 'hidden'
             }}>
-                {/* Modal Header */}
+                {/* Header */}
                 <div style={{
-                    padding: '1rem 1.25rem',
+                    padding: '1.1rem 1.4rem',
                     borderBottom: '1px solid #e2e8f0',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     backgroundColor: '#f8fafc'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        <div style={{ backgroundColor: '#e0e7ff', color: '#4338ca', padding: '0.45rem', borderRadius: '8px', display: 'flex' }}>
-                            <MessageSquare size={18} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{
+                            backgroundColor: '#e0e7ff',
+                            color: '#4338ca',
+                            padding: '0.55rem',
+                            borderRadius: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <CalendarDays size={20} />
                         </div>
                         <div>
-                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
-                                Stage Remarks: {stage}
-                            </h3>
-                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
-                                Shipment Week: <strong>{weekStr}</strong> • {stageRemarks.length} Remark{stageRemarks.length !== 1 ? 's' : ''}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                                    {stage}
+                                </h3>
+                                <span style={{
+                                    backgroundColor: '#4f46e5',
+                                    color: '#ffffff',
+                                    padding: '0.15rem 0.55rem',
+                                    borderRadius: '9999px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700
+                                }}>
+                                    {variant}
+                                </span>
+                            </div>
+                            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                                Shipment Week: <strong>{weekStr}</strong>
                             </p>
                         </div>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '0.25rem', display: 'flex', borderRadius: '4px' }}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#64748b',
+                            padding: '0.35rem',
+                            display: 'flex',
+                            borderRadius: '6px',
+                            transition: 'background 0.15s ease'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                         <X size={20} />
                     </button>
                 </div>
 
-                {/* Modal Body */}
-                <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {/* Add New Remark Input */}
+                {/* Body */}
+                <div style={{
+                    padding: '1.25rem 1.4rem',
+                    overflowY: 'auto',
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1.35rem'
+                }}>
+                    {/* SECTION 1: Planned Date / "Will be completed by" & History */}
                     <div style={{
                         backgroundColor: '#f8fafc',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '8px',
-                        padding: '0.75rem',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '1rem 1.15rem',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '0.5rem'
+                        gap: '0.75rem'
                     }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>
-                            Add New Remark
-                        </div>
-                        <textarea
-                            placeholder="Type a remark for this stage..."
-                            value={newRemarkText}
-                            onChange={e => setNewRemarkText(e.target.value)}
-                            rows={3}
-                            style={{
-                                width: '100%',
-                                padding: '0.5rem 0.65rem',
-                                fontSize: '0.82rem',
-                                border: '1px solid #94a3b8',
-                                borderRadius: '6px',
-                                outline: 'none',
-                                resize: 'vertical',
-                                boxSizing: 'border-box',
-                                fontFamily: 'inherit'
-                            }}
-                            onKeyDown={e => {
-                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                                    handlePost();
-                                }
-                            }}
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-                                Tip: Press Ctrl+Enter to post
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                <Clock size={16} style={{ color: '#0284c7' }} />
+                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+                                    "Will be completed by" / Planned Date
+                                </span>
+                            </div>
+                            <span style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                padding: '0.2rem 0.6rem',
+                                borderRadius: '9999px',
+                                backgroundColor: changeCount > 0 ? '#fef3c7' : '#dcfce7',
+                                color: changeCount > 0 ? '#92400e' : '#166534',
+                                border: `1px solid ${changeCount > 0 ? '#fde68a' : '#bbf7d0'}`
+                            }}>
+                                {changeCount > 0 ? `Changed ${changeCount} time${changeCount > 1 ? 's' : ''}` : 'No date changes (0 times changed)'}
                             </span>
-                            <button
-                                type="button"
-                                onClick={handlePost}
-                                disabled={!newRemarkText.trim() || isSubmitting}
-                                style={{
+                        </div>
+
+                        {/* Current Target Date Box */}
+                        <div style={{
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            padding: '0.75rem 0.9rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.4rem'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                <div style={{ fontSize: '0.82rem', color: '#475569' }}>
+                                    Current Planned Date: <strong style={{ color: estDate ? '#0284c7' : '#64748b', fontSize: '0.9rem' }}>{estDate || 'Not scheduled'}</strong>
+                                </div>
+                                {actDate && (
+                                    <div style={{ fontSize: '0.82rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                        <CheckCircle2 size={13} style={{ color: '#16a34a' }} />
+                                        Actual completed: <strong>{actDate}</strong>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Plan Author & Creation Metadata */}
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: '0.4rem',
+                                backgroundColor: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '6px',
+                                padding: '0.45rem 0.65rem',
+                                fontSize: '0.76rem',
+                                color: '#334155'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    <User size={13} style={{ color: '#6366f1' }} />
+                                    <span>
+                                        Plan given by: <strong style={{ color: '#1e293b' }}>{planGivenBy || (estDate ? 'System Baseline' : 'Not assigned')}</strong>
+                                    </span>
+                                </div>
+                                {planCreatedAt && (
+                                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                        Given on: <strong>{formatDateTime(planCreatedAt)}</strong>
+                                    </div>
+                                )}
+                            </div>
+
+                            {changeCount > 0 && dateHistory[dateHistory.length - 1]?.edited_by && (
+                                <div style={{
+                                    fontSize: '0.72rem',
+                                    color: '#92400e',
+                                    backgroundColor: '#fffbeb',
+                                    border: '1px solid #fef3c7',
+                                    borderRadius: '4px',
+                                    padding: '0.3rem 0.5rem',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '0.35rem',
-                                    padding: '0.35rem 0.85rem',
-                                    fontSize: '0.78rem',
-                                    backgroundColor: newRemarkText.trim() && !isSubmitting ? '#4f46e5' : '#a5b4fc',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    cursor: newRemarkText.trim() && !isSubmitting ? 'pointer' : 'not-allowed',
-                                    fontWeight: 700
-                                }}
-                            >
-                                <Send size={12} />
-                                <span>{isSubmitting ? 'Posting...' : 'Post Remark'}</span>
-                            </button>
-                        </div>
-                    </div>
+                                    gap: '0.3rem'
+                                }}>
+                                    <Clock size={11} style={{ color: '#d97706', flexShrink: 0 }} />
+                                    <span>
+                                        Latest date revised by <strong>{dateHistory[dateHistory.length - 1].edited_by}</strong>
+                                        {dateHistory[dateHistory.length - 1].timestamp && ` on ${formatDateTime(dateHistory[dateHistory.length - 1].timestamp)}`}
+                                    </span>
+                                </div>
+                            )}
 
-                    {/* Remarks List */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            Remarks List ({stageRemarks.length})
-                        </div>
-
-                        {stageRemarks.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
-                                No remarks posted yet for this stage.
+                            <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.75rem', color: '#64748b', borderTop: '1px solid #f1f5f9', paddingTop: '0.35rem' }}>
+                                <span>Planned Qty: <strong style={{ color: '#1e293b' }}>{Number(row["planned Value"] || 0).toLocaleString()}</strong></span>
+                                <span>Completed Qty: <strong style={{ color: '#1e293b' }}>{Number(row.completed || 0).toLocaleString()}</strong></span>
                             </div>
-                        ) : (
-                            stageRemarks.map(rm => (
-                                <div
-                                    key={rm.id}
-                                    style={{
-                                        border: '1px solid #e2e8f0',
-                                        borderRadius: '8px',
-                                        padding: '0.75rem 0.9rem',
-                                        backgroundColor: '#ffffff',
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '0.4rem',
-                                        minWidth: 0
-                                    }}
-                                >
-                                    {editingRemarkId === rm.id ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                            <textarea
-                                                value={editingRemarkText}
-                                                onChange={e => setEditingRemarkText(e.target.value)}
-                                                rows={3}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '0.45rem 0.6rem',
-                                                    fontSize: '0.82rem',
-                                                    border: '1px solid #818cf8',
-                                                    borderRadius: '6px',
-                                                    resize: 'vertical',
-                                                    boxSizing: 'border-box',
-                                                    fontFamily: 'inherit'
-                                                }}
-                                                autoFocus
-                                            />
-                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setEditingRemarkId(null); setEditingRemarkText(''); }}
-                                                    style={{
-                                                        padding: '0.25rem 0.65rem',
-                                                        fontSize: '0.74rem',
-                                                        backgroundColor: '#e2e8f0',
-                                                        color: '#475569',
-                                                        border: 'none',
-                                                        borderRadius: '4px',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleSaveEdit(rm.id)}
-                                                    style={{
-                                                        padding: '0.25rem 0.75rem',
-                                                        fontSize: '0.74rem',
-                                                        backgroundColor: '#4f46e5',
-                                                        color: '#ffffff',
-                                                        border: 'none',
-                                                        borderRadius: '4px',
-                                                        cursor: 'pointer',
-                                                        fontWeight: 600
-                                                    }}
-                                                >
-                                                    Save Edit
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', minWidth: 0 }}>
-                                                <div style={{
-                                                    fontSize: '0.84rem',
-                                                    color: '#1e293b',
-                                                    lineHeight: 1.45,
-                                                    whiteSpace: 'pre-wrap',
-                                                    wordBreak: 'break-all',
-                                                    overflowWrap: 'anywhere',
-                                                    flex: 1,
-                                                    minWidth: 0
-                                                }}>
-                                                    {rm.remark}
-                                                </div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setEditingRemarkId(rm.id);
-                                                            setEditingRemarkText(rm.remark);
-                                                        }}
-                                                        title="Edit remark"
-                                                        style={{
-                                                            padding: '0.25rem',
-                                                            color: '#64748b',
-                                                            backgroundColor: '#f1f5f9',
-                                                            border: 'none',
-                                                            borderRadius: '4px',
-                                                            cursor: 'pointer',
-                                                            display: 'flex'
-                                                        }}
-                                                    >
-                                                        <Edit2 size={13} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => onDeleteRemark(rm.id)}
-                                                        title="Delete remark"
-                                                        style={{
-                                                            padding: '0.25rem',
-                                                            color: '#ef4444',
-                                                            backgroundColor: '#fee2e2',
-                                                            border: 'none',
-                                                            borderRadius: '4px',
-                                                            cursor: 'pointer',
-                                                            display: 'flex'
-                                                        }}
-                                                    >
-                                                        <Trash2 size={13} />
-                                                    </button>
-                                                </div>
-                                            </div>
+                        </div>
 
-                                            <div style={{
-                                                display: 'flex',
-                                                flexWrap: 'wrap',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                gap: '0.35rem',
-                                                marginTop: '0.3rem',
-                                                paddingTop: '0.35rem',
-                                                borderTop: '1px solid #f1f5f9',
-                                                fontSize: '0.7rem',
-                                                color: '#64748b'
-                                            }}>
-                                                <span>
-                                                    By <strong style={{ color: '#334155' }}>{rm.created_by}</strong> • {formatDateTime(rm.created_at)}
-                                                </span>
-                                                {rm.edit_history && rm.edit_history.length > 0 && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => onViewHistory(rm)}
-                                                        style={{
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '0.25rem',
-                                                            padding: '0.1rem 0.45rem',
-                                                            backgroundColor: '#fef3c7',
-                                                            color: '#92400e',
-                                                            borderRadius: '9999px',
-                                                            border: '1px solid #fde68a',
-                                                            fontSize: '0.66rem',
-                                                            fontWeight: 700,
-                                                            cursor: 'pointer'
-                                                        }}
-                                                        title="Click to view full revision history"
-                                                    >
-                                                        <History size={11} />
-                                                        <span>Edited ({rm.edit_history.length})</span>
-                                                    </button>
+                        {/* Revisions list */}
+                        {changeCount > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.2rem' }}>
+                                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    Planned Date Change Revisions ({changeCount}):
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                                    {dateHistory.slice().reverse().map((entry, idx) => {
+                                        const revNum = entry.edit || (changeCount - idx);
+                                        return (
+                                            <div
+                                                key={idx}
+                                                style={{
+                                                    backgroundColor: '#ffffff',
+                                                    border: '1px solid #e2e8f0',
+                                                    borderRadius: '6px',
+                                                    padding: '0.55rem 0.75rem',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '0.25rem',
+                                                    fontSize: '0.78rem'
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{
+                                                        backgroundColor: '#f1f5f9',
+                                                        color: '#334155',
+                                                        padding: '0.1rem 0.4rem',
+                                                        borderRadius: '4px',
+                                                        fontSize: '0.7rem',
+                                                        fontWeight: 700
+                                                    }}>
+                                                        Revision #{revNum}
+                                                    </span>
+                                                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                                        {formatDateTime(entry.timestamp)}
+                                                    </span>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
+                                                    <span style={{ textDecoration: 'line-through', color: '#94a3b8' }}>
+                                                        {entry.old_value || 'None'}
+                                                    </span>
+                                                    <ArrowRight size={12} style={{ color: '#64748b' }} />
+                                                    <strong style={{ color: '#0369a1' }}>
+                                                        {entry.new_value}
+                                                    </strong>
+                                                </div>
+                                                {entry.edited_by && (
+                                                    <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '0.1rem' }}>
+                                                        Changed by: <strong style={{ color: '#1e293b' }}>{entry.edited_by}</strong>
+                                                    </div>
                                                 )}
                                             </div>
-                                        </>
-                                    )}
+                                        );
+                                    })}
                                 </div>
-                            ))
+                            </div>
+                        ) : (
+                            <div style={{
+                                backgroundColor: '#f0fdf4',
+                                border: '1px solid #bbf7d0',
+                                borderRadius: '6px',
+                                padding: '0.55rem 0.75rem',
+                                color: '#166534',
+                                fontSize: '0.76rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.4rem'
+                            }}>
+                                <CheckCircle2 size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                <span>No date changes recorded. Planned date has remained <strong>{estDate || 'as planned'}</strong> since initial entry.</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* SECTION 2: Variant Remarks */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                <MessageSquare size={16} style={{ color: '#6366f1' }} />
+                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
+                                    Remarks for {variant}
+                                </span>
+                            </div>
+                            <span style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '9999px',
+                                backgroundColor: '#e0e7ff',
+                                color: '#4338ca'
+                            }}>
+                                {variantRemarks.length} Remark{variantRemarks.length !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+
+                        {/* Add New Remark Input */}
+                        <div style={{
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            padding: '0.75rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.5rem'
+                        }}>
+                            <textarea
+                                placeholder={`Type a remark for ${variant} (${stage})...`}
+                                value={newRemarkText}
+                                onChange={e => setNewRemarkText(e.target.value)}
+                                rows={3}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.5rem 0.65rem',
+                                    fontSize: '0.82rem',
+                                    border: '1px solid #94a3b8',
+                                    borderRadius: '6px',
+                                    outline: 'none',
+                                    resize: 'vertical',
+                                    boxSizing: 'border-box',
+                                    fontFamily: 'inherit'
+                                }}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                        handlePost();
+                                    }
+                                }}
+                            />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                                    Tip: Press Ctrl+Enter to post
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={handlePost}
+                                    disabled={!newRemarkText.trim() || isSubmitting}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.35rem',
+                                        padding: '0.35rem 0.85rem',
+                                        fontSize: '0.78rem',
+                                        backgroundColor: newRemarkText.trim() && !isSubmitting ? '#4f46e5' : '#a5b4fc',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        cursor: newRemarkText.trim() && !isSubmitting ? 'pointer' : 'not-allowed',
+                                        fontWeight: 700
+                                    }}
+                                >
+                                    <Send size={12} />
+                                    <span>{isSubmitting ? 'Posting...' : 'Post Remark'}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Variant Remarks List */}
+                        {variantRemarks.length === 0 ? (
+                            <div style={{
+                                textAlign: 'center',
+                                padding: '1.25rem',
+                                color: '#94a3b8',
+                                fontSize: '0.8rem',
+                                fontStyle: 'italic',
+                                backgroundColor: '#f8fafc',
+                                borderRadius: '8px'
+                            }}>
+                                No remarks posted yet for {variant}.
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                                {variantRemarks.map(rm => (
+                                    <div
+                                        key={rm.id}
+                                        style={{
+                                            border: '1px solid #e2e8f0',
+                                            borderRadius: '8px',
+                                            padding: '0.75rem 0.9rem',
+                                            backgroundColor: '#ffffff',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '0.4rem',
+                                            minWidth: 0
+                                        }}
+                                    >
+                                        {editingRemarkId === rm.id ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                                <textarea
+                                                    value={editingRemarkText}
+                                                    onChange={e => setEditingRemarkText(e.target.value)}
+                                                    rows={3}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '0.45rem 0.6rem',
+                                                        fontSize: '0.82rem',
+                                                        border: '1px solid #818cf8',
+                                                        borderRadius: '6px',
+                                                        resize: 'vertical',
+                                                        boxSizing: 'border-box',
+                                                        fontFamily: 'inherit'
+                                                    }}
+                                                    autoFocus
+                                                />
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setEditingRemarkId(null); setEditingRemarkText(''); }}
+                                                        style={{
+                                                            padding: '0.25rem 0.65rem',
+                                                            fontSize: '0.74rem',
+                                                            backgroundColor: '#e2e8f0',
+                                                            color: '#475569',
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSaveEdit(rm.id)}
+                                                        style={{
+                                                            padding: '0.25rem 0.75rem',
+                                                            fontSize: '0.74rem',
+                                                            backgroundColor: '#4f46e5',
+                                                            color: '#ffffff',
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer',
+                                                            fontWeight: 600
+                                                        }}
+                                                    >
+                                                        Save Edit
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', minWidth: 0 }}>
+                                                    <div style={{
+                                                        fontSize: '0.84rem',
+                                                        color: '#1e293b',
+                                                        lineHeight: 1.45,
+                                                        whiteSpace: 'pre-wrap',
+                                                        wordBreak: 'break-all',
+                                                        overflowWrap: 'anywhere',
+                                                        flex: 1,
+                                                        minWidth: 0
+                                                    }}>
+                                                        {rm.remark}
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEditingRemarkId(rm.id);
+                                                                setEditingRemarkText(rm.remark);
+                                                            }}
+                                                            title="Edit remark"
+                                                            style={{
+                                                                padding: '0.25rem',
+                                                                color: '#64748b',
+                                                                backgroundColor: '#f1f5f9',
+                                                                border: 'none',
+                                                                borderRadius: '4px',
+                                                                cursor: 'pointer',
+                                                                display: 'flex'
+                                                            }}
+                                                        >
+                                                            <Edit2 size={13} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => onDeleteRemark(rm.id)}
+                                                            title="Delete remark"
+                                                            style={{
+                                                                padding: '0.25rem',
+                                                                color: '#ef4444',
+                                                                backgroundColor: '#fee2e2',
+                                                                border: 'none',
+                                                                borderRadius: '4px',
+                                                                cursor: 'pointer',
+                                                                display: 'flex'
+                                                            }}
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div style={{
+                                                    display: 'flex',
+                                                    flexWrap: 'wrap',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    gap: '0.35rem',
+                                                    marginTop: '0.3rem',
+                                                    paddingTop: '0.35rem',
+                                                    borderTop: '1px solid #f1f5f9',
+                                                    fontSize: '0.7rem',
+                                                    color: '#64748b'
+                                                }}>
+                                                    <span>
+                                                        By <strong style={{ color: '#334155' }}>{rm.created_by}</strong> • {formatDateTime(rm.created_at)}
+                                                    </span>
+                                                    {rm.edit_history && rm.edit_history.length > 0 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => onViewHistory(rm)}
+                                                            style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '0.25rem',
+                                                                padding: '0.1rem 0.45rem',
+                                                                backgroundColor: '#fef3c7',
+                                                                color: '#92400e',
+                                                                borderRadius: '9999px',
+                                                                border: '1px solid #fde68a',
+                                                                fontSize: '0.66rem',
+                                                                fontWeight: 700,
+                                                                cursor: 'pointer'
+                                                            }}
+                                                            title="Click to view full revision history"
+                                                        >
+                                                            <History size={11} />
+                                                            <span>Edited ({rm.edit_history.length})</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </div>
                 </div>
 
-                {/* Modal Footer */}
-                <div style={{ padding: '0.8rem 1.25rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#f8fafc' }}>
+                {/* Footer */}
+                <div style={{
+                    padding: '0.85rem 1.4rem',
+                    borderTop: '1px solid #e2e8f0',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    backgroundColor: '#f8fafc'
+                }}>
                     <button
                         type="button"
                         onClick={onClose}
                         style={{
-                            padding: '0.45rem 1.1rem',
+                            padding: '0.45rem 1.2rem',
                             backgroundColor: '#e2e8f0',
                             color: '#334155',
                             borderRadius: '6px',
@@ -539,7 +825,11 @@ const StageRemarksModal: React.FC<StageRemarksModalProps> = ({
     );
 };
 
-const SymbPipelineView: React.FC = () => {
+interface SymbPipelineViewProps {
+    showBufferData?: boolean;
+}
+
+const SymbPipelineView: React.FC<SymbPipelineViewProps> = ({ showBufferData = true }) => {
     const { user } = useAuth();
     const [data, setData] = useState<SymbPlanRow[]>([]);
     const [loading, setLoading] = useState(true);
@@ -550,7 +840,12 @@ const SymbPipelineView: React.FC = () => {
     // Remarks State
     const [remarks, setRemarks] = useState<StageRemark[]>([]);
     const [, setLoadingRemarks] = useState(false);
-    const [activeModalStage, setActiveModalStage] = useState<{ weekStr: string; stage: string } | null>(null);
+    const [activeVariantModal, setActiveVariantModal] = useState<{
+        weekStr: string;
+        stage: string;
+        variant: string;
+        row: SymbPlanRow;
+    } | null>(null);
     const [activeHistoryRemark, setActiveHistoryRemark] = useState<StageRemark | null>(null);
 
     // Coverage Stage Filter State
@@ -563,21 +858,18 @@ const SymbPipelineView: React.FC = () => {
     const [selectedVariant, setSelectedVariant] = useState<string>('All');
     const isAdmin = user?.role === 'Admin';
 
-    // Buffer Analysis State (Admin Only)
-    const [bufferFilter, setBufferFilter] = useState<'all' | 'at_risk' | 'breached' | 'healthy'>('all');
-    const [bufferSortMode, setBufferSortMode] = useState<'least_buffer' | 'chronological'>('least_buffer');
-    const [isBufferSectionOpen, setIsBufferSectionOpen] = useState<boolean>(true);
-    const [selectedBufferStage, setSelectedBufferStage] = useState<string | null>(null);
-
     const MILESTONE_STAGES = useMemo(() => [
         { key: 'EBOM covered', title: 'EBOM covered', eventMatch: ['EBOM covered'], color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe' },
-        { key: 'PCBA', title: 'PCBA', eventMatch: ['PCBA covered', 'PCBA Ready'], color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+        { key: 'PCBA covered', title: 'PCBA covered', eventMatch: ['PCBA covered', 'PCBA Ready'], color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
         { key: 'All Material Available', title: 'All Material Available', eventMatch: ['All Material Available'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
         { key: 'Materials Issued', title: 'Materials Issued', eventMatch: ['Materials Issued'], color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' },
-        { key: 'Active Alignment', title: 'Active Alignment', eventMatch: ['Active alignment'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
-        { key: 'Production / Assembly', title: 'Production / Assembly', eventMatch: ['Production/Assembly'], color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' },
+        { key: 'Active alignment', title: 'Active alignment', eventMatch: ['Active alignment'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+        { key: 'Production/Assembly', title: 'Production/Assembly', eventMatch: ['Production/Assembly'], color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' },
         { key: 'FQC', title: 'FQC', eventMatch: ['FQC'], color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
-        { key: 'Finished Goods', title: 'Finished Goods', eventMatch: ['Finished goods'], color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' }
+        { key: 'Finished goods', title: 'Finished goods', eventMatch: ['Finished goods'], color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+        { key: 'Invoice Date', title: 'Invoice Date', eventMatch: ['Invoice Date'], color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+        { key: 'Shipment Date', title: 'Shipment Date', eventMatch: ['Shipment Date'], color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8' },
+        { key: 'customer place', title: 'customer place', eventMatch: ['customer place'], color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' }
     ], []);
 
     const fetchRemarks = async () => {
@@ -588,15 +880,14 @@ const SymbPipelineView: React.FC = () => {
                 const json = await res.json();
                 setRemarks(json);
             }
-        } catch (error) {
-            console.error("Error fetching stage remarks:", error);
+        } catch (err) {
+            console.error("Failed to fetch symb plan remarks:", err);
         } finally {
             setLoadingRemarks(false);
         }
     };
 
     useEffect(() => {
-        fetchData();
         fetchRemarks();
     }, []);
 
@@ -604,22 +895,29 @@ const SymbPipelineView: React.FC = () => {
         try {
             setLoading(true);
             const res = await fetch('/api/admin/symb-plan/transformed');
-            const json = await res.json();
-            setData(json);
-        } catch (error) {
-            console.error("Error fetching pipeline data:", error);
+            if (res.ok) {
+                const json = await res.json();
+                setData(json);
+            }
+        } catch (err) {
+            console.error("Failed to fetch symb plan data:", err);
         } finally {
             setLoading(false);
         }
     };
 
+    useEffect(() => {
+        fetchData();
+    }, []);
+
     const handleRefresh = async () => {
         try {
             setIsRefreshing(true);
-            await Promise.all([
-                fetch('/api/admin/symb-plan/transformed').then(r => r.json()).then(json => setData(json)),
-                fetch('/api/admin/symb-plan/remarks').then(r => r.json()).then(json => setRemarks(json))
-            ]);
+            const res = await fetch('/api/admin/symb-plan/run-pipeline', { method: 'POST' });
+            if (res.ok) {
+                await fetchData();
+                await fetchRemarks();
+            }
         } catch (error) {
             console.error("Error refreshing pipeline data:", error);
         } finally {
@@ -627,7 +925,7 @@ const SymbPipelineView: React.FC = () => {
         }
     };
 
-    const handleAddRemark = async (shipmentWeek: string, stage: string, text: string) => {
+    const handleAddRemark = async (shipmentWeek: string, stage: string, variant: string, text: string) => {
         const trimmed = text.trim();
         if (!trimmed) return;
 
@@ -639,6 +937,7 @@ const SymbPipelineView: React.FC = () => {
                 body: JSON.stringify({
                     shipment_week: shipmentWeek,
                     stage: stage,
+                    variant: variant,
                     remark: trimmed,
                     user_name: author
                 })
@@ -1228,136 +1527,6 @@ const SymbPipelineView: React.FC = () => {
         return map;
     }, [weeklyBufferData]);
 
-    // High-level Executive KPIs for Buffer Dashboard
-    const bufferExecutiveKPIs = useMemo(() => {
-        if (weeklyBufferData.length === 0) {
-            return {
-                avgBufferWeeks: 4.0,
-                avgBufferDays: 28,
-                healthyCount: 0,
-                consumedCount: 0,
-                atRiskCount: 0,
-                breachedCount: 0,
-                totalWeeks: 0,
-                topBottleneckStage: 'None',
-                topBottleneckDays: 0
-            };
-        }
-
-        const totalWeeks = weeklyBufferData.length;
-        const totalBufferDays = weeklyBufferData.reduce((sum, w) => sum + w.bufferDays, 0);
-        const avgBufferDays = Math.round(totalBufferDays / totalWeeks);
-        const avgBufferWeeks = Number((avgBufferDays / 7.0).toFixed(1));
-
-        let healthyCount = 0;
-        let consumedCount = 0;
-        let atRiskCount = 0;
-        let breachedCount = 0;
-
-        weeklyBufferData.forEach(w => {
-            if (w.status === 'healthy') healthyCount++;
-            else if (w.status === 'consumed') consumedCount++;
-            else if (w.status === 'at_risk') atRiskCount++;
-            else if (w.status === 'breached') breachedCount++;
-        });
-
-        // Stage attribution: sum of slippage per stage across all weeks
-        const stageSums: Record<string, number> = {};
-        BUFFER_STAGES.forEach(s => { stageSums[s] = 0; });
-
-        weeklyBufferData.forEach(w => {
-            w.stageBreakdowns.forEach(sb => {
-                if (sb.slippageDays > 0) {
-                    stageSums[sb.stage] = (stageSums[sb.stage] || 0) + sb.slippageDays;
-                }
-            });
-        });
-
-        let topBottleneckStage = 'All on track';
-        let topBottleneckDays = 0;
-        Object.entries(stageSums).forEach(([stg, days]) => {
-            if (days > topBottleneckDays) {
-                topBottleneckDays = days;
-                topBottleneckStage = stg;
-            }
-        });
-
-        return {
-            avgBufferWeeks,
-            avgBufferDays,
-            healthyCount,
-            consumedCount,
-            atRiskCount,
-            breachedCount,
-            totalWeeks,
-            topBottleneckStage,
-            topBottleneckDays
-        };
-    }, [weeklyBufferData, BUFFER_STAGES]);
-
-    // Stage Buffer Attribution Ranking (Which stage is eating the most cushion?)
-    const stageBufferAttribution = useMemo(() => {
-        const list: { stage: string; totalDaysEaten: number; impactedWeeksCount: number; pctShare: number }[] = [];
-        let totalPipelineDaysLost = 0;
-
-        BUFFER_STAGES.forEach(stageName => {
-            let totalDaysEaten = 0;
-            let impactedWeeksCount = 0;
-
-            weeklyBufferData.forEach(w => {
-                const sb = w.stageBreakdowns.find(s => s.stage === stageName);
-                if (sb && sb.slippageDays > 0) {
-                    totalDaysEaten += sb.slippageDays;
-                    impactedWeeksCount++;
-                }
-            });
-
-            totalPipelineDaysLost += totalDaysEaten;
-            list.push({
-                stage: stageName,
-                totalDaysEaten,
-                impactedWeeksCount,
-                pctShare: 0
-            });
-        });
-
-        if (totalPipelineDaysLost > 0) {
-            list.forEach(item => {
-                item.pctShare = Math.round((item.totalDaysEaten / totalPipelineDaysLost) * 100);
-            });
-        }
-
-        return list.sort((a, b) => b.totalDaysEaten - a.totalDaysEaten);
-    }, [weeklyBufferData, BUFFER_STAGES]);
-
-    // Filtered & Sorted Weekly Buffer List for the Buffer Available Grid
-    const filteredWeeklyBufferList = useMemo(() => {
-        let list = [...weeklyBufferData];
-
-        if (selectedBufferStage) {
-            list = list.filter(w => {
-                const sb = w.stageBreakdowns.find(s => s.stage === selectedBufferStage);
-                return sb && sb.slippageDays > 0;
-            });
-        }
-
-        if (bufferFilter === 'at_risk') {
-            list = list.filter(w => w.status === 'at_risk');
-        } else if (bufferFilter === 'breached') {
-            list = list.filter(w => w.status === 'breached');
-        } else if (bufferFilter === 'healthy') {
-            list = list.filter(w => w.status === 'healthy');
-        }
-
-        if (bufferSortMode === 'least_buffer') {
-            list.sort((a, b) => a.bufferDays - b.bufferDays);
-        } else {
-            list.sort((a, b) => a.shipDate.getTime() - b.shipDate.getTime());
-        }
-
-        return list;
-    }, [weeklyBufferData, bufferFilter, bufferSortMode, selectedBufferStage]);
-
     const handleWeekClick = (weekStr: string) => {
         // If the target week is in completedWeeks, ensure accordion is open so card exists in DOM
         const isCompleted = completedWeeks.some(([w]) => w === weekStr);
@@ -1379,7 +1548,13 @@ const SymbPipelineView: React.FC = () => {
         }, 2500);
     };
 
-    const renderVariantSection = (row: SymbPlanRow, isBackfilled: boolean, backfillSourceStage?: string, backfillActualCompDate?: string) => {
+    const renderVariantSection = (
+        row: SymbPlanRow, 
+        isBackfilled: boolean, 
+        weekStr: string,
+        backfillSourceStage?: string, 
+        backfillActualCompDate?: string
+    ) => {
         const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
         const isCompleted = isNativeCompleted || isBackfilled;
         const isDelayed = !isCompleted && row["Delayed by days"] > 0;
@@ -1388,15 +1563,43 @@ const SymbPipelineView: React.FC = () => {
         const warningMsg = row.warning_msg || row["warning_msg"] || (unplannedQty > 0 ? `There is no plan for remaining qty (${unplannedQty.toLocaleString()} units). Please update!` : '');
         const actualCompDate = row["Actual Completed Date"] || row["actual_completed_date"] || backfillActualCompDate;
         
+        const variantType = row["Variant Type"] || "Variant 1";
+        const stageName = row["Event Type"] || "";
+        const variantRemarksCount = remarks.filter(
+            r => r.shipment_week === weekStr && 
+                 r.stage === stageName && 
+                 (r.variant || 'Variant 1').toLowerCase() === variantType.toLowerCase()
+        ).length;
+        const dateHist = Array.isArray(row["Estimated Completion Date History"]) ? row["Estimated Completion Date History"] : [];
+        const dateHistCount = dateHist.length;
+
         return (
-            <div key={row.id} style={{ 
-                padding: '0.75rem', 
-                backgroundColor: isBackfilled ? '#f1f5f9' : '#f8fafc', 
-                borderRadius: '8px',
-                borderLeft: `4px solid ${unplannedQty > 0 ? '#ef4444' : isNativeCompleted ? '#10b981' : isBackfilled ? '#94a3b8' : isDelayed ? '#ef4444' : '#f59e0b'}`,
-                marginBottom: '0.5rem',
-                fontSize: '0.85rem'
-            }}>
+            <div 
+                key={row.id} 
+                onClick={() => setActiveVariantModal({ weekStr, stage: stageName, variant: variantType, row })}
+                style={{ 
+                    padding: '0.75rem', 
+                    backgroundColor: isBackfilled ? '#f1f5f9' : '#f8fafc', 
+                    borderRadius: '8px',
+                    borderLeft: `4px solid ${unplannedQty > 0 ? '#ef4444' : isNativeCompleted ? '#10b981' : isBackfilled ? '#94a3b8' : isDelayed ? '#ef4444' : '#f59e0b'}`,
+                    marginBottom: '0.5rem',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                }}
+                title={`Click to view ${variantType} date change history and remarks`}
+                onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = isBackfilled ? '#e2e8f0' : '#f1f5f9';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px -2px rgba(0,0,0,0.1)';
+                }}
+                onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = isBackfilled ? '#f1f5f9' : '#f8fafc';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)';
+                }}
+            >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                     <span style={{ fontWeight: 700, color: isBackfilled ? '#475569' : '#1e293b' }}>{row["Variant Type"]}</span>
                     <span style={{
@@ -1487,13 +1690,67 @@ const SymbPipelineView: React.FC = () => {
                         </div>
                     );
                 })()}
+
+                {/* Variant Card Footer: Date changes & remarks info & click affordance */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginTop: '0.45rem',
+                    paddingTop: '0.35rem',
+                    borderTop: '1px dashed #cbd5e1',
+                    fontSize: '0.72rem',
+                    color: '#64748b'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        {dateHistCount > 0 && (
+                            <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.2rem',
+                                backgroundColor: '#fef3c7',
+                                color: '#92400e',
+                                padding: '0.1rem 0.35rem',
+                                borderRadius: '4px',
+                                fontWeight: 700,
+                                fontSize: '0.67rem'
+                            }} title={`Planned date changed ${dateHistCount} time(s)`}>
+                                <Clock size={10} />
+                                {dateHistCount} date edit{dateHistCount > 1 ? 's' : ''}
+                            </span>
+                        )}
+                        {variantRemarksCount > 0 ? (
+                            <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.2rem',
+                                backgroundColor: '#e0e7ff',
+                                color: '#4338ca',
+                                padding: '0.1rem 0.35rem',
+                                borderRadius: '4px',
+                                fontWeight: 700,
+                                fontSize: '0.67rem'
+                            }}>
+                                <MessageSquare size={10} />
+                                {variantRemarksCount} remark{variantRemarksCount > 1 ? 's' : ''}
+                            </span>
+                        ) : (
+                            <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                + Add remark
+                            </span>
+                        )}
+                    </div>
+                    <span style={{ color: '#4f46e5', fontWeight: 700, fontSize: '0.69rem', display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                        Details &rarr;
+                    </span>
+                </div>
             </div>
         );
     };
 
     const renderWeekCardBlock = (weekStr: string, rows: SymbPlanRow[], pct: number) => {
         const isComplete = pct === 100;
-        const weekBufInfo = isAdmin ? weeklyBufferMap.get(weekStr) : undefined;
+        const weekBufInfo = (isAdmin && showBufferData) ? weeklyBufferMap.get(weekStr) : undefined;
         const { maxNativeCompletedIdxMap, maxNativeCompletedStageNameMap } = getWeekBackfillInfo(rows);
 
         const v1MaxIdx = maxNativeCompletedIdxMap['Variant 1'] ?? maxNativeCompletedIdxMap['variant 1'] ?? -1;
@@ -1551,7 +1808,7 @@ const SymbPipelineView: React.FC = () => {
                             {quickSummaryText}
                         </span>
 
-                        {isAdmin && weekBufInfo && (
+                        {isAdmin && showBufferData && weekBufInfo && (
                             <span 
                                 title={`Finished Goods Target: ${weekBufInfo.targetFgFormatted} • Projected/Actual FG: ${weekBufInfo.projectedFgFormatted} • Primary Bottleneck: ${weekBufInfo.primaryEaterStage}`}
                                 style={{
@@ -1668,7 +1925,7 @@ const SymbPipelineView: React.FC = () => {
                                                     ? (backfillSourceRow["Actual Completed Date"] || backfillSourceRow["actual_completed_date"]) 
                                                     : undefined;
 
-                                                return renderVariantSection(row, isBackfilled, backfillSourceStage, backfillActualCompDate);
+                                                return renderVariantSection(row, isBackfilled, weekStr, backfillSourceStage, backfillActualCompDate);
                                             })
                                         )}
 
@@ -1690,155 +1947,6 @@ const SymbPipelineView: React.FC = () => {
                                                 <span>{criticalMsg}</span>
                                             </div>
                                         )}
-
-                                        {/* Remarks Section */}
-                                        {(() => {
-                                            const cardRemarks = remarks
-                                                .filter(r => r.shipment_week === weekStr && r.stage === eventType)
-                                                .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-                                            return (
-                                                <div style={{
-                                                    marginTop: '0.85rem',
-                                                    paddingTop: '0.65rem',
-                                                    borderTop: '1px dashed #e2e8f0',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    gap: '0.35rem',
-                                                    minWidth: 0,
-                                                    width: '100%'
-                                                }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                                                            <MessageSquare size={13} style={{ color: '#6366f1' }} />
-                                                            <span>Remarks</span>
-                                                            {cardRemarks.length > 0 && (
-                                                                <span style={{
-                                                                    fontSize: '0.65rem',
-                                                                    backgroundColor: '#e0e7ff',
-                                                                    color: '#4338ca',
-                                                                    borderRadius: '9999px',
-                                                                    padding: '0.05rem 0.4rem',
-                                                                    fontWeight: 800
-                                                                }}>
-                                                                    {cardRemarks.length}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                                            {cardRemarks.length > 0 && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setActiveModalStage({ weekStr, stage: eventType })}
-                                                                    style={{
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: '0.2rem',
-                                                                        fontSize: '0.7rem',
-                                                                        fontWeight: 600,
-                                                                        color: '#475569',
-                                                                        backgroundColor: '#f1f5f9',
-                                                                        border: '1px solid #cbd5e1',
-                                                                        cursor: 'pointer',
-                                                                        padding: '0.15rem 0.4rem',
-                                                                        borderRadius: '4px'
-                                                                    }}
-                                                                    title="Expand remarks popup"
-                                                                >
-                                                                    <Maximize2 size={11} />
-                                                                    <span>Expand</span>
-                                                                </button>
-                                                            )}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setActiveModalStage({ weekStr, stage: eventType })}
-                                                                style={{
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '0.2rem',
-                                                                    fontSize: '0.7rem',
-                                                                    fontWeight: 600,
-                                                                    color: '#4f46e5',
-                                                                    backgroundColor: '#eef2ff',
-                                                                    border: '1px solid #c7d2fe',
-                                                                    cursor: 'pointer',
-                                                                    padding: '0.15rem 0.4rem',
-                                                                    borderRadius: '4px'
-                                                                }}
-                                                                title="Add or view remarks"
-                                                            >
-                                                                <Plus size={11} />
-                                                                <span>Add</span>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Preview of latest remark if present */}
-                                                    {cardRemarks.length > 0 ? (
-                                                        <div
-                                                            onClick={() => setActiveModalStage({ weekStr, stage: eventType })}
-                                                            style={{
-                                                                backgroundColor: '#f8fafc',
-                                                                border: '1px solid #e2e8f0',
-                                                                borderRadius: '6px',
-                                                                padding: '0.4rem 0.5rem',
-                                                                fontSize: '0.72rem',
-                                                                cursor: 'pointer',
-                                                                transition: 'all 0.15s ease',
-                                                                width: '100%',
-                                                                boxSizing: 'border-box',
-                                                                minWidth: 0
-                                                            }}
-                                                            title="Click to expand remarks in pop-up"
-                                                            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                                                            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                                                        >
-                                                            <div style={{
-                                                                color: '#1e293b',
-                                                                lineHeight: 1.35,
-                                                                wordBreak: 'break-all',
-                                                                overflowWrap: 'anywhere',
-                                                                whiteSpace: 'pre-wrap',
-                                                                display: '-webkit-box',
-                                                                WebkitLineClamp: 2,
-                                                                WebkitBoxOrient: 'vertical',
-                                                                overflow: 'hidden'
-                                                            }}>
-                                                                {cardRemarks[cardRemarks.length - 1].remark}
-                                                            </div>
-                                                            <div style={{
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'space-between',
-                                                                marginTop: '0.25rem',
-                                                                fontSize: '0.64rem',
-                                                                color: '#64748b'
-                                                            }}>
-                                                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
-                                                                    By {cardRemarks[cardRemarks.length - 1].created_by?.split('@')[0]}
-                                                                </span>
-                                                                <span style={{ color: '#4f46e5', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
-                                                                    {cardRemarks.length > 1 ? `+${cardRemarks.length - 1} more • Expand` : 'Expand'}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div 
-                                                            onClick={() => setActiveModalStage({ weekStr, stage: eventType })}
-                                                            style={{ 
-                                                                fontSize: '0.7rem', 
-                                                                color: '#94a3b8', 
-                                                                fontStyle: 'italic', 
-                                                                cursor: 'pointer',
-                                                                padding: '0.2rem 0'
-                                                            }}
-                                                        >
-                                                            + Add remark...
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })()}
                                     </div>
                                 </div>
                                 
@@ -2337,504 +2445,6 @@ const SymbPipelineView: React.FC = () => {
                 </div>
             </div>
 
-            {/* Buffer Available & Risk Analysis Section (Admin Only) */}
-            {isAdmin && (
-                <div style={{
-                    backgroundColor: '#ffffff',
-                    borderRadius: '12px',
-                    padding: '1.25rem 1.5rem',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                    marginBottom: '1.5rem'
-                }}>
-                    {/* Header Banner */}
-                    <div style={{
-                        backgroundColor: '#0f172a',
-                        borderRadius: '10px',
-                        padding: '1rem 1.25rem',
-                        color: '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '1rem',
-                        flexWrap: 'wrap',
-                        marginBottom: '1.25rem',
-                        border: '1px solid #334155'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '0.5rem', borderRadius: '8px', display: 'flex' }}>
-                                <ShieldAlert size={22} />
-                            </div>
-                            <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                        Admin Executive Insight
-                                    </span>
-                                    <span style={{ fontSize: '0.65rem', backgroundColor: '#3b82f6', color: '#ffffff', padding: '0.1rem 0.45rem', borderRadius: '9999px', fontWeight: 800 }}>
-                                        🔒 ADMIN ONLY
-                                    </span>
-                                </div>
-                                <h3 style={{ margin: '0.2rem 0 0 0', fontSize: '1.3rem', fontWeight: 800, color: '#f8fafc' }}>
-                                    Buffer Available & Execution Risk Analysis
-                                </h3>
-                                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
-                                    Standard Policy: Cameras must reach Finished Goods <strong>4 weeks (28 days)</strong> before customer shipment date.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                            <button
-                                type="button"
-                                onClick={() => setIsBufferSectionOpen(!isBufferSectionOpen)}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.35rem',
-                                    padding: '0.4rem 0.85rem',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                    color: '#f8fafc',
-                                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                                    borderRadius: '6px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                {isBufferSectionOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                {isBufferSectionOpen ? 'Collapse Buffer Panel' : 'Expand Buffer Panel'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {isBufferSectionOpen && (
-                        <>
-                            {/* KPI Summary Cards Grid */}
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                                gap: '1rem',
-                                marginBottom: '1.25rem'
-                            }}>
-                                {/* Card 1: Avg Buffer Available */}
-                                <div style={{
-                                    backgroundColor: bufferExecutiveKPIs.avgBufferWeeks >= 3.5 ? '#ecfdf5' : bufferExecutiveKPIs.avgBufferWeeks >= 2.0 ? '#fffbeb' : '#fef2f2',
-                                    border: `1px solid ${bufferExecutiveKPIs.avgBufferWeeks >= 3.5 ? '#a7f3d0' : bufferExecutiveKPIs.avgBufferWeeks >= 2.0 ? '#fde68a' : '#fecaca'}`,
-                                    borderRadius: '10px',
-                                    padding: '1rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '0.35rem'
-                                }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <span>AVG BUFFER IN HAND</span>
-                                        <Clock size={15} style={{ color: bufferExecutiveKPIs.avgBufferWeeks >= 3.5 ? '#059669' : '#d97706' }} />
-                                    </div>
-                                    <div style={{ fontSize: '1.75rem', fontWeight: 900, color: bufferExecutiveKPIs.avgBufferWeeks >= 3.5 ? '#065f46' : bufferExecutiveKPIs.avgBufferWeeks >= 2.0 ? '#92400e' : '#991b1b' }}>
-                                        {bufferExecutiveKPIs.avgBufferWeeks} <span style={{ fontSize: '1rem', fontWeight: 700 }}>weeks</span>
-                                    </div>
-                                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                                        {bufferExecutiveKPIs.avgBufferDays} days avg cushion ({bufferExecutiveKPIs.totalWeeks} total shipment batches)
-                                    </div>
-                                    {/* Mini cushion progress meter */}
-                                    <div style={{ marginTop: '0.3rem', width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden' }}>
-                                        <div style={{
-                                            width: `${Math.min(100, Math.max(0, Math.round((bufferExecutiveKPIs.avgBufferDays / 28) * 100)))}%`,
-                                            height: '100%',
-                                            backgroundColor: bufferExecutiveKPIs.avgBufferWeeks >= 3.5 ? '#10b981' : bufferExecutiveKPIs.avgBufferWeeks >= 2.0 ? '#f59e0b' : '#ef4444',
-                                            borderRadius: '9999px'
-                                        }} />
-                                    </div>
-                                </div>
-
-                                {/* Card 2: Healthy Weeks */}
-                                <div style={{
-                                    backgroundColor: '#f0fdf4',
-                                    border: '1px solid #bbf7d0',
-                                    borderRadius: '10px',
-                                    padding: '1rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '0.35rem'
-                                }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#166534', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <span>HEALTHY WEEKS</span>
-                                        <ShieldCheck size={16} style={{ color: '#16a34a' }} />
-                                    </div>
-                                    <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#15803d' }}>
-                                        {bufferExecutiveKPIs.healthyCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#166534' }}>/ {bufferExecutiveKPIs.totalWeeks} wks</span>
-                                    </div>
-                                    <div style={{ fontSize: '0.72rem', color: '#166534' }}>
-                                        Full 4-week safety cushion intact (≥ 3.5 wks)
-                                    </div>
-                                </div>
-
-                                {/* Card 3: At Risk & Depleted Weeks */}
-                                <div style={{
-                                    backgroundColor: bufferExecutiveKPIs.atRiskCount > 0 ? '#fff7ed' : '#f8fafc',
-                                    border: `1px solid ${bufferExecutiveKPIs.atRiskCount > 0 ? '#fed7aa' : '#e2e8f0'}`,
-                                    borderRadius: '10px',
-                                    padding: '1rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '0.35rem'
-                                }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9a3412', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <span>BUFFER ERODED (AT RISK)</span>
-                                        <TrendingDown size={16} style={{ color: '#ea580c' }} />
-                                    </div>
-                                    <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#c2410c' }}>
-                                        {bufferExecutiveKPIs.atRiskCount + bufferExecutiveKPIs.consumedCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#9a3412' }}>weeks</span>
-                                    </div>
-                                    <div style={{ fontSize: '0.72rem', color: '#7c2d12' }}>
-                                        {bufferExecutiveKPIs.atRiskCount} critical (&lt; 2 wks) • {bufferExecutiveKPIs.consumedCount} caution (2-3.4 wks)
-                                    </div>
-                                </div>
-
-                                {/* Card 4: Breached & Top Culprit */}
-                                <div style={{
-                                    backgroundColor: bufferExecutiveKPIs.breachedCount > 0 ? '#fef2f2' : '#f8fafc',
-                                    border: `1px solid ${bufferExecutiveKPIs.breachedCount > 0 ? '#fecaca' : '#e2e8f0'}`,
-                                    borderRadius: '10px',
-                                    padding: '1rem',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '0.35rem'
-                                }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <span>CRITICAL / BREACHED</span>
-                                        <AlertCircle size={16} style={{ color: '#dc2626' }} />
-                                    </div>
-                                    <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#b91c1c' }}>
-                                        {bufferExecutiveKPIs.breachedCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#991b1b' }}>weeks</span>
-                                    </div>
-                                    <div style={{ fontSize: '0.72rem', color: '#7f1d1d' }}>
-                                        Top Eater: <strong>{bufferExecutiveKPIs.topBottleneckStage}</strong> (-{bufferExecutiveKPIs.topBottleneckDays}d)
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Stage Attribution Breakdown ("Which Stage is Eating Buffer?") */}
-                            <div style={{
-                                backgroundColor: '#f8fafc',
-                                borderRadius: '10px',
-                                border: '1px solid #e2e8f0',
-                                padding: '1rem 1.25rem',
-                                marginBottom: '1.25rem'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <Activity size={18} style={{ color: '#6366f1' }} />
-                                        <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-                                            Which Stage is Eating Buffer Time? (Factory Attribution)
-                                        </h4>
-                                    </div>
-                                    {selectedBufferStage && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedBufferStage(null)}
-                                            style={{
-                                                fontSize: '0.75rem',
-                                                padding: '0.2rem 0.6rem',
-                                                borderRadius: '4px',
-                                                backgroundColor: '#e2e8f0',
-                                                color: '#334155',
-                                                border: 'none',
-                                                cursor: 'pointer',
-                                                fontWeight: 600
-                                            }}
-                                        >
-                                            Clear Stage Filter ({selectedBufferStage})
-                                        </button>
-                                    )}
-                                </div>
-
-                                <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                                    gap: '0.75rem'
-                                }}>
-                                    {stageBufferAttribution.map(item => {
-                                        const isSelected = selectedBufferStage === item.stage;
-                                        const theme = getStageThemeColor(item.stage);
-                                        const hasDelay = item.totalDaysEaten > 0;
-
-                                        return (
-                                            <div 
-                                                key={item.stage}
-                                                onClick={() => setSelectedBufferStage(isSelected ? null : item.stage)}
-                                                style={{
-                                                    backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
-                                                    border: `1px solid ${isSelected ? '#3b82f6' : hasDelay ? '#fecaca' : '#e2e8f0'}`,
-                                                    borderRadius: '8px',
-                                                    padding: '0.75rem',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.15s ease',
-                                                    boxShadow: isSelected ? '0 0 0 2px #93c5fd' : '0 1px 3px rgba(0,0,0,0.03)'
-                                                }}
-                                            >
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: theme.color }}>
-                                                        {item.stage}
-                                                    </span>
-                                                    <span style={{
-                                                        fontSize: '0.7rem',
-                                                        fontWeight: 800,
-                                                        padding: '0.1rem 0.45rem',
-                                                        borderRadius: '9999px',
-                                                        backgroundColor: hasDelay ? '#fee2e2' : '#dcfce7',
-                                                        color: hasDelay ? '#991b1b' : '#166534'
-                                                    }}>
-                                                        {hasDelay ? `-${item.totalDaysEaten} days` : '0 days (On Track)'}
-                                                    </span>
-                                                </div>
-
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', marginBottom: '0.4rem' }}>
-                                                    <span>Impacts: <strong>{item.impactedWeeksCount} shipment batches</strong></span>
-                                                    <span>{item.pctShare}% of total delay</span>
-                                                </div>
-
-                                                {/* Bar */}
-                                                <div style={{ width: '100%', height: '5px', backgroundColor: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
-                                                    <div style={{
-                                                        width: `${Math.min(100, Math.max(0, item.pctShare))}%`,
-                                                        height: '100%',
-                                                        backgroundColor: hasDelay ? '#ef4444' : '#10b981',
-                                                        borderRadius: '4px'
-                                                    }} />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Weekly Buffer Navigation & Strip Controls */}
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                marginBottom: '0.75rem',
-                                flexWrap: 'wrap',
-                                gap: '0.75rem'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Filter Batches:</span>
-                                    
-                                    <button
-                                        type="button"
-                                        onClick={() => setBufferFilter('all')}
-                                        style={{
-                                            padding: '0.25rem 0.7rem',
-                                            fontSize: '0.75rem',
-                                            borderRadius: '6px',
-                                            border: '1px solid #cbd5e1',
-                                            backgroundColor: bufferFilter === 'all' ? '#1e293b' : '#ffffff',
-                                            color: bufferFilter === 'all' ? '#ffffff' : '#475569',
-                                            fontWeight: 700,
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        All Weeks ({weeklyBufferData.length})
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => setBufferFilter('at_risk')}
-                                        style={{
-                                            padding: '0.25rem 0.7rem',
-                                            fontSize: '0.75rem',
-                                            borderRadius: '6px',
-                                            border: '1px solid #fed7aa',
-                                            backgroundColor: bufferFilter === 'at_risk' ? '#ea580c' : '#fff7ed',
-                                            color: bufferFilter === 'at_risk' ? '#ffffff' : '#9a3412',
-                                            fontWeight: 700,
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        At Risk (&lt; 2 wks) ({bufferExecutiveKPIs.atRiskCount})
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => setBufferFilter('breached')}
-                                        style={{
-                                            padding: '0.25rem 0.7rem',
-                                            fontSize: '0.75rem',
-                                            borderRadius: '6px',
-                                            border: '1px solid #fecaca',
-                                            backgroundColor: bufferFilter === 'breached' ? '#dc2626' : '#fef2f2',
-                                            color: bufferFilter === 'breached' ? '#ffffff' : '#991b1b',
-                                            fontWeight: 700,
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        Breached (≤ 0 wks) ({bufferExecutiveKPIs.breachedCount})
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => setBufferFilter('healthy')}
-                                        style={{
-                                            padding: '0.25rem 0.7rem',
-                                            fontSize: '0.75rem',
-                                            borderRadius: '6px',
-                                            border: '1px solid #a7f3d0',
-                                            backgroundColor: bufferFilter === 'healthy' ? '#059669' : '#ecfdf5',
-                                            color: bufferFilter === 'healthy' ? '#ffffff' : '#065f46',
-                                            fontWeight: 700,
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        Healthy (≥ 3.5 wks) ({bufferExecutiveKPIs.healthyCount})
-                                    </button>
-                                </div>
-
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Sort:</span>
-                                    <select
-                                        value={bufferSortMode}
-                                        onChange={e => setBufferSortMode(e.target.value as any)}
-                                        style={{
-                                            padding: '0.25rem 0.6rem',
-                                            fontSize: '0.76rem',
-                                            borderRadius: '6px',
-                                            border: '1px solid #cbd5e1',
-                                            backgroundColor: '#ffffff',
-                                            color: '#334155',
-                                            fontWeight: 600,
-                                            outline: 'none'
-                                        }}
-                                    >
-                                        <option value="least_buffer">Least Buffer First (Highest Risk)</option>
-                                        <option value="chronological">Chronological (Shipment Date)</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Horizontal / Grid of Shipment Week Buffer Cards */}
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                                gap: '0.85rem',
-                                maxHeight: '420px',
-                                overflowY: 'auto',
-                                padding: '0.5rem',
-                                backgroundColor: '#f1f5f9',
-                                borderRadius: '10px',
-                                border: '1px solid #e2e8f0'
-                            }}>
-                                {filteredWeeklyBufferList.length === 0 ? (
-                                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#64748b', fontSize: '0.85rem' }}>
-                                        No shipment batches match the selected filter criteria.
-                                    </div>
-                                ) : (
-                                    filteredWeeklyBufferList.map(item => {
-                                        const bufInfo = weeklyBufferMap.get(item.weekStr);
-                                        if (!bufInfo) return null;
-
-                                        return (
-                                            <div 
-                                                key={item.weekStr}
-                                                style={{
-                                                    backgroundColor: '#ffffff',
-                                                    borderRadius: '8px',
-                                                    padding: '0.85rem 1rem',
-                                                    border: `1px solid ${bufInfo.statusBorder}`,
-                                                    borderLeft: `5px solid ${bufInfo.statusColor}`,
-                                                    boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    gap: '0.45rem'
-                                                }}
-                                            >
-                                                {/* Header row */}
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e293b' }}>
-                                                        {item.weekStr}
-                                                    </span>
-                                                    <span style={{
-                                                        fontSize: '0.72rem',
-                                                        fontWeight: 800,
-                                                        padding: '0.15rem 0.5rem',
-                                                        borderRadius: '12px',
-                                                        backgroundColor: bufInfo.statusBg,
-                                                        color: bufInfo.statusColor,
-                                                        border: `1px solid ${bufInfo.statusBorder}`
-                                                    }}>
-                                                        Buffer: {item.bufferWeeks} wks
-                                                    </span>
-                                                </div>
-
-                                                {/* Cushion Details */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.75rem', color: '#475569' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <span>FG Target (S-28d):</span>
-                                                        <strong style={{ color: '#0369a1' }}>{bufInfo.targetFgFormatted}</strong>
-                                                    </div>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <span>FG Projected / Actual:</span>
-                                                        <strong style={{ color: item.maxSlippageDays > 0 ? '#b91c1c' : '#166534' }}>
-                                                            {bufInfo.projectedFgFormatted}
-                                                        </strong>
-                                                    </div>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <span>Cushion in Hand:</span>
-                                                        <strong style={{ color: item.bufferDays >= 0 ? '#166534' : '#b91c1c' }}>
-                                                            {item.bufferDays >= 0 ? `${item.bufferDays} days remaining` : `${Math.abs(item.bufferDays)} days overdue`}
-                                                        </strong>
-                                                    </div>
-                                                </div>
-
-                                                {/* Top Eater Tag */}
-                                                <div style={{
-                                                    fontSize: '0.72rem',
-                                                    padding: '0.25rem 0.45rem',
-                                                    borderRadius: '4px',
-                                                    backgroundColor: item.maxSlippageDays > 0 ? '#fff7ed' : '#ecfdf5',
-                                                    border: `1px solid ${item.maxSlippageDays > 0 ? '#fed7aa' : '#a7f3d0'}`,
-                                                    color: item.maxSlippageDays > 0 ? '#9a3412' : '#065f46',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between'
-                                                }}>
-                                                    <span>{item.maxSlippageDays > 0 ? `Top Bottleneck: ${item.primaryEaterStage}` : '✓ All Stages On Track'}</span>
-                                                    {item.maxSlippageDays > 0 && <strong>-{item.maxSlippageDays}d</strong>}
-                                                </div>
-
-                                                {/* Jump to Week Button */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleWeekClick(item.weekStr)}
-                                                    style={{
-                                                        marginTop: '0.2rem',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        gap: '0.35rem',
-                                                        padding: '0.3rem 0.5rem',
-                                                        fontSize: '0.74rem',
-                                                        fontWeight: 700,
-                                                        backgroundColor: '#f8fafc',
-                                                        color: '#2563eb',
-                                                        border: '1px solid #bfdbfe',
-                                                        borderRadius: '6px',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    <ArrowUpRight size={13} />
-                                                    Jump to Pipeline Card ↓
-                                                </button>
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        </>
-                    )}
-                </div>
-            )}
-
             {/* Completed in all green Accordion */}
             {completedWeeks.length > 0 && (
                 <div style={{ marginBottom: '1rem', border: '1px solid #bbf7d0', borderRadius: '12px', backgroundColor: '#f0fdf4', overflow: 'hidden' }}>
@@ -2885,14 +2495,16 @@ const SymbPipelineView: React.FC = () => {
                 )}
             </div>
 
-            {/* Stage Remarks Pop-up Modal */}
-            {activeModalStage && (
-                <StageRemarksModal
-                    weekStr={activeModalStage.weekStr}
-                    stage={activeModalStage.stage}
+            {/* Variant Details & Remarks Pop-up Modal */}
+            {activeVariantModal && (
+                <VariantDetailsModal
+                    weekStr={activeVariantModal.weekStr}
+                    stage={activeVariantModal.stage}
+                    variant={activeVariantModal.variant}
+                    row={activeVariantModal.row}
                     remarks={remarks}
-                    onClose={() => setActiveModalStage(null)}
-                    onAddRemark={(text) => handleAddRemark(activeModalStage.weekStr, activeModalStage.stage, text)}
+                    onClose={() => setActiveVariantModal(null)}
+                    onAddRemark={(text) => handleAddRemark(activeVariantModal.weekStr, activeVariantModal.stage, activeVariantModal.variant, text)}
                     onUpdateRemark={(id, text) => handleUpdateRemark(id, text)}
                     onDeleteRemark={(id) => handleDeleteRemark(id)}
                     formatDateTime={formatDateTime}
@@ -2941,7 +2553,7 @@ const SymbPipelineView: React.FC = () => {
                                         Remark Revision History
                                     </h3>
                                     <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
-                                        Week: <strong>{activeHistoryRemark.shipment_week}</strong> • Stage: <strong>{activeHistoryRemark.stage}</strong>
+                                        Week: <strong>{activeHistoryRemark.shipment_week}</strong> • Stage: <strong>{activeHistoryRemark.stage}</strong> • Variant: <strong>{activeHistoryRemark.variant || 'Variant 1'}</strong>
                                     </p>
                                 </div>
                             </div>

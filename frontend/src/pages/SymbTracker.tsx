@@ -1,10 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, X, Table, Activity, Calendar, ChevronUp } from 'lucide-react';
+import { ArrowLeft, RefreshCw, X, Table, Activity, Calendar, ChevronUp, Clock, Eye, EyeOff } from 'lucide-react';
 import '../index.css';
 import SymbTrackerUpdate from '../components/SymbTrackerUpdate';
 import SymbPipelineView from '../components/SymbPipelineView';
 import SymbOverallPlanView from '../components/SymbOverallPlanView';
+import SymbBufferAnalysisView from '../components/SymbBufferAnalysisView';
+import { useAuth } from '../context/AuthContext';
 
 interface SymbRecord {
     _id?: any;
@@ -35,8 +37,64 @@ interface FlagMappingRule {
     yellow?: string | null;
     red?: string | null;
 }
+
+// Helper to extract Committed Due Date across possible field name variations
+const getCDDVal = (rec: SymbRecord) => {
+    return rec['Committed Due date'] || 
+           rec['Committed_Due_date'] || 
+           rec['Committed Due Date'] || 
+           rec['CDD'] || 
+           rec['cdd'] || 
+           rec['Targeted shipment date'] ||
+           rec['Customer Request date'];
+};
+
+// Helper to safely parse dates in standard string formats
+const parseAnyDate = (dateStr?: any): Date | null => {
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return dateStr;
+    const s = String(dateStr).trim();
+    if (!s) return null;
+
+    let d = new Date(s);
+    if (!isNaN(d.getTime())) return d;
+
+    const parts = s.split(/[-/ T]/);
+    if (parts.length >= 3) {
+        const p1 = parseInt(parts[0], 10);
+        const p2 = parseInt(parts[1], 10);
+        const p3 = parseInt(parts[2], 10);
+
+        if (p1 > 1000) return new Date(p1, p2 - 1, p3);
+        if (p3 > 1000) return new Date(p3, p2 - 1, p1);
+    }
+    return null;
+};
+
+// Helper to get Month Year label from Committed Due date (e.g. "July 2026")
+const getMonthYearKey = (dateStr?: string) => {
+    const d = parseAnyDate(dateStr);
+    if (!d) return 'Unspecified';
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+};
+
+// Format date string nicely (e.g. "04 January 2027")
+const formatDatePretty = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    } catch {
+        return dateStr;
+    }
+};
+
 export default function SymbTracker() {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'Admin';
+
     const [records, setRecords] = useState<SymbRecord[]>([]);
     const [flagRules, setFlagRules] = useState<FlagMappingRule[]>([]);
 
@@ -46,8 +104,12 @@ export default function SymbTracker() {
     const [selectedFileDate, setSelectedFileDate] = useState<string>('');
     const [selectedMonth] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-    const [activeSubTab, setActiveSubTab] = useState<'symb_plan_pipeline' | 'tracker_update' | 'overall_plan'>('symb_plan_pipeline');
+    const [activeSubTab, setActiveSubTab] = useState<'symb_plan_pipeline' | 'buffer_analysis' | 'tracker_update' | 'overall_plan'>('symb_plan_pipeline');
     const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
+
+    // Buffer Data Visibility State (Controlled via Admin)
+    const [showBufferData, setShowBufferData] = useState<boolean>(true);
+    const [isTogglingBuffer, setIsTogglingBuffer] = useState<boolean>(false);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -128,9 +190,50 @@ export default function SymbTracker() {
         }
     };
 
+    const fetchSymbSettings = async () => {
+        try {
+            const res = await fetch('/api/admin/symb-tracker/settings');
+            if (res.ok) {
+                const data = await res.json();
+                if (typeof data.show_buffer_data === 'boolean') {
+                    setShowBufferData(data.show_buffer_data);
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching SYMB tracker settings:', err);
+        }
+    };
+
+    const handleToggleBufferData = async () => {
+        if (!isAdmin || isTogglingBuffer) return;
+        setIsTogglingBuffer(true);
+        try {
+            const res = await fetch('/api/admin/symb-tracker/settings/toggle-buffer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ show_buffer_data: !showBufferData })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setShowBufferData(data.show_buffer_data);
+            }
+        } catch (err) {
+            console.error('Error toggling buffer visibility:', err);
+        } finally {
+            setIsTogglingBuffer(false);
+        }
+    };
+
     useEffect(() => {
         fetchSymbData();
+        fetchSymbSettings();
     }, []);
+
+    useEffect(() => {
+        if (!showBufferData && !isAdmin && activeSubTab === 'buffer_analysis') {
+            setActiveSubTab('symb_plan_pipeline');
+        }
+    }, [showBufferData, isAdmin, activeSubTab]);
 
     // Build lookup for flag rules by stage name
     const flagRulesMap = useMemo(() => {
@@ -148,62 +251,6 @@ export default function SymbTracker() {
         });
         return map;
     }, [flagRules]);
-
-    // Format date string nicely (e.g. "04 January 2027")
-    const formatDatePretty = (dateStr?: string) => {
-        if (!dateStr) return '-';
-        try {
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return dateStr;
-            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-        } catch {
-            return dateStr;
-        }
-    };
-
-    // Helper to extract Committed Due Date across possible field name variations
-    const getCDDVal = (rec: SymbRecord) => {
-        return rec['Committed Due date'] || 
-               rec['Committed_Due_date'] || 
-               rec['Committed Due Date'] || 
-               rec['CDD'] || 
-               rec['cdd'] || 
-               rec['Targeted shipment date'] ||
-               rec['Customer Request date'];
-    };
-
-    // Helper to safely parse dates in standard string formats
-    const parseAnyDate = (dateStr?: any): Date | null => {
-        if (!dateStr) return null;
-        if (dateStr instanceof Date) return dateStr;
-        const s = String(dateStr).trim();
-        if (!s) return null;
-
-        let d = new Date(s);
-        if (!isNaN(d.getTime())) return d;
-
-        const parts = s.split(/[-/ T]/);
-        if (parts.length >= 3) {
-            const p1 = parseInt(parts[0], 10);
-            const p2 = parseInt(parts[1], 10);
-            const p3 = parseInt(parts[2], 10);
-
-            if (p1 > 1000) return new Date(p1, p2 - 1, p3);
-            if (p3 > 1000) return new Date(p3, p2 - 1, p1);
-        }
-        return null;
-    };
-
-    // Helper to get Month Year label from Committed Due date (e.g. "July 2026")
-    const getMonthYearKey = (dateStr?: string) => {
-        const d = parseAnyDate(dateStr);
-        if (!d) return 'Unspecified';
-        return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    };
-
-
-
-
 
     const todayStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -362,6 +409,7 @@ export default function SymbTracker() {
                         border: '1px solid #e2e8f0',
                         borderBottom: 'none'
                     }}>
+                        {/* 1. Plan Pipeline */}
                         <button
                             onClick={() => setActiveSubTab('symb_plan_pipeline')}
                             style={{
@@ -384,6 +432,44 @@ export default function SymbTracker() {
                             Plan Pipeline
                         </button>
 
+                        {/* 2. Buffer Analysis */}
+                        {(isAdmin || showBufferData) && (
+                            <button
+                                onClick={() => setActiveSubTab('buffer_analysis')}
+                                style={{
+                                    padding: '0.75rem 1.5rem',
+                                    fontSize: '0.95rem',
+                                    fontWeight: 700,
+                                    border: 'none',
+                                    borderBottom: activeSubTab === 'buffer_analysis' ? '3px solid #f5ad42' : '3px solid transparent',
+                                    backgroundColor: activeSubTab === 'buffer_analysis' ? '#ffffff' : 'transparent',
+                                    color: activeSubTab === 'buffer_analysis' ? '#1e293b' : '#64748b',
+                                    cursor: 'pointer',
+                                    borderRadius: '8px 8px 0 0',
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem'
+                                }}
+                            >
+                                <Clock size={18} style={{ color: activeSubTab === 'buffer_analysis' ? '#f5ad42' : '#64748b' }} />
+                                <span>Buffer Analysis</span>
+                                {isAdmin && !showBufferData && (
+                                    <span style={{
+                                        fontSize: '0.65rem',
+                                        fontWeight: 800,
+                                        padding: '0.1rem 0.4rem',
+                                        borderRadius: '9999px',
+                                        backgroundColor: '#fee2e2',
+                                        color: '#991b1b'
+                                    }}>
+                                        Hidden
+                                    </span>
+                                )}
+                            </button>
+                        )}
+
+                        {/* 3. Tracker Update */}
                         <button
                             onClick={() => setActiveSubTab('tracker_update')}
                             style={{
@@ -406,6 +492,7 @@ export default function SymbTracker() {
                             Tracker Update
                         </button>
 
+                        {/* 4. Overall SYMB Plan */}
                         <button
                             onClick={() => setActiveSubTab('overall_plan')}
                             style={{
@@ -427,16 +514,75 @@ export default function SymbTracker() {
                             <Table size={18} style={{ color: activeSubTab === 'overall_plan' ? '#f5ad42' : '#64748b' }} />
                             Overall SYMB Plan
                         </button>
+
+                        {/* Admin Persistent Buffer Hide / Show Action Button */}
+                        {isAdmin && (
+                            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', paddingRight: '0.5rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={handleToggleBufferData}
+                                    disabled={isTogglingBuffer}
+                                    title={showBufferData ? "Buffer data is currently visible. Click to hide in Admin." : "Buffer data is hidden. Click to enable in Admin."}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.45rem',
+                                        padding: '0.4rem 0.85rem',
+                                        borderRadius: '8px',
+                                        fontSize: '0.8rem',
+                                        fontWeight: 700,
+                                        border: `1px solid ${showBufferData ? '#86efac' : '#fca5a5'}`,
+                                        backgroundColor: showBufferData ? '#ecfdf5' : '#fef2f2',
+                                        color: showBufferData ? '#166534' : '#991b1b',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease',
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                    }}
+                                >
+                                    {showBufferData ? <Eye size={15} color="#16a34a" /> : <EyeOff size={15} color="#dc2626" />}
+                                    <span>{showBufferData ? 'Buffer Data: Visible' : 'Buffer Data: Hidden'}</span>
+                                    <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.35rem', borderRadius: '4px', backgroundColor: showBufferData ? '#dcfce7' : '#fee2e2' }}>
+                                        Admin
+                                    </span>
+                                </button>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Sub-Tab 3: Overall SYMB Plan */}
-                    {activeSubTab === 'overall_plan' && (
-                        <SymbOverallPlanView />
+                    {/* Sub-Tab 1: Plan Pipeline */}
+                    {activeSubTab === 'symb_plan_pipeline' && (
+                        <SymbPipelineView showBufferData={showBufferData} />
                     )}
 
-                    {/* Sub-Tab 2: V1 Progress Charts */}
-                    {activeSubTab === 'symb_plan_pipeline' && (
-                        <SymbPipelineView />
+                    {/* Sub-Tab 2: Buffer Analysis */}
+                    {activeSubTab === 'buffer_analysis' && (isAdmin || showBufferData) && (
+                        <SymbBufferAnalysisView 
+                            showBufferData={showBufferData}
+                            onToggleBufferData={handleToggleBufferData}
+                            onNavigateToPipelineWeek={(weekStr) => {
+                                setActiveSubTab('symb_plan_pipeline');
+                                setTimeout(() => {
+                                    const el = document.getElementById(`week-card-${weekStr}`);
+                                    if (el) {
+                                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        el.style.boxShadow = '0 0 0 3px #f5ad42';
+                                        setTimeout(() => {
+                                            el.style.boxShadow = '';
+                                        }, 2500);
+                                    }
+                                }, 150);
+                            }}
+                        />
+                    )}
+
+                    {/* Sub-Tab 3: Tracker Update */}
+                    {activeSubTab === 'tracker_update' && (
+                        <SymbTrackerUpdate />
+                    )}
+
+                    {/* Sub-Tab 4: Overall SYMB Plan */}
+                    {activeSubTab === 'overall_plan' && (
+                        <SymbOverallPlanView />
                     )}
                 </>
             )}
@@ -565,11 +711,6 @@ export default function SymbTracker() {
                         </div>
                     </div>
                 </div>
-            )}
-
-            {/* Sub-Tab 4: Tracker Update */}
-            {activeSubTab === 'tracker_update' && (
-                <SymbTrackerUpdate />
             )}
 
             {/* Floating Scroll to Top Button */}

@@ -1565,6 +1565,7 @@ async def get_symb_plan_transformed():
 class CreateSymbRemarkPayload(BaseModel):
     shipment_week: str
     stage: str
+    variant: Optional[str] = "Variant 1"
     remark: str
     user_name: Optional[str] = None
 
@@ -1573,17 +1574,27 @@ class UpdateSymbRemarkPayload(BaseModel):
     user_name: Optional[str] = None
 
 @router.get("/symb-plan/remarks")
-async def get_symb_plan_remarks(shipment_week: Optional[str] = Query(None)):
+async def get_symb_plan_remarks(
+    shipment_week: Optional[str] = Query(None),
+    stage: Optional[str] = Query(None),
+    variant: Optional[str] = Query(None)
+):
     try:
         coll = get_collection("symb_plan_remarks")
         query = {}
         if shipment_week:
             query["shipment_week"] = shipment_week
+        if stage:
+            query["stage"] = stage
+        if variant:
+            query["variant"] = variant
         cursor = coll.find(query).sort("created_at", 1)
         remarks = []
         async for doc in cursor:
             doc["id"] = str(doc["_id"])
             del doc["_id"]
+            if "variant" not in doc or not doc["variant"]:
+                doc["variant"] = "Variant 1"
             remarks.append(doc)
         return clean_json_nan(remarks)
     except Exception as e:
@@ -1605,6 +1616,7 @@ async def create_symb_plan_remark(payload: CreateSymbRemarkPayload, authorizatio
         doc = {
             "shipment_week": payload.shipment_week.strip(),
             "stage": payload.stage.strip(),
+            "variant": (payload.variant or "Variant 1").strip(),
             "remark": payload.remark.strip(),
             "created_by": user_email,
             "created_at": now_str,
@@ -1772,6 +1784,44 @@ async def get_symb_tracker_data(week: Optional[int] = None):
     except Exception as e:
         print(f"Error fetching SYMB tracker data: {e}")
         return {"records": [], "flags": [], "count": 0}
+
+
+@router.get("/symb-tracker/settings")
+async def get_symb_tracker_settings():
+    """Retrieve settings for SYMB tracker (buffer data visibility)."""
+    try:
+        coll = get_collection("symb_tracker_settings")
+        doc = await coll.find_one({"type": "buffer_settings"})
+        show_buffer = doc.get("show_buffer_data", True) if doc else True
+        return {"show_buffer_data": bool(show_buffer)}
+    except Exception as e:
+        print(f"Error fetching SYMB tracker settings: {e}")
+        return {"show_buffer_data": True}
+
+
+@router.post("/symb-tracker/settings/toggle-buffer")
+async def toggle_symb_buffer_visibility(payload: dict = Body(default={})):
+    """Toggle or set buffer data visibility in SYMB tracker."""
+    try:
+        coll = get_collection("symb_tracker_settings")
+        doc = await coll.find_one({"type": "buffer_settings"})
+        current_val = doc.get("show_buffer_data", True) if doc else True
+
+        if "show_buffer_data" in payload and payload["show_buffer_data"] is not None:
+            new_val = bool(payload["show_buffer_data"])
+        else:
+            new_val = not current_val
+
+        await coll.update_one(
+            {"type": "buffer_settings"},
+            {"$set": {"type": "buffer_settings", "show_buffer_data": new_val}},
+            upsert=True
+        )
+        return {"show_buffer_data": new_val, "status": "success"}
+    except Exception as e:
+        print(f"Error toggling SYMB buffer visibility: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ====================================================================
 # PRESENTATION SLIDES ENDPOINTS
