@@ -1,0 +1,7336 @@
+{
+  "Region_mapping_table": {
+    "total_docs": 50,
+    "field_count": 4,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 50,
+        "null_count": 0,
+        "total_docs": 50,
+        "sample_vals": [
+          "698320ddcd8d493d4743862a",
+          "698320ddcd8d493d4743862b",
+          "698320ddcd8d493d4743862c"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 50,
+        "null_count": 0,
+        "total_docs": 50,
+        "sample_vals": [
+          "2026-02-04 16:05:09.628000",
+          "2026-02-04 16:05:09.628000",
+          "2026-02-04 16:05:09.628000"
+        ]
+      },
+      "opportunities_owner": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 50,
+        "null_count": 0,
+        "total_docs": 50,
+        "sample_vals": [
+          "Sneha Rajendran",
+          "Hariprasath Gopal",
+          "Karthikeyan M"
+        ]
+      },
+      "region": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 50,
+        "null_count": 0,
+        "total_docs": 50,
+        "sample_vals": [
+          "Europe",
+          "US East",
+          "US East"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      4,
+      4,
+      4
+    ]
+  },
+  "SYMB_Updated_progress_tracker": {
+    "total_docs": 18,
+    "field_count": 12,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 18,
+        "null_count": 0,
+        "total_docs": 18,
+        "sample_vals": [
+          "6a75a18365e80133c5527e0b",
+          "6a75a18965e80133c55281c3",
+          "6a75a26b5f45aed278f6b0b6"
+        ]
+      },
+      "acc_comp_date": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 18,
+        "null_count": 12,
+        "total_docs": 18,
+        "sample_vals": [
+          "2026-08-18T19:07:28.443765",
+          "2026-08-18T19:26:31.180970",
+          "2026-08-18T19:03:14.688497"
+        ]
+      },
+      "acc_work_qty": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": true,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 18,
+        "sample_vals": [
+          350
+        ]
+      },
+      "completed": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 18,
+        "null_count": 0,
+        "total_docs": 18,
+        "sample_vals": [
+          0,
+          4500,
+          50
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 8,
+        "null_count": 0,
+        "total_docs": 18,
+        "sample_vals": [
+          "2026-08-07T14:53:17.978801",
+          "2026-08-07T14:53:17.980215",
+          "2026-08-07T14:53:17.981475"
+        ]
+      },
+      "created_by": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 8,
+        "null_count": 0,
+        "total_docs": 18,
+        "sample_vals": [
+          "suhas@e-consystems.com",
+          "suhas@e-consystems.com",
+          "suhas@e-consystems.com"
+        ]
+      },
+      "edit_history": {
+        "bson_types": [
+          "dict"
+        ],
+        "py_types": [
+          "dict"
+        ],
+        "nullable": false,
+        "present_count": 18,
+        "null_count": 0,
+        "total_docs": 18,
+        "sample_vals": [
+          "dict(keys=['planned_qty', 'completed', 'plan_date'])",
+          "dict(keys=['planned_qty', 'completed', 'plan_date'])",
+          "dict(keys=['planned_qty', 'completed', 'plan_date'])"
+        ]
+      },
+      "event_type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 18,
+        "null_count": 0,
+        "total_docs": 18,
+        "sample_vals": [
+          "PCBA Ready",
+          "FQC",
+          "Active alignment"
+        ]
+      },
+      "input_qty": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 18,
+        "sample_vals": [
+          5000,
+          550,
+          1000
+        ]
+      },
+      "plan_date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 18,
+        "null_count": 0,
+        "total_docs": 18,
+        "sample_vals": [
+          "07-AUG-2026",
+          "07-AUG-2026",
+          "07-AUG-2026"
+        ]
+      },
+      "planned_qty": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 18,
+        "null_count": 0,
+        "total_docs": 18,
+        "sample_vals": [
+          5000,
+          4500,
+          500
+        ]
+      },
+      "variant": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 18,
+        "null_count": 0,
+        "total_docs": 18,
+        "sample_vals": [
+          "1",
+          "1",
+          "1"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      12,
+      10,
+      10
+    ]
+  },
+  "admin_sessions": {
+    "total_docs": 106,
+    "field_count": 10,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 106,
+        "null_count": 0,
+        "total_docs": 106,
+        "sample_vals": [
+          "69e61065897c961af69836b8",
+          "69e76fcc9b1cc13941977516",
+          "69f08e08ce558ffbf7635d31"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 106,
+        "null_count": 0,
+        "total_docs": 106,
+        "sample_vals": [
+          "2026-04-20 11:39:17.468000",
+          "2026-04-21 12:38:36.440000",
+          "2026-04-28 10:38:00.812000"
+        ]
+      },
+      "email": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 77,
+        "null_count": 0,
+        "total_docs": 106,
+        "sample_vals": [
+          "admin@e-consystems.com",
+          "admin@e-consystems.com",
+          "admin@e-consystems.com"
+        ]
+      },
+      "expires_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 106,
+        "null_count": 0,
+        "total_docs": 106,
+        "sample_vals": [
+          "2026-04-20 23:39:17.468000",
+          "2026-04-22 00:38:36.439000",
+          "2026-04-28 22:38:00.812000"
+        ]
+      },
+      "role": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 78,
+        "null_count": 0,
+        "total_docs": 106,
+        "sample_vals": [
+          "Admin",
+          "Admin",
+          "Admin"
+        ]
+      },
+      "sub_role": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 72,
+        "null_count": 0,
+        "total_docs": 106,
+        "sample_vals": [
+          "None",
+          "None",
+          "None"
+        ]
+      },
+      "symb_permissions": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": true,
+        "present_count": 77,
+        "null_count": 0,
+        "total_docs": 106,
+        "sample_vals": [
+          "list(len=1)",
+          "list(len=1)",
+          "list(len=1)"
+        ]
+      },
+      "token": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 106,
+        "null_count": 0,
+        "total_docs": 106,
+        "sample_vals": [
+          "h9Xx1lewcUR8SDTL-lFUgnOu0-54O5xXi967skvGnTQ",
+          "JRrXkxnsDwLdRMUv4ITwNV8vubXy5axVkY4guVh75Tk",
+          "vpynXILrDQMyFEhVI0GQqWDYV-tSouc8C8736l7JmXg"
+        ]
+      },
+      "tracker_access": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": true,
+        "present_count": 77,
+        "null_count": 0,
+        "total_docs": 106,
+        "sample_vals": [
+          "list(len=4)",
+          "list(len=4)",
+          "list(len=4)"
+        ]
+      },
+      "username": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 29,
+        "null_count": 0,
+        "total_docs": 106,
+        "sample_vals": [
+          "Admin",
+          "Admin",
+          "Admin"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      9,
+      9,
+      9
+    ]
+  },
+  "admin_users": {
+    "total_docs": 1,
+    "field_count": 5,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "69e60ffbf35fe97d9528ba0d"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "2026-04-20 11:37:31.820000"
+        ]
+      },
+      "password_hash": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "f26a5778d907fdfb40568ba0f667cca88e1a7ac3c0b2158eb1013b62f9b1..."
+        ]
+      },
+      "salt": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "a88c43471bcb5674618d00fcef70fe82"
+        ]
+      },
+      "username": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "Admin"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      5
+    ]
+  },
+  "ai_agent_config": {
+    "total_docs": 1,
+    "field_count": 8,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "global_config"
+        ]
+      },
+      "agent_name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "e-con BD Analyst"
+        ]
+      },
+      "api_key": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "AIzaSyB8l64kiM5opJR2ZgWQPuXTvm9bJ5_ZCms"
+        ]
+      },
+      "model_name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "gemini-3.6-flash"
+        ]
+      },
+      "system_prompt": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "You are the official e-con Systems Weekly Tracker AI Busines..."
+        ]
+      },
+      "updated_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "2026-09-01 11:05:42.699000"
+        ]
+      },
+      "updated_by": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "admin@e-consystems.com"
+        ]
+      },
+      "visibility_mode": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "admin_only"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      8
+    ]
+  },
+  "ai_chat_logs": {
+    "total_docs": 15,
+    "field_count": 20,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 15,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "6a96abd7f7d825d3e18abdd7",
+          "6a96abecf7d825d3e18abde0",
+          "6a96ac53f7d825d3e18abdf4"
+        ]
+      },
+      "ai_response": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 15,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "There are no key PO's Won greater than $50K recorded across ...",
+          "I am sorry, I cannot provide the total PO won till now for F...",
+          "There are no key PO's Won greater than $50K recorded across ..."
+        ]
+      },
+      "assistant_msg_id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 15,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "3a7f225d-6b80-432e-b6ab-321918148d94",
+          "ae178de3-049b-426f-a743-3008472fe72e",
+          "d34b01b4-c11e-4a17-a044-41aba4ea6d88"
+        ]
+      },
+      "feedback_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": true,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "2026-09-01 11:14:48.741000"
+        ]
+      },
+      "feedback_comment": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 1,
+        "null_count": 1,
+        "total_docs": 15,
+        "sample_vals": []
+      },
+      "feedback_rating": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 15,
+        "null_count": 14,
+        "total_docs": 15,
+        "sample_vals": [
+          "not_useful"
+        ]
+      },
+      "latency_formatted": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "22.19s",
+          "33.28s",
+          "3.90s"
+        ]
+      },
+      "latency_ms": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": true,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          22191,
+          33280,
+          3895
+        ]
+      },
+      "model_used": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "gemini-3.6-flash",
+          "gemini-3.6-flash",
+          "gemini-3.6-flash"
+        ]
+      },
+      "region": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 15,
+        "null_count": 11,
+        "total_docs": 15,
+        "sample_vals": [
+          "Overall",
+          "Overall",
+          "Overall"
+        ]
+      },
+      "session_id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 15,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "cdc6f683-aff7-4243-8843-9cae1741a915",
+          "cdc6f683-aff7-4243-8843-9cae1741a915",
+          "cdc6f683-aff7-4243-8843-9cae1741a915"
+        ]
+      },
+      "slide_id": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 15,
+        "null_count": 15,
+        "total_docs": 15,
+        "sample_vals": []
+      },
+      "timestamp": {
+        "bson_types": [
+          "datetime",
+          "string"
+        ],
+        "py_types": [
+          "datetime",
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 15,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "2026-09-01 10:41:27.708000",
+          "2026-09-01 10:41:48.982000",
+          "2026-09-01 10:43:31.414000"
+        ]
+      },
+      "tools_called": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": false,
+        "present_count": 15,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "list(len=1)",
+          "list(len=0)",
+          "list(len=1)"
+        ]
+      },
+      "tools_executed_details": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": true,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "list(len=3)",
+          "list(len=3)",
+          "list(len=0)"
+        ]
+      },
+      "user_email": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 15,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "admin@e-consystems.com",
+          "admin@e-consystems.com",
+          "admin@e-consystems.com"
+        ]
+      },
+      "user_msg_id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 15,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "d2e8d8c7-3743-49c5-9e29-c0966542fc35",
+          "b5416e51-494c-4427-834f-496a3d0f74a2",
+          "32f320f8-bb2c-4f79-96c1-a96c011f0cc1"
+        ]
+      },
+      "user_name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 15,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "admin",
+          "admin",
+          "admin"
+        ]
+      },
+      "user_prompt": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 15,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          "What are the key PO's Won (>50K) across all regions for week...",
+          "okay so what is the total PO won this till now in FY2027",
+          "What are the key PO's Won (>50K) across all regions for week..."
+        ]
+      },
+      "week": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 15,
+        "null_count": 0,
+        "total_docs": 15,
+        "sample_vals": [
+          36,
+          36,
+          36
+        ]
+      }
+    },
+    "top_doc_counts": [
+      16,
+      16,
+      15
+    ]
+  },
+  "ai_chat_sessions": {
+    "total_docs": 11,
+    "field_count": 8,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "6a96abd7dbbd60239b72baff",
+          "6a96ac8adbbd60239b72bb00",
+          "6a96ad6bdbbd60239b72bb01"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "datetime",
+          "string"
+        ],
+        "py_types": [
+          "datetime",
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "2026-09-01 10:41:22.871000",
+          "2026-09-01 10:44:22.937000",
+          "2026-09-01 10:45:16.758000"
+        ]
+      },
+      "messages": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "list(len=10)",
+          "list(len=2)",
+          "list(len=2)"
+        ]
+      },
+      "session_id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "cdc6f683-aff7-4243-8843-9cae1741a915",
+          "4efb75a6-6145-4782-b643-585df58c82ea",
+          "a28674bd-5382-4a98-8cb2-17b97047b588"
+        ]
+      },
+      "title": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "What are the key PO's Won (>50K) across all r...",
+          "what is the total overall order backlog",
+          "what is the total overall order backlog"
+        ]
+      },
+      "updated_at": {
+        "bson_types": [
+          "datetime",
+          "string"
+        ],
+        "py_types": [
+          "datetime",
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "2026-09-01 10:44:08.675000",
+          "2026-09-01 10:44:26.170000",
+          "2026-09-01 10:48:10.999000"
+        ]
+      },
+      "user_email": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "admin@e-consystems.com",
+          "admin@e-consystems.com",
+          "admin@e-consystems.com"
+        ]
+      },
+      "user_name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "admin",
+          "admin",
+          "admin"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      8,
+      8,
+      8
+    ]
+  },
+  "gross_margin_data": {
+    "total_docs": 3462,
+    "field_count": 19,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 3462,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          "69de401d41630301d793f9ff",
+          "69de401d41630301d793fa00",
+          "69de401d41630301d793fa01"
+        ]
+      },
+      "account_count": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": true,
+        "present_count": 158,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          53,
+          112,
+          23
+        ]
+      },
+      "account_name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 3278,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          "168 Robotics",
+          "AEOLUS ENGINEERING SOLUTIONS",
+          "AFP"
+        ]
+      },
+      "arrived_region": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 3459,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          "ASEAN",
+          "Asean",
+          "Europe"
+        ]
+      },
+      "category": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 3462,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          "overall_summary",
+          "overall_summary_region",
+          "overall_summary_region"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 3462,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          "2026-04-14 18:54:45.367000",
+          "2026-04-14 18:54:45.367000",
+          "2026-04-14 18:54:45.367000"
+        ]
+      },
+      "date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 3462,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          "14-04-2026",
+          "14-04-2026",
+          "14-04-2026"
+        ]
+      },
+      "gm_category": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 3436,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          ">60%",
+          "45 - 60%",
+          "25 - 45%"
+        ]
+      },
+      "gross_margin": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 3462,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          18952260.0,
+          915739.0,
+          2742.0
+        ]
+      },
+      "gross_margin_pct": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 3462,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          44.96,
+          50.67,
+          49.85
+        ]
+      },
+      "manufacturing_gross_margin": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": true,
+        "present_count": 26,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          16750511.0,
+          632740.0,
+          0.0
+        ]
+      },
+      "manufacturing_gross_margin_pct": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": true,
+        "present_count": 26,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          48.55,
+          55.55,
+          0.0
+        ]
+      },
+      "manufacturing_revenue": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": true,
+        "present_count": 26,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          34503124.0,
+          1139017.0,
+          0.0
+        ]
+      },
+      "revenue": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 3462,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          42149309.0,
+          1807423.0,
+          5500.0
+        ]
+      },
+      "services_gross_margin": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": true,
+        "present_count": 26,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          2201749.0,
+          282999.0,
+          2742.0
+        ]
+      },
+      "services_gross_margin_pct": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": true,
+        "present_count": 26,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          28.8,
+          42.34,
+          49.85
+        ]
+      },
+      "services_revenue": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": true,
+        "present_count": 26,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          7646185.0,
+          668406.0,
+          5500.0
+        ]
+      },
+      "type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 3462,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          "gross_margin",
+          "gross_margin",
+          "gross_margin"
+        ]
+      },
+      "upload_week": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 3462,
+        "null_count": 0,
+        "total_docs": 3462,
+        "sample_vals": [
+          16,
+          16,
+          16
+        ]
+      }
+    },
+    "top_doc_counts": [
+      16,
+      16,
+      16
+    ]
+  },
+  "invoice_data": {
+    "total_docs": 1813,
+    "field_count": 14,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "6a8d69fd07fadb80466f8ba7",
+          "6a8d69fd07fadb80466f8ba8",
+          "6a8d69fd07fadb80466f8ba9"
+        ]
+      },
+      "account_name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "SDSU",
+          "Technologies For Tomorrow, Inc.",
+          "garrettdemeyer17@gmail.com"
+        ]
+      },
+      "closing date Fy": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "FY2027",
+          "FY2027",
+          "FY2027"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "2026-08-25 15:40:05.535000",
+          "2026-08-25 15:40:05.536000",
+          "2026-08-25 15:40:05.536000"
+        ]
+      },
+      "econ_region": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "USA West",
+          "USA East-REC",
+          "USA East-REC"
+        ]
+      },
+      "fy": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "FY2027",
+          "FY2027",
+          "FY2027"
+        ]
+      },
+      "grand_total": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          234.0,
+          284.0,
+          204.0
+        ]
+      },
+      "invoice_date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "2026-08-24T00:00:00",
+          "2026-08-24T00:00:00",
+          "2026-08-24T00:00:00"
+        ]
+      },
+      "mRegion": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "USA West",
+          "USA East",
+          "USA East"
+        ]
+      },
+      "nRegion": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "USA West",
+          "USA East",
+          "USA East"
+        ]
+      },
+      "record_id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "38660000621994183",
+          "38660000621893026",
+          "38660000621823120"
+        ]
+      },
+      "upload_id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "9b59b8be-bb6b-4f88-86d9-ba40d30369e2",
+          "9b59b8be-bb6b-4f88-86d9-ba40d30369e2",
+          "9b59b8be-bb6b-4f88-86d9-ba40d30369e2"
+        ]
+      },
+      "week": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          35,
+          35,
+          35
+        ]
+      },
+      "week_label": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1813,
+        "null_count": 0,
+        "total_docs": 1813,
+        "sample_vals": [
+          "Week 35",
+          "Week 35",
+          "Week 35"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      14,
+      14,
+      14
+    ]
+  },
+  "orderbacklogs": {
+    "total_docs": 776,
+    "field_count": 8,
+    "fields": {
+      "Amount - unInvoiced": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 776,
+        "null_count": 0,
+        "total_docs": 776,
+        "sample_vals": [
+          3310763.21,
+          12106154.84,
+          1221330.4
+        ]
+      },
+      "OPP_Type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 767,
+        "null_count": 0,
+        "total_docs": 776,
+        "sample_vals": [
+          "Existing Business",
+          "Free Sample",
+          "New Business"
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 776,
+        "null_count": 0,
+        "total_docs": 776,
+        "sample_vals": [
+          "69e76fe09b1cc139419775a7",
+          "69e76fe09b1cc139419775a8",
+          "69e76fe09b1cc139419775a9"
+        ]
+      },
+      "closing date Fy": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 347,
+        "null_count": 0,
+        "total_docs": 776,
+        "sample_vals": [
+          "FY2026",
+          "FY2027",
+          "FY2026"
+        ]
+      },
+      "mRegion": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 776,
+        "null_count": 0,
+        "total_docs": 776,
+        "sample_vals": [
+          "Asean",
+          "Europe",
+          "Japan"
+        ]
+      },
+      "type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 776,
+        "null_count": 0,
+        "total_docs": 776,
+        "sample_vals": [
+          "weekly",
+          "weekly",
+          "weekly"
+        ]
+      },
+      "upload_date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 776,
+        "null_count": 0,
+        "total_docs": 776,
+        "sample_vals": [
+          "21-04-2026",
+          "21-04-2026",
+          "21-04-2026"
+        ]
+      },
+      "week": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 776,
+        "null_count": 0,
+        "total_docs": 776,
+        "sample_vals": [
+          17,
+          17,
+          17
+        ]
+      }
+    },
+    "top_doc_counts": [
+      8,
+      8,
+      8
+    ]
+  },
+  "revenue_tracker_settings": {
+    "total_docs": 2,
+    "field_count": 4,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          "6aacf1af605ae5ea41cc9dd7",
+          "6aacf1af605ae5ea41cc9ddc"
+        ]
+      },
+      "fy": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          "FY2027"
+        ]
+      },
+      "slides": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": false,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          "list(len=0)",
+          "list(len=0)"
+        ]
+      },
+      "type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          "hidden_slides",
+          "confetti_slides"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      4,
+      3
+    ]
+  },
+  "services_q1_snapshots": {
+    "total_docs": 979,
+    "field_count": 17,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          "69fc5ff43b8f0f9b61ef03f4",
+          "69fc5ff43b8f0f9b61ef03f5",
+          "69fc5ff43b8f0f9b61ef03f6"
+        ]
+      },
+      "calendar_week_number": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          14,
+          15,
+          16
+        ]
+      },
+      "category": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          "q1_snapshot",
+          "q1_snapshot",
+          "q1_snapshot"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          "2026-05-07 15:18:33.949000",
+          "2026-05-07 15:18:33.949000",
+          "2026-05-07 15:18:33.949000"
+        ]
+      },
+      "file_date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          "06-05-2026",
+          "06-05-2026",
+          "06-05-2026"
+        ]
+      },
+      "fiscal_week_number": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          0,
+          1,
+          2
+        ]
+      },
+      "fiscal_year": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          "FY2026",
+          "FY2026",
+          "FY2026"
+        ]
+      },
+      "opp_file_name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          "closed_won_opportunities_moneyball_06-05-2026.csv",
+          "closed_won_opportunities_moneyball_06-05-2026.csv",
+          "closed_won_opportunities_moneyball_06-05-2026.csv"
+        ]
+      },
+      "pipeline_amount": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          941735.0,
+          1206759.0,
+          1174989.0
+        ]
+      },
+      "region": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          "Overall",
+          "Overall",
+          "Overall"
+        ]
+      },
+      "scope": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          "Overall",
+          "Overall",
+          "Overall"
+        ]
+      },
+      "snapshot_date": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          "2025-04-02 00:00:00",
+          "2025-04-09 00:00:00",
+          "2025-04-16 00:00:00"
+        ]
+      },
+      "timeline_file_name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          "timeline_filtered_moneyball_FY2027_06-05-2026.csv",
+          "timeline_filtered_moneyball_FY2027_06-05-2026.csv",
+          "timeline_filtered_moneyball_FY2027_06-05-2026.csv"
+        ]
+      },
+      "total_amount": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          1676238.55,
+          1692238.55,
+          1729088.55
+        ]
+      },
+      "type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          "services_trend",
+          "services_trend",
+          "services_trend"
+        ]
+      },
+      "upload_week": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          19,
+          19,
+          19
+        ]
+      },
+      "week_number": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 979,
+        "null_count": 0,
+        "total_docs": 979,
+        "sample_vals": [
+          14,
+          15,
+          16
+        ]
+      }
+    },
+    "top_doc_counts": [
+      17,
+      17,
+      17
+    ]
+  },
+  "symb_erp_mech_agg": {
+    "total_docs": 86,
+    "field_count": 9,
+    "fields": {
+      "CDD Date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 86,
+        "null_count": 0,
+        "total_docs": 86,
+        "sample_vals": [
+          "2026-07-27 00:00:00",
+          "2026-07-27 00:00:00",
+          "2026-08-03 00:00:00"
+        ]
+      },
+      "CTB Covered QTY": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 86,
+        "null_count": 0,
+        "total_docs": 86,
+        "sample_vals": [
+          900.0,
+          450.0,
+          158.0
+        ]
+      },
+      "EBOM Covered QTY": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 86,
+        "null_count": 0,
+        "total_docs": 86,
+        "sample_vals": [
+          900,
+          450,
+          0
+        ]
+      },
+      "Materials Covered": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 86,
+        "null_count": 0,
+        "total_docs": 86,
+        "sample_vals": [
+          "Yes",
+          "Yes",
+          "No"
+        ]
+      },
+      "Ordered Qty": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 86,
+        "null_count": 0,
+        "total_docs": 86,
+        "sample_vals": [
+          900,
+          450,
+          900
+        ]
+      },
+      "Remaining CTB QTY": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 86,
+        "null_count": 0,
+        "total_docs": 86,
+        "sample_vals": [
+          0.0,
+          0.0,
+          742.0
+        ]
+      },
+      "Remaining EBOM QTY": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 86,
+        "null_count": 0,
+        "total_docs": 86,
+        "sample_vals": [
+          0,
+          0,
+          900
+        ]
+      },
+      "Varient": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 86,
+        "null_count": 0,
+        "total_docs": 86,
+        "sample_vals": [
+          "Varient 1",
+          "Varient 2",
+          "Varient 1"
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 86,
+        "null_count": 0,
+        "total_docs": 86,
+        "sample_vals": [
+          "6a9152abbaa689812a39ab4d",
+          "6a9152abbaa689812a39ab4e",
+          "6a9152abbaa689812a39ab4f"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      9,
+      9,
+      9
+    ]
+  },
+  "symb_erp_mech_agg_Variant": {
+    "total_docs": 2,
+    "field_count": 4,
+    "fields": {
+      "EBOM": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          50,
+          154
+        ]
+      },
+      "MBOM": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          25,
+          22
+        ]
+      },
+      "Variant": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          "Variant 1",
+          "Variant 2"
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          "6aad038f25d76cfcf06448a4",
+          "6aad038f25d76cfcf06448a5"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      4,
+      4
+    ]
+  },
+  "symb_erp_mech_agg_varient": {
+    "total_docs": 2,
+    "field_count": 4,
+    "fields": {
+      "EBOM": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          50,
+          154
+        ]
+      },
+      "MBOM": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          25,
+          22
+        ]
+      },
+      "Varient": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          "Varient 1",
+          "Varient 2"
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 2,
+        "sample_vals": [
+          "6aa8194eb8b69a467b51d5d4",
+          "6aa8194eb8b69a467b51d5d5"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      4,
+      4
+    ]
+  },
+  "symb_erp_mech_raw": {
+    "total_docs": 5,
+    "field_count": 23,
+    "fields": {
+      "C.PO On": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "2026-08-10 00:00:00",
+          "2026-08-10 00:00:00",
+          "2026-08-10 00:00:00"
+        ]
+      },
+      "CDD Date": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 5,
+        "null_count": 5,
+        "total_docs": 5,
+        "sample_vals": []
+      },
+      "CRD Date": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "2027-03-29 00:00:00",
+          "2027-03-29 00:00:00",
+          "2027-03-29 00:00:00"
+        ]
+      },
+      "CTB Date": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 5,
+        "null_count": 5,
+        "total_docs": 5,
+        "sample_vals": []
+      },
+      "CTB Status": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 5,
+        "null_count": 5,
+        "total_docs": 5,
+        "sample_vals": []
+      },
+      "CTB%": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "Customer Name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "Symbotic",
+          "Symbotic",
+          "Symbotic"
+        ]
+      },
+      "EBOM Date": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 5,
+        "null_count": 5,
+        "total_docs": 5,
+        "sample_vals": []
+      },
+      "EBOM Min Build Qty": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          101,
+          156,
+          54
+        ]
+      },
+      "EBOM%": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "0%",
+          "0%",
+          "0%"
+        ]
+      },
+      "MOA ID": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "MOAMP2627-2173",
+          "MOAMP2627-2175",
+          "MOAMP2627-2234"
+        ]
+      },
+      "MOA On": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "2026-08-11 00:00:00",
+          "2026-08-11 00:00:00",
+          "2026-08-27 00:00:00"
+        ]
+      },
+      "MOA-C.PO": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          1,
+          1,
+          17
+        ]
+      },
+      "Min Build Qty": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          50,
+          45,
+          45
+        ]
+      },
+      "Ordered Qty": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          62706,
+          31566,
+          31507
+        ]
+      },
+      "Product Code": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "NeduCAM25_CHLC_IP67_H08R3",
+          "NeduCAM25_CHLC_IP67_H13R3",
+          "NeduCAM25_CHLC_IP67_H15R3"
+        ]
+      },
+      "Product Status": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "Forecast",
+          "Forecast",
+          "Forecast"
+        ]
+      },
+      "Region": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "USA EAST-NE",
+          "USA EAST-NE",
+          "USA EAST-NE"
+        ]
+      },
+      "Remarks": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 5,
+        "null_count": 1,
+        "total_docs": 5,
+        "sample_vals": [
+          ".",
+          ".",
+          "/"
+        ]
+      },
+      "SO Number": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "Int64"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          38660000619880367,
+          38660000619880367,
+          38660000619880367
+        ]
+      },
+      "SO Owner Name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "Nishanth",
+          "Nishanth",
+          "Nishanth"
+        ]
+      },
+      "Stage": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "Order Ack",
+          "Order Ack",
+          "Order Ack"
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 5,
+        "sample_vals": [
+          "6a91540600685c894421f438",
+          "6a91540600685c894421f439",
+          "6a91540600685c894421f43a"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      19,
+      19,
+      19
+    ]
+  },
+  "symb_flag_mapping": {
+    "total_docs": 14,
+    "field_count": 6,
+    "fields": {
+      "Regular Stage": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 14,
+        "null_count": 0,
+        "total_docs": 14,
+        "sample_vals": [
+          "-None-",
+          "Order Ack",
+          "Ordering placed"
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 14,
+        "null_count": 0,
+        "total_docs": 14,
+        "sample_vals": [
+          "6a61e0e63255b63172d00b97",
+          "6a61e0e63255b63172d00b98",
+          "6a61e0e63255b63172d00b99"
+        ]
+      },
+      "blue": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 14,
+        "null_count": 13,
+        "total_docs": 14,
+        "sample_vals": [
+          "always"
+        ]
+      },
+      "green": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 14,
+        "null_count": 1,
+        "total_docs": 14,
+        "sample_vals": [
+          "diff_weeks > 20",
+          "diff_weeks > 18",
+          "diff_weeks > 16"
+        ]
+      },
+      "red": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 14,
+        "null_count": 1,
+        "total_docs": 14,
+        "sample_vals": [
+          "diff_weeks <= 20",
+          "diff_weeks < 16",
+          "diff_weeks < 14"
+        ]
+      },
+      "yellow": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 14,
+        "null_count": 8,
+        "total_docs": 14,
+        "sample_vals": [
+          "16 <= diff_weeks <= 18",
+          "14 <= diff_weeks <= 16",
+          "8 <= diff_weeks <= 9"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      5,
+      5,
+      5
+    ]
+  },
+  "symb_jabil_production": {
+    "total_docs": 280,
+    "field_count": 10,
+    "fields": {
+      "Account Name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 280,
+        "null_count": 0,
+        "total_docs": 280,
+        "sample_vals": [
+          "Symbotic",
+          "Symbotic",
+          "Symbotic"
+        ]
+      },
+      "List Price": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 280,
+        "null_count": 0,
+        "total_docs": 280,
+        "sample_vals": [
+          "96",
+          "96",
+          "96"
+        ]
+      },
+      "Product Code": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 280,
+        "null_count": 0,
+        "total_docs": 280,
+        "sample_vals": [
+          "NeduCAM25_CHLC_IP67_H08R3",
+          "NeduCAM25_CHLC_IP67_H14R4",
+          "NeduCAM25_CHLC_IP67_H10R4"
+        ]
+      },
+      "Quantity": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 280,
+        "null_count": 0,
+        "total_docs": 280,
+        "sample_vals": [
+          "450",
+          "225",
+          "225"
+        ]
+      },
+      "SO Number": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 280,
+        "null_count": 0,
+        "total_docs": 280,
+        "sample_vals": [
+          "38660000607675125",
+          "38660000607675125",
+          "38660000607675125"
+        ]
+      },
+      "Total": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 280,
+        "null_count": 0,
+        "total_docs": 280,
+        "sample_vals": [
+          "43200",
+          "21600",
+          "21600"
+        ]
+      },
+      "Unnamed: 6": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 280,
+        "null_count": 280,
+        "total_docs": 280,
+        "sample_vals": []
+      },
+      "Unnamed: 7": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 280,
+        "null_count": 280,
+        "total_docs": 280,
+        "sample_vals": []
+      },
+      "Unnamed: 8": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 280,
+        "null_count": 280,
+        "total_docs": 280,
+        "sample_vals": []
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 280,
+        "null_count": 0,
+        "total_docs": 280,
+        "sample_vals": [
+          "6a61cd9562488f4c1c03d570",
+          "6a61cd9562488f4c1c03d571",
+          "6a61cd9562488f4c1c03d572"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      7,
+      7,
+      7
+    ]
+  },
+  "symb_plan_raw": {
+    "total_docs": 518,
+    "field_count": 9,
+    "fields": {
+      "Event Type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 518,
+        "null_count": 0,
+        "total_docs": 518,
+        "sample_vals": [
+          "All Material Available",
+          "All Material Available",
+          "AA"
+        ]
+      },
+      "Last Batch Date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 518,
+        "null_count": 0,
+        "total_docs": 518,
+        "sample_vals": [
+          "06/01/2026",
+          "06/01/2026",
+          "06/15/2026"
+        ]
+      },
+      "Shipment Month": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 516,
+        "null_count": 0,
+        "total_docs": 518,
+        "sample_vals": [
+          "Jul 2026",
+          "Jul 2026",
+          "Jul 2026"
+        ]
+      },
+      "Shipment Week": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 518,
+        "null_count": 0,
+        "total_docs": 518,
+        "sample_vals": [
+          "07/20/2026",
+          "07/20/2026",
+          "07/20/2026"
+        ]
+      },
+      "Variant Type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 518,
+        "null_count": 0,
+        "total_docs": 518,
+        "sample_vals": [
+          "V1",
+          "V2",
+          "V1"
+        ]
+      },
+      "Week #": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": true,
+        "present_count": 516,
+        "null_count": 0,
+        "total_docs": 518,
+        "sample_vals": [
+          1,
+          1,
+          1
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 518,
+        "null_count": 0,
+        "total_docs": 518,
+        "sample_vals": [
+          "6a719c110f5929c16a458633",
+          "6a719c110f5929c16a458634",
+          "6a719c110f5929c16a458635"
+        ]
+      },
+      "completed": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 516,
+        "null_count": 516,
+        "total_docs": 518,
+        "sample_vals": []
+      },
+      "planned Value": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 518,
+        "null_count": 0,
+        "total_docs": 518,
+        "sample_vals": [
+          45,
+          20,
+          45
+        ]
+      }
+    },
+    "top_doc_counts": [
+      8,
+      8,
+      8
+    ]
+  },
+  "symb_plan_remarks": {
+    "total_docs": 11,
+    "field_count": 10,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "6aa8fec24577201fc1d21ddc",
+          "6aa8ffa14577201fc1d21df4",
+          "6aa9013a4577201fc1d22d1e"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "2026-09-15T13:46:02.368029",
+          "2026-09-15T13:49:45.665583",
+          "2026-09-15T13:56:34.184759"
+        ]
+      },
+      "created_by": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "admin@e-consystems.com",
+          "admin@e-consystems.com",
+          "admin@e-consystems.com"
+        ]
+      },
+      "edit_history": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "list(len=1)",
+          "list(len=0)",
+          "list(len=0)"
+        ]
+      },
+      "remark": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "hisjdfhsjdhsdjjhsdjhfhsdhisjdfhsjdhsdjjhsdjhfhsdhisjdfhsjdhs...",
+          "hi",
+          "thisngs are still need ded to be procured waiting on the new..."
+        ]
+      },
+      "shipment_week": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "2026-07-20",
+          "2026-08-10",
+          "2026-07-27"
+        ]
+      },
+      "stage": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "EBOM covered",
+          "EBOM covered",
+          "EBOM covered"
+        ]
+      },
+      "updated_at": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "2026-09-15T13:51:12.089806",
+          "2026-09-15T13:49:45.665583",
+          "2026-09-15T13:56:34.184759"
+        ]
+      },
+      "updated_by": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "admin@e-consystems.com",
+          "admin@e-consystems.com",
+          "admin@e-consystems.com"
+        ]
+      },
+      "variant": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "Variant 1",
+          "Variant 1",
+          "Variant 1"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      10,
+      10,
+      10
+    ]
+  },
+  "symb_plan_transformed": {
+    "total_docs": 946,
+    "field_count": 21,
+    "fields": {
+      "Actual Completed Date": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 946,
+        "null_count": 921,
+        "total_docs": 946,
+        "sample_vals": [
+          "06-AUG-2026",
+          "18-AUG-2026",
+          "18-AUG-2026"
+        ]
+      },
+      "Delayed by days": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          0.0,
+          0.0,
+          109.0
+        ]
+      },
+      "Delayed by weeks": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          0.0,
+          0.0,
+          16.0
+        ]
+      },
+      "Estimated Completion Date": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 946,
+        "null_count": 917,
+        "total_docs": 946,
+        "sample_vals": [
+          "07-AUG-2026",
+          "07-AUG-2026",
+          "16-AUG-2026"
+        ]
+      },
+      "Estimated Completion Date Created At": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 946,
+        "null_count": 917,
+        "total_docs": 946,
+        "sample_vals": [
+          "2026-08-18T19:20:16.566220",
+          "2026-08-07T14:48:03.744139",
+          "2026-08-18T18:46:02.487922"
+        ]
+      },
+      "Estimated Completion Date Given By": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 946,
+        "null_count": 917,
+        "total_docs": 946,
+        "sample_vals": [
+          "admin@e-consystems.com",
+          "admin@e-consystems.com",
+          "admin@e-consystems.com"
+        ]
+      },
+      "Estimated Completion Date History": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          "list(len=0)",
+          "list(len=0)",
+          "list(len=0)"
+        ]
+      },
+      "Event Type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          "EBOM covered",
+          "PCBA covered",
+          "All Material Available"
+        ]
+      },
+      "Last Batch Date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          "2026-05-21 00:00:00",
+          "2026-05-27 00:00:00",
+          "2026-06-01 00:00:00"
+        ]
+      },
+      "Material Covered": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          "Yes",
+          "Yes",
+          "No"
+        ]
+      },
+      "Shipment Month": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 946,
+        "null_count": 430,
+        "total_docs": 946,
+        "sample_vals": [
+          "Jul 2026",
+          "Jul 2026",
+          "Jul 2026"
+        ]
+      },
+      "Shipment Week": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          "2026-07-20 00:00:00",
+          "2026-07-20 00:00:00",
+          "2026-07-20 00:00:00"
+        ]
+      },
+      "Variant Type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          "Variant 1",
+          "Variant 1",
+          "Variant 1"
+        ]
+      },
+      "Week #": {
+        "bson_types": [
+          "double",
+          "null"
+        ],
+        "py_types": [
+          "NoneType",
+          "float"
+        ],
+        "nullable": true,
+        "present_count": 946,
+        "null_count": 430,
+        "total_docs": 946,
+        "sample_vals": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          "6aad038f25d76cfcf06444ee",
+          "6aad038f25d76cfcf06444ef",
+          "6aad038f25d76cfcf06444f0"
+        ]
+      },
+      "completed": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          45,
+          45,
+          25
+        ]
+      },
+      "is_autofilled": {
+        "bson_types": [
+          "bool"
+        ],
+        "py_types": [
+          "bool"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          false,
+          false,
+          false
+        ]
+      },
+      "original_planned_value": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          45,
+          45,
+          45
+        ]
+      },
+      "planned Value": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          45,
+          45,
+          45
+        ]
+      },
+      "unplanned_qty": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "warning_msg": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 946,
+        "null_count": 0,
+        "total_docs": 946,
+        "sample_vals": [
+          "",
+          "",
+          ""
+        ]
+      }
+    },
+    "top_doc_counts": [
+      21,
+      21,
+      21
+    ]
+  },
+  "symb_production_progress": {
+    "total_docs": 180,
+    "field_count": 10,
+    "fields": {
+      "Customer Name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 180,
+        "null_count": 0,
+        "total_docs": 180,
+        "sample_vals": [
+          "Hudl USA",
+          "Hudl USA",
+          "Symbotic V2"
+        ]
+      },
+      "Daily Production": {
+        "bson_types": [
+          "double",
+          "null"
+        ],
+        "py_types": [
+          "NoneType",
+          "float"
+        ],
+        "nullable": true,
+        "present_count": 180,
+        "null_count": 3,
+        "total_docs": 180,
+        "sample_vals": [
+          500.0,
+          500.0,
+          500.0
+        ]
+      },
+      "Data category": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 180,
+        "null_count": 0,
+        "total_docs": 180,
+        "sample_vals": [
+          "Active alignment",
+          "Active alignment",
+          "Active alignment"
+        ]
+      },
+      "Day": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 180,
+        "null_count": 0,
+        "total_docs": 180,
+        "sample_vals": [
+          "26-Jun-2026",
+          "27-Jun-2026",
+          "29-Jun-2026"
+        ]
+      },
+      "Product Name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 180,
+        "null_count": 0,
+        "total_docs": 180,
+        "sample_vals": [
+          "e-CAM123_CUMI676C_MOD_H02R2",
+          "e-CAM123_CUMI676C_MOD_H02R2",
+          "V2"
+        ]
+      },
+      "UPD (85% efficiency)": {
+        "bson_types": [
+          "double",
+          "null"
+        ],
+        "py_types": [
+          "NoneType",
+          "float"
+        ],
+        "nullable": true,
+        "present_count": 180,
+        "null_count": 31,
+        "total_docs": 180,
+        "sample_vals": [
+          500.0,
+          500.0,
+          500.0
+        ]
+      },
+      "Unnamed: 8": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 180,
+        "null_count": 180,
+        "total_docs": 180,
+        "sample_vals": []
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 180,
+        "null_count": 0,
+        "total_docs": 180,
+        "sample_vals": [
+          "6a61e97880bb2cd046d28352",
+          "6a61e97880bb2cd046d28353",
+          "6a61e97880bb2cd046d28354"
+        ]
+      },
+      "completed": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 180,
+        "null_count": 0,
+        "total_docs": 180,
+        "sample_vals": [
+          0,
+          0,
+          219
+        ]
+      },
+      "cumilative completed": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 180,
+        "null_count": 180,
+        "total_docs": 180,
+        "sample_vals": []
+      }
+    },
+    "top_doc_counts": [
+      8,
+      8,
+      8
+    ]
+  },
+  "symb_progress_summary_agg": {
+    "total_docs": 4,
+    "field_count": 4,
+    "fields": {
+      "Data category": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "Active alignment",
+          "FQC",
+          "PCBA Ready"
+        ]
+      },
+      "Variant": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "Variant 1",
+          "Variant 1",
+          "Variant 1"
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "6aad038f25d76cfcf06448a0",
+          "6aad038f25d76cfcf06448a1",
+          "6aad038f25d76cfcf06448a2"
+        ]
+      },
+      "completed": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          4350,
+          4500,
+          5000
+        ]
+      }
+    },
+    "top_doc_counts": [
+      4,
+      4,
+      4
+    ]
+  },
+  "symb_so_numbers": {
+    "total_docs": 113,
+    "field_count": 3,
+    "fields": {
+      "SO NUMBER": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 113,
+        "null_count": 0,
+        "total_docs": 113,
+        "sample_vals": [
+          "SO_38660000603116264",
+          "SO_38660000603116274",
+          "SO_38660000603116284"
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 113,
+        "null_count": 0,
+        "total_docs": 113,
+        "sample_vals": [
+          "6a746613a73e04c80f56d097",
+          "6a746613a73e04c80f56d098",
+          "6a746613a73e04c80f56d099"
+        ]
+      },
+      "who": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 113,
+        "null_count": 0,
+        "total_docs": 113,
+        "sample_vals": [
+          "Flex refurb",
+          "Flex refurb",
+          "Flex refurb"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      3,
+      3,
+      3
+    ]
+  },
+  "symb_stage_lead_times": {
+    "total_docs": 11,
+    "field_count": 5,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "6aa8e2a7d2df4165a311a4ca",
+          "6aa8e3f5d2df4165a311a4cb",
+          "6aa8e3f5d2df4165a311a4cc"
+        ]
+      },
+      "days": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          3,
+          2,
+          0
+        ]
+      },
+      "order": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          0,
+          1,
+          2
+        ]
+      },
+      "stage": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          "EBOM covered",
+          "PCBA covered",
+          "All Material Available"
+        ]
+      },
+      "weeks": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 11,
+        "null_count": 0,
+        "total_docs": 11,
+        "sample_vals": [
+          9,
+          8,
+          7
+        ]
+      }
+    },
+    "top_doc_counts": [
+      5,
+      5,
+      5
+    ]
+  },
+  "symb_tracker_data": {
+    "total_docs": 585,
+    "field_count": 48,
+    "fields": {
+      "Account Name (Opportunities Name)": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "Symbotic",
+          "Symbotic",
+          "Symbotic"
+        ]
+      },
+      "Amount": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          8373120.0,
+          8373120.0,
+          8373120.0
+        ]
+      },
+      "Billing Country": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "USA",
+          "USA",
+          "USA"
+        ]
+      },
+      "CDD FY": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "FY2027",
+          "FY2027",
+          "FY2027"
+        ]
+      },
+      "CRD FY": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "FY2027",
+          "FY2027",
+          "FY2027"
+        ]
+      },
+      "Closing Date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "May 7, 2026",
+          "May 7, 2026",
+          "May 7, 2026"
+        ]
+      },
+      "Committed Due date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "2026-07-27T00:00:00",
+          "2026-07-27T00:00:00",
+          "2026-07-27T00:00:00"
+        ]
+      },
+      "Customer Request date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "2026-08-03T00:00:00",
+          "2026-08-03T00:00:00",
+          "2026-08-03T00:00:00"
+        ]
+      },
+      "Due Date": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 585,
+        "null_count": 585,
+        "total_docs": 585,
+        "sample_vals": []
+      },
+      "Grand Total": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          10680.0,
+          10680.0,
+          10680.0
+        ]
+      },
+      "Invoiced Date": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 585,
+        "null_count": 580,
+        "total_docs": 585,
+        "sample_vals": [
+          "Jul 21, 2026",
+          "Jul 21, 2026",
+          "Jul 21, 2026"
+        ]
+      },
+      "List Price": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          89.0,
+          89.0,
+          89.0
+        ]
+      },
+      "NPI": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "38660000603116268",
+          "38660000603116268",
+          "38660000603116268"
+        ]
+      },
+      "NPI- Product Stage": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 585,
+        "null_count": 585,
+        "total_docs": 585,
+        "sample_vals": []
+      },
+      "OPP Category": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "Product-Existing-MassOrderOpp",
+          "Product-Existing-MassOrderOpp",
+          "Product-Existing-MassOrderOpp"
+        ]
+      },
+      "Previous Product Stage (ReadOnly)": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "Ready For Shipment",
+          "Ready For Shipment",
+          "Ready For Shipment"
+        ]
+      },
+      "Product Name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "PCBA-NeduCAM25_CHLC_IP67_H08R3",
+          "PCBA- NeduCAM25_CHLC_IP67_H10R4",
+          "PCBA-NeduCAM25_CHLC_IP67_H09R4"
+        ]
+      },
+      "Product Status": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "Regular",
+          "Regular",
+          "Regular"
+        ]
+      },
+      "Production Status(Production Team use only)": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "Green",
+          "Green",
+          "Green"
+        ]
+      },
+      "Purchase Order Date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "May 18, 2026",
+          "May 18, 2026",
+          "May 18, 2026"
+        ]
+      },
+      "Quantity": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          40.0,
+          20.0,
+          20.0
+        ]
+      },
+      "Reason for ProductionTeam Flag Status": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "Setting flag status as GREEN .RDD-Today difference in days 1...",
+          "Setting flag status as GREEN .RDD-Today difference in days 1...",
+          "Setting flag status as GREEN .RDD-Today difference in days 1..."
+        ]
+      },
+      "Record Id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "zcrm_38660000603116268",
+          "zcrm_38660000603116268",
+          "zcrm_38660000603116268"
+        ]
+      },
+      "Region (Reports) (Account Name)": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "USA EAST-NE",
+          "USA EAST-NE",
+          "USA EAST-NE"
+        ]
+      },
+      "Regular-Product Stage": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "Ready For Shipment",
+          "Ready For Shipment",
+          "Ready For Shipment"
+        ]
+      },
+      "SO NUMBER": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "SO_38660000603116274",
+          "SO_38660000603116274",
+          "SO_38660000603116274"
+        ]
+      },
+      "SO Number": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "SO_38660000603116274",
+          "SO_38660000603116274",
+          "SO_38660000603116274"
+        ]
+      },
+      "Shipped Date": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 585,
+        "null_count": 585,
+        "total_docs": 585,
+        "sample_vals": []
+      },
+      "Stage Completed (%)": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          85.0,
+          85.0,
+          85.0
+        ]
+      },
+      "Status": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "Invoiced",
+          "Invoiced",
+          "Invoiced"
+        ]
+      },
+      "Sub Total": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          10680.0,
+          10680.0,
+          10680.0
+        ]
+      },
+      "Subject": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "NeduCAM25_CHLC _IP67_H08R3 NeduCAM25_CHLC_IP67_H13R3 NeduCAM...",
+          "NeduCAM25_CHLC _IP67_H08R3 NeduCAM25_CHLC_IP67_H13R3 NeduCAM...",
+          "NeduCAM25_CHLC _IP67_H08R3 NeduCAM25_CHLC_IP67_H13R3 NeduCAM..."
+        ]
+      },
+      "Targeted shipment date": {
+        "bson_types": [
+          "null"
+        ],
+        "py_types": [
+          "NoneType"
+        ],
+        "nullable": true,
+        "present_count": 585,
+        "null_count": 585,
+        "total_docs": 585,
+        "sample_vals": []
+      },
+      "Total Invoiced": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          16020.0,
+          16020.0,
+          16020.0
+        ]
+      },
+      "Weighted Revenue": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          9078.0,
+          9078.0,
+          9078.0
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "6a61e0e63255b63172d0094e",
+          "6a61e0e63255b63172d0094f",
+          "6a61e0e63255b63172d00950"
+        ]
+      },
+      "_merge": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "both",
+          "both",
+          "both"
+        ]
+      },
+      "audited_time": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "2026-06-16T16:04:41+05:30",
+          "2026-06-16T16:04:41+05:30",
+          "2026-06-16T16:04:41+05:30"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "2026-07-23T15:07:42.851148",
+          "2026-07-23T15:07:42.851148",
+          "2026-07-23T15:07:42.851148"
+        ]
+      },
+      "econ-Region": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "USA EAST-NE",
+          "USA EAST-NE",
+          "USA EAST-NE"
+        ]
+      },
+      "file_date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "23-07-2026",
+          "23-07-2026",
+          "23-07-2026"
+        ]
+      },
+      "n-reg_stage": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "Ready For Shipment",
+          "Ready For Shipment",
+          "Ready For Shipment"
+        ]
+      },
+      "new_flag_algo": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "green",
+          "green",
+          "green"
+        ]
+      },
+      "record_id_norm": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "38660000603116268",
+          "38660000603116268",
+          "38660000603116268"
+        ]
+      },
+      "recovery stage": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "Active Alignment Done",
+          "Active Alignment Done",
+          "Active Alignment Done"
+        ]
+      },
+      "upload_week": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          30,
+          30,
+          30
+        ]
+      },
+      "week_diff": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          5.71,
+          5.71,
+          5.71
+        ]
+      },
+      "who": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 585,
+        "null_count": 0,
+        "total_docs": 585,
+        "sample_vals": [
+          "Flex refurb",
+          "Flex refurb",
+          "Flex refurb"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      44,
+      44,
+      44
+    ]
+  },
+  "symb_tracker_settings": {
+    "total_docs": 1,
+    "field_count": 3,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "6aabe688d2df4165a311a4d5"
+        ]
+      },
+      "show_buffer_data": {
+        "bson_types": [
+          "bool"
+        ],
+        "py_types": [
+          "bool"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          true
+        ]
+      },
+      "type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "buffer_settings"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      3
+    ]
+  },
+  "system_settings": {
+    "total_docs": 1,
+    "field_count": 8,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "data_update_lock"
+        ]
+      },
+      "end_time": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "16:59"
+        ]
+      },
+      "start_time": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "00:00"
+        ]
+      },
+      "unlocked_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "2026-09-18 13:00:16.750000"
+        ]
+      },
+      "unlocked_by": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "admin@e-consystems.com"
+        ]
+      },
+      "unlocked_until": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "2026-09-18 13:10:16.750000"
+        ]
+      },
+      "updated_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "2026-08-19 09:19:00.234000"
+        ]
+      },
+      "updated_by": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 1,
+        "sample_vals": [
+          "admin@e-consystems.com"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      8
+    ]
+  },
+  "target_metadata": {
+    "total_docs": 21,
+    "field_count": 3,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 21,
+        "null_count": 0,
+        "total_docs": 21,
+        "sample_vals": [
+          "695bb7235598b3aa9ef8b4b9",
+          "695bb7515598b3aa9ef8b4bd",
+          "695bb78a5598b3aa9ef8b4c2"
+        ]
+      },
+      "category": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 21,
+        "null_count": 0,
+        "total_docs": 21,
+        "sample_vals": [
+          "Category Type",
+          "Category Value",
+          "Category Value"
+        ]
+      },
+      "value": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 21,
+        "null_count": 0,
+        "total_docs": 21,
+        "sample_vals": [
+          "Overall - region",
+          "base target",
+          "Stretch Target"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      3,
+      3,
+      3
+    ]
+  },
+  "target_settings": {
+    "total_docs": 128,
+    "field_count": 8,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 128,
+        "null_count": 0,
+        "total_docs": 128,
+        "sample_vals": [
+          "6981ed805143bd48b5fced7a",
+          "6981ed9d5143bd48b5fced7d",
+          "6981edd25143bd48b5fced84"
+        ]
+      },
+      "category_type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 128,
+        "null_count": 0,
+        "total_docs": 128,
+        "sample_vals": [
+          "Overall - region",
+          "Overall - region",
+          "Overall - region"
+        ]
+      },
+      "category_value": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 128,
+        "null_count": 0,
+        "total_docs": 128,
+        "sample_vals": [
+          "base target",
+          "Stretch Target",
+          "base target"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 128,
+        "null_count": 0,
+        "total_docs": 128,
+        "sample_vals": [
+          "2026-02-03 18:13:44.130000",
+          "2026-02-03 18:14:13.396000",
+          "2026-02-03 18:15:06.444000"
+        ]
+      },
+      "financial_qtr": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 128,
+        "null_count": 0,
+        "total_docs": 128,
+        "sample_vals": [
+          "overall",
+          "overall",
+          "QP2"
+        ]
+      },
+      "financial_year": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 128,
+        "null_count": 0,
+        "total_docs": 128,
+        "sample_vals": [
+          "FY2027",
+          "FY2027",
+          "FY2027"
+        ]
+      },
+      "ppt_type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 128,
+        "null_count": 0,
+        "total_docs": 128,
+        "sample_vals": [
+          "Weekly Tracker",
+          "Weekly Tracker",
+          "Weekly Tracker"
+        ]
+      },
+      "target_value": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 128,
+        "null_count": 0,
+        "total_docs": 128,
+        "sample_vals": [
+          63800000.0,
+          73000000.0,
+          0.0
+        ]
+      }
+    },
+    "top_doc_counts": [
+      8,
+      8,
+      8
+    ]
+  },
+  "upload_logs": {
+    "total_docs": 32,
+    "field_count": 7,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 32,
+        "null_count": 0,
+        "total_docs": 32,
+        "sample_vals": [
+          "6983312ef761dd286d2efedd",
+          "69833142f761dd286d2eff05",
+          "698c8cdf35599254e999041b"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 32,
+        "null_count": 0,
+        "total_docs": 32,
+        "sample_vals": [
+          "2026-02-04 17:14:46.479000",
+          "2026-02-04 17:15:06.291000",
+          "2026-02-11 19:36:23.649000"
+        ]
+      },
+      "file_date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 32,
+        "null_count": 0,
+        "total_docs": 32,
+        "sample_vals": [
+          "30-01-2026",
+          "03-02-2026",
+          "11-02-2026"
+        ]
+      },
+      "file_name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 32,
+        "null_count": 0,
+        "total_docs": 32,
+        "sample_vals": [
+          "weekly-tracker_30-01-2026.csv",
+          "weekly-tracker_03-02-2026.csv",
+          "weekly-tracker_11-02-2026.csv"
+        ]
+      },
+      "records_count": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 32,
+        "sample_vals": [
+          516,
+          113,
+          5
+        ]
+      },
+      "type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 32,
+        "null_count": 0,
+        "total_docs": 32,
+        "sample_vals": [
+          "weekly",
+          "weekly",
+          "weekly"
+        ]
+      },
+      "week": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 32,
+        "null_count": 0,
+        "total_docs": 32,
+        "sample_vals": [
+          5,
+          6,
+          7
+        ]
+      }
+    },
+    "top_doc_counts": [
+      7,
+      7,
+      7
+    ]
+  },
+  "users": {
+    "total_docs": 4,
+    "field_count": 28,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "69c3ba57d543696ee71aece5",
+          "6a759d77211687bb42df08ce",
+          "6a75a513e2bb5e99275fcfb4"
+        ]
+      },
+      "approved_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "2026-08-07 09:28:10.411000",
+          "2026-08-07 11:25:49.899000"
+        ]
+      },
+      "approved_by": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "admin@e-consystems.com",
+          "admin@e-consystems.com"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "datetime",
+          "string"
+        ],
+        "py_types": [
+          "datetime",
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "2026-03-25T10:35:03.958819",
+          "2026-08-07 08:55:19.574000",
+          "2026-08-07 09:27:47.485000"
+        ]
+      },
+      "current_password": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "@Ec255kif5f",
+          "x9f8aNqsKWwi"
+        ]
+      },
+      "default_password": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "iyV0IChHlzNJ",
+          "x9f8aNqsKWwi"
+        ]
+      },
+      "department": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "Management",
+          "production-test",
+          "test"
+        ]
+      },
+      "email": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "admin@e-consystems.com",
+          "suhas@e-consystems.com",
+          "suhas-test_live@e-consystems.com"
+        ]
+      },
+      "has_pending_page_request": {
+        "bson_types": [
+          "bool"
+        ],
+        "py_types": [
+          "bool"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          false,
+          false
+        ]
+      },
+      "initial_password": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "iyV0IChHlzNJ",
+          "x9f8aNqsKWwi"
+        ]
+      },
+      "is_online": {
+        "bson_types": [
+          "bool"
+        ],
+        "py_types": [
+          "bool"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          true,
+          false,
+          false
+        ]
+      },
+      "last_active_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "2026-09-18 13:17:22.723000",
+          "2026-09-15 13:18:52.547000",
+          "2026-08-07 13:27:41.783000"
+        ]
+      },
+      "last_active_page": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "Admin Upload",
+          "Home",
+          "Home"
+        ]
+      },
+      "last_page_request_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": true,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "2026-08-07 10:24:20.897000"
+        ]
+      },
+      "password": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "$2b$12$jl0s7mWkhRv1nzeXzf95UuF0I9Pi1P/1fgliI4WTS1WTCgjLJUfN."
+        ]
+      },
+      "password_changed": {
+        "bson_types": [
+          "bool"
+        ],
+        "py_types": [
+          "bool"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          true,
+          false
+        ]
+      },
+      "password_changed_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": true,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "2026-08-07 09:33:40.814000"
+        ]
+      },
+      "password_hash": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "04283407545191265e5b321b77bc6d258e753adfed58461c42bac297f8ec...",
+          "c2469ff66aa1a17c2440df8cb65559813a31486664ad5541b9748df9521c...",
+          "e8a1bef654a7ef92ef3967e08b75f2e9f54ba275bececb7907736e263526..."
+        ]
+      },
+      "requested_pages": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "list(len=0)",
+          "list(len=0)"
+        ]
+      },
+      "role": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "admin",
+          "Admin",
+          "ERP"
+        ]
+      },
+      "salt": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "b917574bb597d6d1d1c8f2c8ed22656f",
+          "001e9dd073e9ad1abb94477f62bd960c",
+          "69b24f0d118a0f468985f4a67e8401de"
+        ]
+      },
+      "status": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "Active",
+          "Active",
+          "Active"
+        ]
+      },
+      "sub_role": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "None",
+          "None"
+        ]
+      },
+      "symb_permissions": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "list(len=1)",
+          "list(len=1)",
+          "list(len=0)"
+        ]
+      },
+      "tracker_access": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": true,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "list(len=4)",
+          "list(len=2)",
+          "list(len=1)"
+        ]
+      },
+      "updated_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "2026-09-01 07:32:04.415000",
+          "2026-08-07 11:26:42.773000"
+        ]
+      },
+      "updated_by": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "admin@e-consystems.com",
+          "admin@e-consystems.com"
+        ]
+      },
+      "username": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "admin"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      26,
+      24,
+      13
+    ]
+  },
+  "weekly_tracker_custom_slides": {
+    "total_docs": 0,
+    "field_count": 0,
+    "fields": {},
+    "top_doc_counts": []
+  },
+  "weekly_tracker_data": {
+    "total_docs": 1516,
+    "field_count": 12,
+    "fields": {
+      "Amount": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 1516,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          1428049.05,
+          4360200.0,
+          44650.0
+        ]
+      },
+      "OPP_Type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 1308,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          "Existing Business",
+          "Free Sample",
+          "Samples"
+        ]
+      },
+      "Weighted Amount": {
+        "bson_types": [
+          "double"
+        ],
+        "py_types": [
+          "float"
+        ],
+        "nullable": false,
+        "present_count": 1516,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          1428049.05,
+          4360200.0,
+          44650.0
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 1516,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          "6983312ef761dd286d2efede",
+          "6983312ef761dd286d2efedf",
+          "6983312ef761dd286d2efee0"
+        ]
+      },
+      "closing date Fy": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1516,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          "FY2027",
+          "FY2027",
+          "FY2027"
+        ]
+      },
+      "closing date QTR": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1516,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          "Q1",
+          "Q1",
+          "Q1"
+        ]
+      },
+      "granular_QTR": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1516,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          "Q1",
+          "Q1",
+          "Q1"
+        ]
+      },
+      "mRegion": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1516,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          "Asean",
+          "Europe",
+          "Japan"
+        ]
+      },
+      "projection - category": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1516,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          "Closed Won",
+          "Closed Won",
+          "Closed Won"
+        ]
+      },
+      "type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1516,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          "weekly",
+          "weekly",
+          "weekly"
+        ]
+      },
+      "upload_date": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1516,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          "30-01-2026",
+          "30-01-2026",
+          "30-01-2026"
+        ]
+      },
+      "week": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 1516,
+        "null_count": 0,
+        "total_docs": 1516,
+        "sample_vals": [
+          5,
+          5,
+          5
+        ]
+      }
+    },
+    "top_doc_counts": [
+      12,
+      12,
+      12
+    ]
+  },
+  "weekly_tracker_data_cache": {
+    "total_docs": 461,
+    "field_count": 4,
+    "fields": {
+      "Record Id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 461,
+        "null_count": 0,
+        "total_docs": 461,
+        "sample_vals": [
+          "38660000347853433",
+          "38660000392961263",
+          "38660000436221997"
+        ]
+      },
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 461,
+        "null_count": 0,
+        "total_docs": 461,
+        "sample_vals": [
+          "6981ecc85143bd48b5fcec3d",
+          "6981ecc85143bd48b5fcec3e",
+          "6981ecc85143bd48b5fcec3f"
+        ]
+      },
+      "audited_date": {
+        "bson_types": [
+          "datetime",
+          "null"
+        ],
+        "py_types": [
+          "NoneType",
+          "datetime"
+        ],
+        "nullable": true,
+        "present_count": 461,
+        "null_count": 312,
+        "total_docs": 461,
+        "sample_vals": [
+          "2026-01-20 00:00:00",
+          "2025-11-20 00:00:00",
+          "2026-01-20 00:00:00"
+        ]
+      },
+      "logged_date": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 461,
+        "null_count": 0,
+        "total_docs": 461,
+        "sample_vals": [
+          "2026-02-03 00:00:00",
+          "2026-02-03 00:00:00",
+          "2026-02-03 00:00:00"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      4,
+      4,
+      4
+    ]
+  },
+  "weekly_tracker_images": {
+    "total_docs": 112,
+    "field_count": 7,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 112,
+        "null_count": 0,
+        "total_docs": 112,
+        "sample_vals": [
+          "698b2f5b3641e2f3e1862bef",
+          "698b32993641e2f3e1862bf0",
+          "698b38213510e588473d5581"
+        ]
+      },
+      "content_type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 112,
+        "null_count": 0,
+        "total_docs": 112,
+        "sample_vals": [
+          "image/png",
+          "image/png",
+          "image/png"
+        ]
+      },
+      "filename": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 112,
+        "null_count": 0,
+        "total_docs": 112,
+        "sample_vals": [
+          "image (1).png",
+          "image (1).png",
+          "image (1).png"
+        ]
+      },
+      "image_data": {
+        "bson_types": [
+          "binData"
+        ],
+        "py_types": [
+          "bytes"
+        ],
+        "nullable": false,
+        "present_count": 112,
+        "null_count": 0,
+        "total_docs": 112,
+        "sample_vals": [
+          "binData(len=30180)",
+          "binData(len=30180)",
+          "binData(len=30180)"
+        ]
+      },
+      "slide_id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 112,
+        "null_count": 0,
+        "total_docs": 112,
+        "sample_vals": [
+          "slide_6_1",
+          "698b32769ef7397d88831cd5",
+          "698b3818a81dd4347356cedd"
+        ]
+      },
+      "uploaded_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 112,
+        "null_count": 0,
+        "total_docs": 112,
+        "sample_vals": [
+          "2026-02-10 18:45:07.721000",
+          "2026-02-10 18:58:57.131000",
+          "2026-02-10 19:22:33.265000"
+        ]
+      },
+      "week": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 112,
+        "null_count": 0,
+        "total_docs": 112,
+        "sample_vals": [
+          7,
+          7,
+          7
+        ]
+      }
+    },
+    "top_doc_counts": [
+      7,
+      7,
+      7
+    ]
+  },
+  "weekly_tracker_settings": {
+    "total_docs": 3,
+    "field_count": 4,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 3,
+        "sample_vals": [
+          "698b2e250cefac51642f9d83",
+          "69ccf61888df9fe4c3749028",
+          "6a97f274491aa55dcdf200ef"
+        ]
+      },
+      "fy": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 2,
+        "null_count": 0,
+        "total_docs": 3,
+        "sample_vals": [
+          "FY2027",
+          "FY2028"
+        ]
+      },
+      "slides": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": false,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 3,
+        "sample_vals": [
+          "list(len=0)",
+          "list(len=1)",
+          "list(len=9)"
+        ]
+      },
+      "type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 3,
+        "null_count": 0,
+        "total_docs": 3,
+        "sample_vals": [
+          "hidden_slides",
+          "confetti_slides",
+          "hidden_slides"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      4,
+      4,
+      3
+    ]
+  },
+  "weekly_tracker_slide_extras": {
+    "total_docs": 7,
+    "field_count": 5,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 7,
+        "null_count": 0,
+        "total_docs": 7,
+        "sample_vals": [
+          "69e8bf9e6793ee340ffa9cb7",
+          "69e8bfd36793ee340ffa9cb8",
+          "69f06f6f6793ee340ffa9cbc"
+        ]
+      },
+      "imageOverlays": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": false,
+        "present_count": 7,
+        "null_count": 0,
+        "total_docs": 7,
+        "sample_vals": [
+          "list(len=0)",
+          "list(len=0)",
+          "list(len=0)"
+        ]
+      },
+      "slide_id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 7,
+        "null_count": 0,
+        "total_docs": 7,
+        "sample_vals": [
+          "6",
+          "2",
+          "12.1"
+        ]
+      },
+      "textOverlays": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": false,
+        "present_count": 7,
+        "null_count": 0,
+        "total_docs": 7,
+        "sample_vals": [
+          "list(len=0)",
+          "list(len=0)",
+          "list(len=0)"
+        ]
+      },
+      "updated_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 7,
+        "null_count": 0,
+        "total_docs": 7,
+        "sample_vals": [
+          "2026-05-06 18:31:27.899000",
+          "2026-08-25 15:37:55.547000",
+          "2026-04-28 14:41:39.264000"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      5,
+      5,
+      5
+    ]
+  },
+  "weekly_tracker_slide_gifs": {
+    "total_docs": 4,
+    "field_count": 6,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "69cd20e0a3914efcefeefba1",
+          "69cd2129a3914efcefeefba2",
+          "69e76c156793ee340ffa9cb4"
+        ]
+      },
+      "enabled": {
+        "bson_types": [
+          "bool"
+        ],
+        "py_types": [
+          "bool"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          false,
+          false,
+          false
+        ]
+      },
+      "position": {
+        "bson_types": [
+          "dict"
+        ],
+        "py_types": [
+          "dict"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "dict(keys=['x', 'y', 'width'])",
+          "dict(keys=['x', 'y', 'width'])",
+          "dict(keys=['x', 'y', 'width'])"
+        ]
+      },
+      "slide_id": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "2",
+          "6",
+          "12.2.1"
+        ]
+      },
+      "updated_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "2026-04-14 19:09:10.415000",
+          "2026-04-29 13:21:58.114000",
+          "2026-04-21 17:52:49.736000"
+        ]
+      },
+      "url": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 4,
+        "null_count": 0,
+        "total_docs": 4,
+        "sample_vals": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGB...",
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGB...",
+          "https://share.google/LmEClpDJOaUUFkFoW"
+        ]
+      }
+    },
+    "top_doc_counts": [
+      6,
+      6,
+      6
+    ]
+  },
+  "weekly_tracker_user_input": {
+    "total_docs": 1144,
+    "field_count": 11,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 1144,
+        "null_count": 0,
+        "total_docs": 1144,
+        "sample_vals": [
+          "698b1b3ff0cd741dffd9f33f",
+          "698b1b41f0cd741dffd9f342",
+          "698b1b43f0cd741dffd9f345"
+        ]
+      },
+      "date_updated": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 1144,
+        "null_count": 0,
+        "total_docs": 1144,
+        "sample_vals": [
+          "2026-02-11 16:37:32.497000",
+          "2026-02-10 17:19:21.886000",
+          "2026-02-10 17:19:23.451000"
+        ]
+      },
+      "freeform_text": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1144,
+        "null_count": 0,
+        "total_docs": 1144,
+        "sample_vals": [
+          "hi",
+          "woask",
+          "jsskd"
+        ]
+      },
+      "fy": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 1144,
+        "sample_vals": [
+          "FY2027",
+          "FY2027",
+          "FY2027"
+        ]
+      },
+      "region": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 6,
+        "null_count": 5,
+        "total_docs": 1144,
+        "sample_vals": [
+          "US East"
+        ]
+      },
+      "row_index": {
+        "bson_types": [
+          "int",
+          "null"
+        ],
+        "py_types": [
+          "NoneType",
+          "int"
+        ],
+        "nullable": true,
+        "present_count": 1144,
+        "null_count": 213,
+        "total_docs": 1144,
+        "sample_vals": [
+          0,
+          0,
+          0
+        ]
+      },
+      "service_type": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 6,
+        "null_count": 0,
+        "total_docs": 1144,
+        "sample_vals": [
+          "Services",
+          "ALL",
+          "ALL"
+        ]
+      },
+      "slide_id": {
+        "bson_types": [
+          "null",
+          "string"
+        ],
+        "py_types": [
+          "NoneType",
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 1144,
+        "null_count": 19,
+        "total_docs": 1144,
+        "sample_vals": [
+          "us_west_acc_mgmt",
+          "us_west_acc_mgmt",
+          "us_west_acc_mgmt"
+        ]
+      },
+      "slide_no": {
+        "bson_types": [
+          "int",
+          "null"
+        ],
+        "py_types": [
+          "NoneType",
+          "int"
+        ],
+        "nullable": true,
+        "present_count": 1144,
+        "null_count": 1125,
+        "total_docs": 1144,
+        "sample_vals": [
+          24,
+          21,
+          5
+        ]
+      },
+      "table_name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 1144,
+        "null_count": 0,
+        "total_docs": 1144,
+        "sample_vals": [
+          "pos_won_50k",
+          "rfqs_received",
+          "proposals_given"
+        ]
+      },
+      "week_recorded": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 1144,
+        "null_count": 0,
+        "total_docs": 1144,
+        "sample_vals": [
+          7,
+          7,
+          7
+        ]
+      }
+    },
+    "top_doc_counts": [
+      9,
+      9,
+      9
+    ]
+  },
+  "whale_accounts": {
+    "total_docs": 19,
+    "field_count": 11,
+    "fields": {
+      "_id": {
+        "bson_types": [
+          "ObjectId"
+        ],
+        "py_types": [
+          "ObjectId"
+        ],
+        "nullable": false,
+        "present_count": 19,
+        "null_count": 0,
+        "total_docs": 19,
+        "sample_vals": [
+          "6a5df91e843a89dcff1d51a6",
+          "6a5df933843a89dcff1d51a7",
+          "6a5df9d3843a89dcff1d51a8"
+        ]
+      },
+      "account_name": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 19,
+        "null_count": 0,
+        "total_docs": 19,
+        "sample_vals": [
+          "cubic",
+          "cubic",
+          "cubic"
+        ]
+      },
+      "created_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 19,
+        "null_count": 0,
+        "total_docs": 19,
+        "sample_vals": [
+          "2026-07-20 10:31:58.482000",
+          "2026-07-20 10:32:19.617000",
+          "2026-07-20 10:34:59.847000"
+        ]
+      },
+      "date_updated": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": false,
+        "present_count": 19,
+        "null_count": 0,
+        "total_docs": 19,
+        "sample_vals": [
+          "20 Jul 2026",
+          "17 Jul 2026",
+          "13 Jul 2026"
+        ]
+      },
+      "fy": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 1,
+        "null_count": 0,
+        "total_docs": 19,
+        "sample_vals": [
+          "FY2027"
+        ]
+      },
+      "is_old_data": {
+        "bson_types": [
+          "bool"
+        ],
+        "py_types": [
+          "bool"
+        ],
+        "nullable": true,
+        "present_count": 5,
+        "null_count": 0,
+        "total_docs": 19,
+        "sample_vals": [
+          false,
+          false,
+          true
+        ]
+      },
+      "region": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 10,
+        "null_count": 0,
+        "total_docs": 19,
+        "sample_vals": [
+          "Europe",
+          "Europe",
+          "Europe"
+        ]
+      },
+      "text_data": {
+        "bson_types": [
+          "string"
+        ],
+        "py_types": [
+          "str"
+        ],
+        "nullable": true,
+        "present_count": 8,
+        "null_count": 0,
+        "total_docs": 19,
+        "sample_vals": [
+          "week2\n",
+          "week old\n",
+          "week1 \n"
+        ]
+      },
+      "updated_at": {
+        "bson_types": [
+          "datetime"
+        ],
+        "py_types": [
+          "datetime"
+        ],
+        "nullable": false,
+        "present_count": 19,
+        "null_count": 0,
+        "total_docs": 19,
+        "sample_vals": [
+          "2026-07-20 11:05:21.527000",
+          "2026-07-20 10:58:48.007000",
+          "2026-07-20 10:34:59.847000"
+        ]
+      },
+      "variants": {
+        "bson_types": [
+          "list"
+        ],
+        "py_types": [
+          "list"
+        ],
+        "nullable": true,
+        "present_count": 13,
+        "null_count": 0,
+        "total_docs": 19,
+        "sample_vals": [
+          "list(len=3)",
+          "list(len=1)",
+          "list(len=1)"
+        ]
+      },
+      "week_updated": {
+        "bson_types": [
+          "int"
+        ],
+        "py_types": [
+          "int"
+        ],
+        "nullable": false,
+        "present_count": 19,
+        "null_count": 0,
+        "total_docs": 19,
+        "sample_vals": [
+          30,
+          29,
+          30
+        ]
+      }
+    },
+    "top_doc_counts": [
+      10,
+      9,
+      9
+    ]
+  }
+}

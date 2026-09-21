@@ -1,32 +1,20 @@
-
 import { useEffect, useState } from 'react';
 import ParticleEarth from './ParticleEarth';
 
-// Interfaces
-interface PieChartData {
-    week: number;
-    target: number;
-    deficit: number;
-    po: number;
-    pipeline: number;
-    total: number;
-    achievement_pct: number;
+interface InvoicedData {
+    total_invoiced: number;
+    last_week_invoiced: number;
+    growth_amount: number;
+    growth_pct: number;
 }
 
-interface Slide2Data {
+interface RevenueSlide1Data {
     current_week: number;
     previous_week: number;
-    base_target: number;
-    stretch_target: number;
-    prev_week_base: PieChartData;
-    current_week_base: PieChartData;
-    current_week_stretch: PieChartData;
-    invoiced_data?: {
-        total_invoiced: number;
-        last_week_invoiced: number;
-        growth_amount: number;
-        growth_pct: number;
-    };
+    target: number;
+    current_po: number;
+    prev_po: number;
+    invoiced_data?: InvoicedData;
     error?: string;
 }
 
@@ -73,7 +61,8 @@ const InvoicedCard = ({
             justifyContent: 'center',
             alignItems: 'center',
             padding: '1.25rem 1rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            boxSizing: 'border-box'
         }}>
             <div style={{
                 fontFamily: 'Helvetica, Arial, sans-serif',
@@ -125,9 +114,21 @@ const InvoicedCard = ({
     );
 };
 
-const TargetCard = ({ title, value, color, borderColor, prevValue }: { title: string, value: number, color: string, borderColor: string, prevValue?: number }) => {
-    let showDiff = prevValue !== undefined && prevValue !== null;
-    let diff = showDiff ? value - (prevValue as number) : 0;
+const TargetCard = ({
+    title,
+    value,
+    color,
+    borderColor,
+    prevValue
+}: {
+    title: string;
+    value: number;
+    color: string;
+    borderColor: string;
+    prevValue?: number;
+}) => {
+    const showDiff = prevValue !== undefined && prevValue !== null;
+    const diff = showDiff ? value - (prevValue as number) : 0;
 
     const isGrowth = diff > 0;
     const isDip = diff < 0;
@@ -137,28 +138,29 @@ const TargetCard = ({ title, value, color, borderColor, prevValue }: { title: st
 
     return (
         <div style={{
-            backgroundColor: '#f3f4f6', // Light grey background
-            borderRadius: '12px',      // Slightly more rounded
+            backgroundColor: '#f3f4f6',
+            borderRadius: '12px',
             border: '1px solid #e5e7eb',
-            borderLeft: `12px solid ${borderColor}`, // Much Thicker Accent (User request: "thick enough colors")
+            borderLeft: `12px solid ${borderColor}`,
             width: '100%',
             height: '100%',
-            minHeight: '140px', // Added minHeight to increase height
+            minHeight: '140px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
-            padding: '1.75rem 1rem', // Increased vertical padding
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+            padding: '1.75rem 1rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            boxSizing: 'border-box'
         }}>
             <div style={{
                 fontFamily: 'Helvetica, Arial, sans-serif',
-                fontSize: '0.8rem', // Slightly smaller label
+                fontSize: '0.8rem',
                 fontWeight: '800',
                 color: color,
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
-                marginBottom: '0.25rem', // Tighter spacing
+                marginBottom: '0.25rem',
                 textAlign: 'center'
             }}>
                 {title}
@@ -171,7 +173,7 @@ const TargetCard = ({ title, value, color, borderColor, prevValue }: { title: st
             }}>
                 <div style={{
                     fontFamily: 'Helvetica, Arial, sans-serif',
-                    fontSize: '2.25rem', // Slightly smaller value (was 2.5rem)
+                    fontSize: '2.25rem',
                     fontWeight: '900',
                     color: color,
                     lineHeight: '1'
@@ -196,33 +198,93 @@ const TargetCard = ({ title, value, color, borderColor, prevValue }: { title: st
     );
 };
 
-export default function Slide2({ fy = "FY2027" }: { fy?: string }) {
-    const [data, setData] = useState<Slide2Data | null>(null);
+export default function RevenueSlide1({
+    fy = 'FY2027',
+}: {
+    fy?: string;
+    isEditing?: boolean;
+    onNextSlide?: () => void;
+    onPreviousSlide?: () => void;
+}) {
+    const [data, setData] = useState<RevenueSlide1Data | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchSlide2Data();
+        let isCancelled = false;
+
+        const fetchRevenueSlide1Data = async () => {
+            try {
+                setLoading(true);
+                const response = await fetch(`/api/admin/revenue/slides/slide1?fy=${fy}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const result = await response.json();
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+                if (!isCancelled) {
+                    setData(result);
+                    setError(null);
+                }
+            } catch (err) {
+                if (!isCancelled) {
+                    console.error('Failed to load Revenue slide 1 data:', err);
+                    setError(err instanceof Error ? err.message : 'Failed to load data');
+                }
+            } finally {
+                if (!isCancelled) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        fetchRevenueSlide1Data();
+
+        return () => {
+            isCancelled = true;
+        };
     }, [fy]);
 
-    const fetchSlide2Data = async () => {
-        try {
-            setLoading(true);
-            const response = await fetch(`/api/admin/slides/slide2?fy=${fy}`);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const result = await response.json();
-            if (result.error) throw new Error(result.error);
-            setData(result);
-        } catch (err) {
-            console.error(err);
-            setError(err instanceof Error ? err.message : 'Failed to load data');
-        } finally {
-            setLoading(false);
-        }
-    };
+    if (loading) {
+        return (
+            <div style={{
+                backgroundColor: '#ffffff',
+                width: '100%',
+                height: '100%',
+                minHeight: '400px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6b7280',
+                fontWeight: 'bold',
+                fontFamily: 'Helvetica, Arial, sans-serif'
+            }}>
+                <div className="animate-pulse">Loading Revenue Tracker Overview...</div>
+            </div>
+        );
+    }
 
-    if (loading) return <div className="flex items-center justify-center h-full text-gray-500 font-bold animate-pulse">Loading...</div>;
-    if (error || !data) return <div className="flex items-center justify-center h-full text-red-700 bg-red-100">Error: {error}</div>;
+    if (error || !data) {
+        return (
+            <div style={{
+                backgroundColor: '#fee2e2',
+                width: '100%',
+                height: '100%',
+                minHeight: '400px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#991b1b',
+                fontWeight: 'bold',
+                fontFamily: 'Helvetica, Arial, sans-serif',
+                padding: '2rem'
+            }}>
+                <div>Error loading Revenue Tracker slide 1: {error || 'No data found'}</div>
+            </div>
+        );
+    }
 
     return (
         <div style={{
@@ -238,7 +300,7 @@ export default function Slide2({ fy = "FY2027" }: { fy?: string }) {
             overflow: 'hidden',
             gap: '2.5rem'
         }}>
-            {/* Left Section: World Map */}
+            {/* Left Column: Dense Point Cloud Flat Continent Map with Global Connections */}
             <div style={{
                 flex: '0 0 40%',
                 minWidth: 0,
@@ -254,7 +316,7 @@ export default function Slide2({ fy = "FY2027" }: { fy?: string }) {
                 </div>
             </div>
 
-            {/* Right Section: Text + Cards */}
+            {/* Right Column: Title Stack & Key Metrics Cards */}
             <div style={{
                 flex: 1,
                 minWidth: 0,
@@ -282,7 +344,7 @@ export default function Slide2({ fy = "FY2027" }: { fy?: string }) {
                         margin: '0 0 0.75rem 0',
                         lineHeight: '1.1'
                     }}>
-                        Weekly Tracker
+                        Revenue Tracker
                     </h1>
                     <h2 style={{
                         fontFamily: 'Helvetica, Arial, sans-serif',
@@ -290,55 +352,38 @@ export default function Slide2({ fy = "FY2027" }: { fy?: string }) {
                         fontWeight: 'bold',
                         color: '#9ca3af',
                         margin: '0'
-                    }}>{fy} - week {data.current_week}
+                    }}>
+                        {fy} - week {data.current_week}
                     </h2>
                 </div>
 
-                {/* 2. Key Metrics Grid */}
+                {/* 2. Top Row: 2 Cards (TARGET and TOTAL PO) */}
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(2, 1fr)',
-                    gridTemplateRows: 'repeat(2, auto)',
                     gap: '1.25rem',
                     width: '100%',
                     boxSizing: 'border-box'
                 }}>
-                    {/* Top Left: Stretch Target */}
+                    {/* Card 1: TARGET (Notice: purely 'TARGET' - no mention of base target) */}
                     <TargetCard
-                        title="STRETCH TARGET"
-                        value={data.stretch_target}
-                        color="#9d45eb"
-                        borderColor="#b666f7"
+                        title="TARGET"
+                        value={data.target}
+                        color="#2563eb"
+                        borderColor="#3b82f6"
                     />
 
-                    {/* Top Right: Base Target */}
-                    <TargetCard
-                        title="BASE TARGET"
-                        value={data.base_target}
-                        color="#466cd3"
-                        borderColor="#668cf3"
-                    />
-
-                    {/* Bottom Left: Total PO */}
+                    {/* Card 2: TOTAL PO (CLOSED WON) */}
                     <TargetCard
                         title="TOTAL PO (CLOSED WON)"
-                        value={data.current_week_base?.po || 0}
-                        prevValue={data.prev_week_base?.po}
+                        value={data.current_po || 0}
+                        prevValue={data.prev_po}
                         color="#787878"
                         borderColor="#999999"
                     />
-
-                    {/* Bottom Right: Total Forecast */}
-                    <TargetCard
-                        title="TOTAL W.FORECAST (PIPELINE)"
-                        value={data.current_week_base?.pipeline || 0}
-                        prevValue={data.prev_week_base?.pipeline}
-                        color="#dead65ff"
-                        borderColor="#fbc14cff"
-                    />
                 </div>
 
-                {/* Invoiced Amount Card */}
+                {/* 3. Bottom Row: 1 Big Wide Invoiced Amount Card */}
                 <div style={{ marginTop: '1.25rem', width: '100%', boxSizing: 'border-box' }}>
                     <InvoicedCard
                         totalInvoiced={data.invoiced_data?.total_invoiced}

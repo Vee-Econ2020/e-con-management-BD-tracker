@@ -1717,7 +1717,7 @@ export default function SymbTrackerUpdate() {
 
 
             {/* Tracker Table Section */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', overflowX: 'auto' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <FileText size={20} color="#3b82f6" /> Tracker Records
@@ -1796,132 +1796,144 @@ export default function SymbTrackerUpdate() {
                 <MetricCardsStack title="Variant 1 Summary" metrics={v1Metrics} records={v1Records} allVariantRecords={allV1Records} selectedEventTab={selectedEventTab} />
                 <MetricCardsStack title="Variant 2 Summary" metrics={v2Metrics} records={v2Records} allVariantRecords={allV2Records} selectedEventTab={selectedEventTab} />
 
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                    <thead style={{ backgroundColor: '#f3f4f6' }}>
-                        <tr>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Variant</th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Event Type</th>
-                            <th 
-                                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} 
-                                style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#1e293b', fontWeight: '700', cursor: 'pointer', userSelect: 'none' }}
-                                title="Click to toggle Oldest vs Newest sorting"
-                            >
-                                Plan Date {sortOrder === 'asc' ? '↑ (Oldest)' : '↓ (Newest)'}
-                            </th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Input Qty</th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Planned Qty</th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Acc Work QTY</th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Completed</th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>First Pass Fail %</th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Remaining</th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Excess</th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Actual Comp. Date</th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600' }}>Created By</th>
-                            <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', textAlign: 'right' }}>Actions</th>
-                        </tr>
-                        {/* Column Filter Inputs */}
-                        <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                            <th style={{ padding: '0.4rem 0.75rem' }}>
-                                <input 
-                                    type="text" 
-                                    placeholder="Filter..." 
-                                    value={columnFilters.variant} 
-                                    onChange={e => setColumnFilters({...columnFilters, variant: e.target.value})} 
-                                    style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
-                                />
-                            </th>
-                            <th style={{ padding: '0.4rem 0.75rem' }}>
-                                <input 
-                                    type="text" 
-                                    placeholder="Filter..." 
-                                    value={columnFilters.event_type} 
-                                    onChange={e => setColumnFilters({...columnFilters, event_type: e.target.value})} 
-                                    style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
-                                />
-                            </th>
-                            <th style={{ padding: '0.4rem 0.75rem', minWidth: '170px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                                    <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.65rem', color: '#6b7280', width: '32px' }}>From:</span>
-                                        <input 
-                                            type="date" 
-                                            value={columnFilters.plan_date_from} 
-                                            onChange={e => setColumnFilters({...columnFilters, plan_date_from: e.target.value})} 
-                                            style={{ flex: 1, padding: '0.15rem 0.3rem', fontSize: '0.72rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
-                                        />
+                {/* Dedicated Scrollable Table Viewport with Frozen (Sticky) Header */}
+                <div style={{
+                    maxHeight: '70vh',
+                    minHeight: '420px',
+                    overflowY: 'auto',
+                    overflowX: 'auto',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    backgroundColor: '#ffffff',
+                    position: 'relative',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                        <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f3f4f6', boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }}>
+                            <tr>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>Variant</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>Event Type</th>
+                                <th 
+                                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} 
+                                    style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#1e293b', fontWeight: '700', cursor: 'pointer', userSelect: 'none', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}
+                                    title="Click to toggle Oldest vs Newest sorting"
+                                >
+                                    Plan Date {sortOrder === 'asc' ? '↑ (Oldest)' : '↓ (Newest)'}
+                                </th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>Input Qty</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>Planned Qty</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>Acc Work QTY</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>Completed</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>First Pass Fail %</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>Remaining</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>Excess</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>Actual Comp. Date</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>Created By</th>
+                                <th style={{ padding: '0.75rem', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontWeight: '600', textAlign: 'right', backgroundColor: '#f3f4f6', whiteSpace: 'nowrap' }}>Actions</th>
+                            </tr>
+                            {/* Column Filter Inputs */}
+                            <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                                <th style={{ padding: '0.4rem 0.75rem', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Filter..." 
+                                        value={columnFilters.variant} 
+                                        onChange={e => setColumnFilters({...columnFilters, variant: e.target.value})} 
+                                        style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
+                                    />
+                                </th>
+                                <th style={{ padding: '0.4rem 0.75rem', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Filter..." 
+                                        value={columnFilters.event_type} 
+                                        onChange={e => setColumnFilters({...columnFilters, event_type: e.target.value})} 
+                                        style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
+                                    />
+                                </th>
+                                <th style={{ padding: '0.4rem 0.75rem', minWidth: '170px', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                        <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '0.65rem', color: '#6b7280', width: '32px' }}>From:</span>
+                                            <input 
+                                                type="date" 
+                                                value={columnFilters.plan_date_from} 
+                                                onChange={e => setColumnFilters({...columnFilters, plan_date_from: e.target.value})} 
+                                                style={{ flex: 1, padding: '0.15rem 0.3rem', fontSize: '0.72rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
+                                            />
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '0.65rem', color: '#6b7280', width: '32px' }}>To:</span>
+                                            <input 
+                                                type="date" 
+                                                value={columnFilters.plan_date_to} 
+                                                onChange={e => setColumnFilters({...columnFilters, plan_date_to: e.target.value})} 
+                                                style={{ flex: 1, padding: '0.15rem 0.3rem', fontSize: '0.72rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
+                                            />
+                                        </div>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.65rem', color: '#6b7280', width: '32px' }}>To:</span>
-                                        <input 
-                                            type="date" 
-                                            value={columnFilters.plan_date_to} 
-                                            onChange={e => setColumnFilters({...columnFilters, plan_date_to: e.target.value})} 
-                                            style={{ flex: 1, padding: '0.15rem 0.3rem', fontSize: '0.72rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
-                                        />
-                                    </div>
-                                </div>
-                            </th>
-                            <th style={{ padding: '0.4rem 0.75rem' }}></th>
-                            <th style={{ padding: '0.4rem 0.75rem' }}>
-                                <input 
-                                    type="text" 
-                                    placeholder="Filter..." 
-                                    value={columnFilters.planned_qty} 
-                                    onChange={e => setColumnFilters({...columnFilters, planned_qty: e.target.value})} 
-                                    style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
-                                />
-                            </th>
-                            <th style={{ padding: '0.4rem 0.75rem' }}>
-                                <input 
-                                    type="text" 
-                                    placeholder="Filter..." 
-                                    value={columnFilters.acc_work_qty} 
-                                    onChange={e => setColumnFilters({...columnFilters, acc_work_qty: e.target.value})} 
-                                    style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
-                                />
-                            </th>
-                            <th style={{ padding: '0.4rem 0.75rem' }}>
-                                <input 
-                                    type="text" 
-                                    placeholder="Filter..." 
-                                    value={columnFilters.completed} 
-                                    onChange={e => setColumnFilters({...columnFilters, completed: e.target.value})} 
-                                    style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
-                                />
-                            </th>
-                            <th style={{ padding: '0.4rem 0.75rem' }}></th>
-                            <th style={{ padding: '0.4rem 0.75rem' }}></th>
-                            <th style={{ padding: '0.4rem 0.75rem' }}></th>
-                            <th style={{ padding: '0.4rem 0.75rem' }}>
-                                <input 
-                                    type="text" 
-                                    placeholder="Filter comp date..." 
-                                    value={columnFilters.acc_comp_date} 
-                                    onChange={e => setColumnFilters({...columnFilters, acc_comp_date: e.target.value})} 
-                                    style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
-                                />
-                            </th>
-                            <th style={{ padding: '0.4rem 0.75rem' }}>
-                                <input 
-                                    type="text" 
-                                    placeholder="Filter creator..." 
-                                    value={columnFilters.created_by} 
-                                    onChange={e => setColumnFilters({...columnFilters, created_by: e.target.value})} 
-                                    style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
-                                />
-                            </th>
-                            <th style={{ padding: '0.4rem 0.75rem', textAlign: 'right' }}>
-                                {(columnFilters.variant || columnFilters.event_type || columnFilters.plan_date_from || columnFilters.plan_date_to || columnFilters.planned_qty || columnFilters.acc_work_qty || columnFilters.completed || columnFilters.acc_comp_date || columnFilters.created_by) && (
-                                    <button 
-                                        onClick={() => setColumnFilters({ variant: '', event_type: '', plan_date_from: '', plan_date_to: '', planned_qty: '', acc_work_qty: '', completed: '', acc_comp_date: '', created_by: '' })}
-                                        style={{ fontSize: '0.72rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}
-                                    >
-                                        Clear
-                                    </button>
-                                )}
-                            </th>
-                        </tr>
-                    </thead>
+                                </th>
+                                <th style={{ padding: '0.4rem 0.75rem', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}></th>
+                                <th style={{ padding: '0.4rem 0.75rem', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Filter..." 
+                                        value={columnFilters.planned_qty} 
+                                        onChange={e => setColumnFilters({...columnFilters, planned_qty: e.target.value})} 
+                                        style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
+                                    />
+                                </th>
+                                <th style={{ padding: '0.4rem 0.75rem', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Filter..." 
+                                        value={columnFilters.acc_work_qty} 
+                                        onChange={e => setColumnFilters({...columnFilters, acc_work_qty: e.target.value})} 
+                                        style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
+                                    />
+                                </th>
+                                <th style={{ padding: '0.4rem 0.75rem', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Filter..." 
+                                        value={columnFilters.completed} 
+                                        onChange={e => setColumnFilters({...columnFilters, completed: e.target.value})} 
+                                        style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
+                                    />
+                                </th>
+                                <th style={{ padding: '0.4rem 0.75rem', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}></th>
+                                <th style={{ padding: '0.4rem 0.75rem', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}></th>
+                                <th style={{ padding: '0.4rem 0.75rem', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}></th>
+                                <th style={{ padding: '0.4rem 0.75rem', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Filter comp date..." 
+                                        value={columnFilters.acc_comp_date} 
+                                        onChange={e => setColumnFilters({...columnFilters, acc_comp_date: e.target.value})} 
+                                        style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
+                                    />
+                                </th>
+                                <th style={{ padding: '0.4rem 0.75rem', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Filter creator..." 
+                                        value={columnFilters.created_by} 
+                                        onChange={e => setColumnFilters({...columnFilters, created_by: e.target.value})} 
+                                        style={{ width: '100%', padding: '0.25rem 0.4rem', fontSize: '0.78rem', borderRadius: '4px', border: '1px solid #d1d5db' }} 
+                                    />
+                                </th>
+                                <th style={{ padding: '0.4rem 0.75rem', textAlign: 'right', backgroundColor: '#f9fafb', whiteSpace: 'nowrap' }}>
+                                    {(columnFilters.variant || columnFilters.event_type || columnFilters.plan_date_from || columnFilters.plan_date_to || columnFilters.planned_qty || columnFilters.acc_work_qty || columnFilters.completed || columnFilters.acc_comp_date || columnFilters.created_by) && (
+                                        <button 
+                                            onClick={() => setColumnFilters({ variant: '', event_type: '', plan_date_from: '', plan_date_to: '', planned_qty: '', acc_work_qty: '', completed: '', acc_comp_date: '', created_by: '' })}
+                                            style={{ fontSize: '0.72rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </th>
+                            </tr>
+                        </thead>
                     <tbody>
                         {filteredRecords.map((rec: TrackerRecord) => {
                             const isEditing = editingId === rec._id;
@@ -2247,6 +2259,7 @@ export default function SymbTrackerUpdate() {
                         )}
                     </tbody>
                 </table>
+                </div>
             </div>
 
             {/* Admin Verification Modal for Delete Confirmation */}

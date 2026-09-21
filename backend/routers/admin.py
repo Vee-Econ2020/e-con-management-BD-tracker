@@ -3709,3 +3709,194 @@ async def update_symb_updated_tracker(id: str, payload: SymbTrackerUpdateRow, au
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# REVENUE TRACKER SLIDES & SETTINGS
+# ============================================================================
+
+@router.get("/revenue/slides/slide1")
+async def get_revenue_slide1_data(fy: str = "FY2027"):
+    """
+    Get computed data for Revenue Tracker Slide 1:
+    - target: Target from target_settings (PPT type 'Revenue Tracker', category 'overall-mfg', QTR 'overall', FY)
+    - current_po: Current week Total PO Closed Won
+    - prev_po: Previous week Total PO Closed Won
+    - invoiced_data: Total Invoiced, last week invoiced, WoW growth amount & pct
+    - current_week & previous_week
+    """
+    try:
+        coll_targets = get_collection("target_settings")
+        # 1. Target
+        target_doc = await coll_targets.find_one({
+            "ppt_type": {"$regex": "^revenue tracker$", "$options": "i"},
+            "financial_year": fy,
+            "financial_qtr": {"$regex": "^overall$", "$options": "i"},
+            "category_type": {"$regex": "^overall-mfg$", "$options": "i"},
+            "category_value": {"$regex": "^base target$", "$options": "i"}
+        })
+        if not target_doc:
+            target_doc = await coll_targets.find_one({
+                "ppt_type": {"$regex": "^revenue tracker$", "$options": "i"},
+                "financial_year": fy,
+                "financial_qtr": {"$regex": "^overall$", "$options": "i"},
+                "category_type": {"$regex": "^overall-mfg$", "$options": "i"}
+            })
+
+        target_value = float(target_doc.get("target_value", 0.0)) if target_doc else 0.0
+
+        # 2. Slide 2 data for PO and Invoiced metrics
+        slide2 = await compute_slide2_data(db, fy=fy)
+        if not slide2 or "error" in slide2:
+            return {
+                "current_week": 36,
+                "previous_week": 35,
+                "target": target_value,
+                "current_po": 0.0,
+                "prev_po": 0.0,
+                "invoiced_data": {
+                    "total_invoiced": 0.0,
+                    "last_week_invoiced": 0.0,
+                    "growth_amount": 0.0,
+                    "growth_pct": 0.0
+                }
+            }
+
+        curr_week = int(slide2.get("current_week", 36))
+        prev_week = int(slide2.get("previous_week", curr_week - 1))
+        curr_po = float(slide2.get("current_week_base", {}).get("po", 0.0))
+        prev_po = float(slide2.get("prev_week_base", {}).get("po", 0.0))
+        
+        inv_raw = slide2.get("invoiced_data", {})
+        invoiced_data = {
+            "total_invoiced": float(inv_raw.get("total_invoiced", 0.0)),
+            "last_week_invoiced": float(inv_raw.get("last_week_invoiced", 0.0)),
+            "growth_amount": float(inv_raw.get("growth_amount", 0.0)),
+            "growth_pct": float(inv_raw.get("growth_pct", 0.0))
+        }
+
+        return {
+            "current_week": curr_week,
+            "previous_week": prev_week,
+            "target": target_value,
+            "current_po": curr_po,
+            "prev_po": prev_po,
+            "invoiced_data": invoiced_data
+        }
+    except Exception as e:
+        print(f"Error computing revenue slide 1 data: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to compute revenue slide 1 data: {str(e)}")
+
+
+@router.get("/revenue/hidden-slides")
+async def get_revenue_hidden_slides(fy: Optional[str] = Query(None)):
+    try:
+        coll = get_collection("revenue_tracker_settings")
+        doc = None
+        if fy:
+            doc = await coll.find_one({"type": "hidden_slides", "fy": fy})
+            if not doc and fy == "FY2027":
+                doc = await coll.find_one({"type": "hidden_slides", "fy": {"$exists": False}})
+        else:
+            doc = await coll.find_one({"type": "hidden_slides"})
+        return {"hidden_slides": doc.get("slides", []) if doc else []}
+    except Exception as e:
+        print(f"Error fetching revenue hidden slides: {e}")
+        return {"hidden_slides": []}
+
+
+@router.post("/revenue/hidden-slides/toggle")
+async def toggle_revenue_hidden_slide(payload: dict = Body(...)):
+    slide_id = payload.get("slide_id")
+    if slide_id is None:
+        raise HTTPException(status_code=400, detail="Missing slide_id")
+    fy = payload.get("fy", "FY2027")
+    s_id_str = str(slide_id)
+    try:
+        coll = get_collection("revenue_tracker_settings")
+        doc = await coll.find_one({"type": "hidden_slides", "fy": fy})
+        if not doc and fy == "FY2027":
+            doc = await coll.find_one({"type": "hidden_slides", "fy": {"$exists": False}})
+        if not doc:
+            await coll.insert_one({"type": "hidden_slides", "fy": fy, "slides": [s_id_str]})
+            return {"current_hidden": [s_id_str], "status": "hidden"}
+        else:
+            current_slides = set(doc.get("slides", []))
+            if s_id_str in current_slides:
+                current_slides.remove(s_id_str)
+                status = "visible"
+            else:
+                current_slides.add(s_id_str)
+                status = "hidden"
+            await coll.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"type": "hidden_slides", "fy": fy, "slides": list(current_slides)}},
+                upsert=True
+            )
+            return {"current_hidden": list(current_slides), "status": status}
+    except Exception as e:
+        print(f"Error toggling revenue hidden slide: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/revenue/hidden-slides/set")
+async def set_revenue_hidden_slides(payload: dict = Body(...)):
+    slides = payload.get("slides")
+    if not isinstance(slides, list):
+        raise HTTPException(status_code=400, detail="Missing or invalid slides list")
+    fy = payload.get("fy", "FY2027")
+    s_ids = [str(s) for s in slides]
+    try:
+        coll = get_collection("revenue_tracker_settings")
+        await coll.update_one(
+            {"type": "hidden_slides", "fy": fy},
+            {"$set": {"slides": s_ids}},
+            upsert=True
+        )
+        return {"current_hidden": s_ids, "status": "success"}
+    except Exception as e:
+        print(f"Error setting revenue hidden slides: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/revenue/confetti-slides")
+async def get_revenue_confetti_slides():
+    try:
+        coll = get_collection("revenue_tracker_settings")
+        doc = await coll.find_one({"type": "confetti_slides"})
+        return {"confetti_slides": doc.get("slides", []) if doc else []}
+    except Exception as e:
+        print(f"Error fetching revenue confetti slides: {e}")
+        return {"confetti_slides": []}
+
+
+@router.post("/revenue/confetti-slides/toggle")
+async def toggle_revenue_confetti_slide(payload: dict = Body(...)):
+    slide_id = payload.get("slide_id")
+    if slide_id is None:
+        raise HTTPException(status_code=400, detail="Missing slide_id")
+    s_id_str = str(slide_id)
+    try:
+        coll = get_collection("revenue_tracker_settings")
+        doc = await coll.find_one({"type": "confetti_slides"})
+        if not doc:
+            await coll.insert_one({"type": "confetti_slides", "slides": [s_id_str]})
+            return {"current_confetti": [s_id_str], "status": "enabled"}
+        else:
+            current_slides = set(doc.get("slides", []))
+            if s_id_str in current_slides:
+                current_slides.remove(s_id_str)
+                status = "disabled"
+            else:
+                current_slides.add(s_id_str)
+                status = "enabled"
+            await coll.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"type": "confetti_slides", "slides": list(current_slides)}},
+                upsert=True
+            )
+            return {"current_confetti": list(current_slides), "status": status}
+    except Exception as e:
+        print(f"Error toggling revenue confetti slide: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
