@@ -147,10 +147,129 @@ If requested week has 0 records, query tools automatically fall back to latest w
 - `frontend/src/services/` — API client and data fetching logic
 - `.env` — Runtime config (MONGODB_URI, DATABASE_NAME, API keys—not in git)
 
-## Token Optimization Notes
+## Folder Structure (Skip Patterns for Token Savings)
 
-- **Skip reading node_modules/**: Use Glob patterns excluding `node_modules/` when searching.
-- **Skip reading mongodb export folder**: Use for reference only; actual data is in live MongoDB.
-- **Read only relevant routers/services**: Target specific domain (e.g., `routers/slides.py` for slide logic).
-- **Use GEMINI.md for AI/Gemini work**: Don't re-derive invariants; they're documented there.
-- **Always use `py` for Python execution**: Reduces token usage by avoiding shell aliasing.
+### NEVER Read These
+- `frontend/node_modules/` — Thousands of files; use Glob to find specific packages by name only
+- `mongodb export/` — Static reference data; actual live data is in MongoDB
+- `frontend/.git/`, `backend/__pycache__/` — Generated files
+- `test-results/`, `exports/` — Temporary output folders
+- Screenshots, `.env` files — Not relevant to code logic
+
+### Read Only These When Relevant
+| Folder | Size | Purpose | Skip unless... |
+|--------|------|---------|---|
+| `frontend/src/components/` | 10 files | React UI components (charts, admin, 3D) | Working on UI/components |
+| `frontend/src/pages/` | 9 files | Page-level components (dashboard, settings) | Modifying page structure |
+| `backend/routers/` | 5 files | FastAPI endpoints (admin, auth, AI, export) | Adding/fixing API routes |
+| `backend/services/` | Empty | Business logic (reserved for future) | Not relevant now |
+| `agents/` | Config files | Agent definitions | Working with AI agents |
+| Root `*.py` | Main + utilities | Data transforms, exports | Data pipeline work |
+
+### Frontend Components (~10 files)
+- Main app wrapper, dashboard container, settings panels
+- Chart components (Cumulative, Target, Performance)
+- 3D visualizations (Confetti, React Three Fiber)
+- Admin UI (AiAgentConfig, AccessControl, SlideManager)
+- Target settings and configuration modals
+
+### Backend Routers (~5 files, ~300KB total)
+- `admin.py` (160KB) — Slide CRUD, custom slides, settings, user management
+- `ai_agent.py` (85KB) — Gemini integration, tool execution, conversation history
+- `access_management.py` (15KB) — Permission checks, role-based access
+- `auth.py` (12KB) — Login, session management
+- `export.py` (5KB) — Data exports
+
+### Root Python Scripts (~12 files)
+- Data transformation: `transformation.py`, `transformation_with_progress.py`, `SYMB_transformation.py`
+- Admin utilities: `update_admin.py`, `slides_compute.py`
+- Export/processing: `export_worker.py`, `append_slides.py`, `append_routes.py`
+- Validation: `check_services_targets.py`, `qp3_check.py`, `test_po_won.py`
+- Infrastructure: `context.py`, `progress_tracker.py`
+
+## Token Optimization Strategy
+
+**CRITICAL: Read CLAUDE.md first, then target ONE file or folder, not the entire codebase.**
+
+### How Claude Should Work
+1. ✅ Read CLAUDE.md (this file)
+2. ✅ Read GEMINI.md if working with AI/Gemini features
+3. ✅ Use Glob to find specific files by name (e.g., `py transformation.py`)
+4. ✅ Read 1–2 specific files (e.g., `admin.py` for slide logic)
+5. ❌ DON'T: Glob `**/*.py` or `**/*.tsx` — too many matches
+6. ❌ DON'T: Read entire `backend/`, `frontend/src/` folders
+7. ❌ DON'T: Re-derive schema info from Pydantic models — use section below
+
+### Database Schema Reference (Don't Read Models)
+
+**weekly_tracker_data** (Main dataset)
+- `week` (int), `region` (string), `category` (string), `amount` (float)
+- `projection_category` (string: "Closed Won", "Pipeline", "Forecast")
+- `weighted_amount` (float), `fy` (string: "FY2027", "FY2028")
+- Indexed on: `(week, fy)`, `(region, category)`
+
+**weekly_tracker_settings** (Hidden/Visible slides)
+- `type` (string: "hidden_slides"), `fy` (string, defaults to "FY2027")
+- `hidden_slide_ids` (array of slide IDs)
+
+**weekly_tracker_custom_slides** (User-defined slides)
+- `fy` (string, REQUIRED on creation), `title`, `description`, `data_source`
+- Always filter by FY to prevent cross-FY pollution
+
+**orderbacklogs** (Order pipeline)
+- `week` (int), `region` (string), `amount_uninvoiced` (float)
+- `closing_date_fy` (string: "FY2027", "FY2028", "FY2029")
+- FY2027 backlog filtered: `{"closing_date_fy": "FY2027"}` → ~$47.19M
+
+**target_settings** (KPI thresholds)
+- `base_target` (float: 63.80M), `stretch_target` (float: 73.00M)
+- `category` (string), `fy` (string)
+
+**ai_chat_sessions** & **ai_chat_logs** (AI conversation audit)
+- Sanitize all Protobuf/NumPy before insert
+- Pop `_id` from update payloads
+- Track `latency_ms` and `tool_count`
+
+### API Endpoint Structure (Don't Need to Read Code)
+
+**Admin Router** (`/api/admin/*`)
+- `GET /slides/{week}/{fy}` — Fetch slides for week and FY
+- `POST /slides` — Create custom slide (MUST include `fy`)
+- `PUT /slides/{id}` — Update slide (pop `_id` before DB insert)
+- `DELETE /slides/{id}` — Delete slide
+- `GET /settings` — Fetch hidden/visible slides (filtered by FY)
+- `POST /settings/toggle-slide` — Toggle slide visibility per FY
+
+**AI Agent Router** (`/api/ai/*`)
+- `POST /chat` — Send message, call Gemini with tools
+- `GET /conversations` — Fetch chat history (top 10, sorted descending)
+- `GET /conversations/{id}` — Fetch single conversation with trace
+- `GET /logs` — Admin audit logs with latency
+
+**Auth Router** (`/api/auth/*`)
+- `POST /login` — Session creation
+- `GET /me` — Current user info
+- `POST /logout` — Session cleanup
+
+**Export Router** (`/api/export/*`)
+- `POST /excel` — Export tracker to XLSX
+- `POST /json` — Export to JSON
+
+### When to Read Full Files
+Only if implementing features in these domains:
+- **Slide management changes** → read `admin.py` (but skip repetitive update patterns)
+- **AI/Gemini integration** → read `ai_agent.py` PLUS `GEMINI.md` (critical)
+- **Authentication changes** → read `auth.py` (small, 12KB)
+- **New transformation pipeline** → read existing `transformation.py` (study structure, adapt)
+- **React component bug** → read specific component file only (e.g., `TargetSetting.tsx`)
+
+## Always Use `py` for Python Execution
+
+Reduces tokens by avoiding shell aliasing overhead:
+```bash
+py main.py                          # Start backend
+py transformation.py                # Run data pipeline
+py backend/check_services_targets.py # Validation script
+```
+
+NOT: `python main.py`, `python3 main.py`, etc.
