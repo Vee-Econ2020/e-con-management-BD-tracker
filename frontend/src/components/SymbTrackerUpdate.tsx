@@ -35,7 +35,17 @@ interface TrackerRecord {
     edit_history?: EditHistory;
 }
 
-const EVENT_TABS = ['ALL', 'PCBA Ready', 'Materials Issued', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
+const EVENT_TABS = ['ALL', 'EBOM covered', '100% CTB', 'PCBA Ready', 'Materials Issued', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
+
+// The "EBOM covered" and "100% CTB" tabs don't come from daily tracker plan-date batches like
+// the other stages. Their Shipment Week / Variant / Required Qty / Completed Qty are all
+// auto-fetched from the plan pipeline; the team only enters an ETA Date, which the pipeline
+// then uses as "Will be completed on" for that stage. This maps the tab's display label to the
+// underlying pipeline Event Type string (mirrors the existing "PCBA Ready" -> "PCBA covered" mapping).
+const ETA_STAGE_EVENT_MAP: Record<string, string> = {
+    'EBOM covered': 'EBOM covered',
+    '100% CTB': 'All Material Available'
+};
 
 function parseDayDate(dayStr: any): Date | null {
     if (!dayStr) return null;
@@ -984,6 +994,194 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
     );
 };
 
+interface StageEtaRow {
+    shipmentWeek: string;
+    variant: string;
+    requiredQty: number;
+    completedQty: number;
+    etaDate: string;
+}
+
+function toDateInputValue(raw?: string | null): string {
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function formatShipmentWeekDisplay(raw: string): string {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+interface StageEtaPanelProps {
+    stageLabel: string;
+    user: any;
+    effectiveIsEditAllowed: boolean;
+    hasPermission: (evt: string) => boolean;
+}
+
+const StageEtaPanel = ({ stageLabel, user, effectiveIsEditAllowed, hasPermission }: StageEtaPanelProps) => {
+    const eventType = ETA_STAGE_EVENT_MAP[stageLabel] || stageLabel;
+    const [rows, setRows] = useState<StageEtaRow[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [savingKey, setSavingKey] = useState<string | null>(null);
+    const [editValues, setEditValues] = useState<Record<string, string>>({});
+    const [errorMsg, setErrorMsg] = useState('');
+
+    const canEdit = hasPermission(eventType);
+
+    const rowKey = (r: { shipmentWeek: string; variant: string }) => `${toDateInputValue(r.shipmentWeek)}|${r.variant}`;
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [planRes, etaRes] = await Promise.all([
+                fetch('/api/admin/symb-plan/transformed'),
+                fetch(`/api/admin/symb-stage-eta?event_type=${encodeURIComponent(eventType)}`)
+            ]);
+            const planData = planRes.ok ? await planRes.json() : [];
+            const etaData = etaRes.ok ? await etaRes.json() : [];
+
+            const etaByKey: Record<string, any> = {};
+            etaData.forEach((r: any) => {
+                etaByKey[`${toDateInputValue(r.shipment_week)}|${r.variant}`] = r;
+            });
+
+            const built: StageEtaRow[] = planData
+                .filter((r: any) => r["Event Type"] === eventType)
+                .map((r: any) => {
+                    const key = `${toDateInputValue(r["Shipment Week"])}|${r["Variant Type"]}`;
+                    const etaRec = etaByKey[key];
+                    return {
+                        shipmentWeek: r["Shipment Week"],
+                        variant: r["Variant Type"],
+                        requiredQty: r["planned Value"] || 0,
+                        completedQty: r.completed || 0,
+                        etaDate: toDateInputValue(etaRec?.eta_date || r["Estimated Completion Date"])
+                    };
+                });
+
+            built.sort((a, b) => {
+                const t = new Date(a.shipmentWeek).getTime() - new Date(b.shipmentWeek).getTime();
+                if (t !== 0) return t;
+                return a.variant.localeCompare(b.variant);
+            });
+
+            setRows(built);
+        } catch (err) {
+            console.error('Failed to load stage ETA data:', err);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => { fetchData(); }, [eventType]);
+
+    const handleSave = async (row: StageEtaRow) => {
+        const key = rowKey(row);
+        const newEta = editValues[key];
+        if (!newEta) return;
+        setSavingKey(key);
+        setErrorMsg('');
+        try {
+            const author = user?.email || user?.name || 'User';
+            const res = await fetch('/api/admin/symb-stage-eta', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    event_type: eventType,
+                    shipment_week: row.shipmentWeek,
+                    variant: row.variant,
+                    eta_date: newEta,
+                    user_name: author
+                })
+            });
+            if (res.ok) {
+                await fetchData();
+                setEditValues(prev => { const next = { ...prev }; delete next[key]; return next; });
+            } else {
+                const err = await res.json();
+                setErrorMsg(err.detail || 'Failed to save ETA');
+            }
+        } catch (err) {
+            console.error('Failed to save ETA:', err);
+            setErrorMsg('Error saving ETA');
+        }
+        setSavingKey(null);
+    };
+
+    return (
+        <div>
+            <div style={{ marginBottom: '0.9rem', fontSize: '0.85rem', color: '#64748b', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem 1rem' }}>
+                Shipment Week, Variant, Required Qty and Completed Qty are auto-fetched from the plan pipeline. Only <strong>ETA Date</strong> needs to be entered by the team — it is shown as "Will be completed on" for <strong>{stageLabel}</strong> in the Plan Pipeline page.
+            </div>
+            {errorMsg && <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '0.75rem', fontWeight: 600 }}>{errorMsg}</div>}
+            <div style={{ maxHeight: '65vh', minHeight: '300px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#ffffff' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                    <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f3f4f6', zIndex: 5, boxShadow: '0 2px 4px rgba(0,0,0,0.06)' }}>
+                        <tr>
+                            <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>Shipment Week</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>Variant</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>Required Qty</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>Completed Qty</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>ETA Date</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map(row => {
+                            const key = rowKey(row);
+                            const isEditing = editValues[key] !== undefined;
+                            return (
+                                <tr key={key} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                    <td style={{ padding: '0.75rem' }}>{formatShipmentWeekDisplay(row.shipmentWeek)}</td>
+                                    <td style={{ padding: '0.75rem' }}>{row.variant}</td>
+                                    <td style={{ padding: '0.75rem' }}>{row.requiredQty.toLocaleString()}</td>
+                                    <td style={{ padding: '0.75rem' }}>{row.completedQty.toLocaleString()}</td>
+                                    <td style={{ padding: '0.75rem' }}>
+                                        <input
+                                            type="date"
+                                            disabled={!canEdit || !effectiveIsEditAllowed}
+                                            value={isEditing ? editValues[key] : row.etaDate}
+                                            onChange={e => setEditValues(prev => ({ ...prev, [key]: e.target.value }))}
+                                            style={{ padding: '0.35rem', borderRadius: '4px', border: '1px solid #d1d5db' }}
+                                        />
+                                    </td>
+                                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                                        {isEditing && (
+                                            <button
+                                                onClick={() => handleSave(row)}
+                                                disabled={savingKey === key}
+                                                style={{ padding: '0.35rem 0.75rem', backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: savingKey === key ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                                            >
+                                                {savingKey === key ? 'Saving...' : 'Save'}
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                        {!canEdit && rows.length > 0 && (
+                            <tr>
+                                <td colSpan={6} style={{ padding: '0.6rem 0.75rem', color: '#ef4444', fontSize: '0.78rem', fontStyle: 'italic' }}>
+                                    you dont have access to it
+                                </td>
+                            </tr>
+                        )}
+                        {rows.length === 0 && !loading && (
+                            <tr><td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>No shipment weeks found.</td></tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
 export default function SymbTrackerUpdate() {
     const { user } = useAuth();
     const [records, setRecords] = useState<TrackerRecord[]>([]);
@@ -1055,6 +1253,7 @@ export default function SymbTrackerUpdate() {
 
     // Filtering State
     const [selectedEventTab, setSelectedEventTab] = useState<string>('ALL');
+    const isEtaStage = selectedEventTab === 'EBOM covered' || selectedEventTab === '100% CTB';
     const [columnFilters, setColumnFilters] = useState({
         variant: '',
         event_type: '',
@@ -1792,6 +1991,15 @@ export default function SymbTrackerUpdate() {
                     ))}
                 </div>
 
+                {isEtaStage ? (
+                    <StageEtaPanel
+                        stageLabel={selectedEventTab}
+                        user={user}
+                        effectiveIsEditAllowed={effectiveIsEditAllowed}
+                        hasPermission={hasPermission}
+                    />
+                ) : (
+                <>
                 {/* Summary Metric Cards - Stack 1: Variant 1 & Stack 2: Variant 2 */}
                 <MetricCardsStack title="Variant 1 Summary" metrics={v1Metrics} records={v1Records} allVariantRecords={allV1Records} selectedEventTab={selectedEventTab} />
                 <MetricCardsStack title="Variant 2 Summary" metrics={v2Metrics} records={v2Records} allVariantRecords={allV2Records} selectedEventTab={selectedEventTab} />
@@ -2260,6 +2468,8 @@ export default function SymbTrackerUpdate() {
                     </tbody>
                 </table>
                 </div>
+                </>
+                )}
             </div>
 
             {/* Admin Verification Modal for Delete Confirmation */}

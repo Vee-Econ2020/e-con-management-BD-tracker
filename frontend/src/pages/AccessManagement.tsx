@@ -1250,9 +1250,22 @@ export default function AccessManagement() {
                                     <div>
                                         <label>SYMB Permissions (Can edit)</label>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.5rem' }}>
-                                            {['ALL', 'PCBA Ready', 'Materials Issued', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'].map(perm => (
-                                                <label key={perm} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
-                                                    <input type="checkbox" checked={symbPermissions.includes(perm)} onChange={() => handleSymbPermissionChange(perm)} /> {perm}
+                                            {[
+                                                { value: 'ALL', label: 'ALL' },
+                                                { value: 'EBOM covered', label: 'EBOM covered' },
+                                                { value: 'All Material Available', label: '100% CTB' },
+                                                { value: 'PCBA Ready', label: 'PCBA Ready' },
+                                                { value: 'Materials Issued', label: 'Materials Issued' },
+                                                { value: 'Active alignment', label: 'Active alignment' },
+                                                { value: 'Production/Assembly', label: 'Production/Assembly' },
+                                                { value: 'FQC', label: 'FQC' },
+                                                { value: 'Finished goods', label: 'Finished goods' },
+                                                { value: 'Invoice Date', label: 'Invoice Date' },
+                                                { value: 'Shipment Date', label: 'Shipment Date' },
+                                                { value: 'customer place', label: 'customer place' }
+                                            ].map(perm => (
+                                                <label key={perm.value} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem' }}>
+                                                    <input type="checkbox" checked={symbPermissions.includes(perm.value)} onChange={() => handleSymbPermissionChange(perm.value)} /> {perm.label}
                                                 </label>
                                             ))}
                                         </div>

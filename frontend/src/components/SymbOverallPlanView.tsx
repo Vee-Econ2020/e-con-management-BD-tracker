@@ -49,6 +49,7 @@ const STAGE_COLOR_MAP: Record<string, { color: string; bg: string; border: strin
     'PCBA covered': { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
     'PCBA Ready': { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
     'All Material Available': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
+    '100% CTB': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
     'Materials Issued': { color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe', text: '#5b21b6' },
     'Active alignment': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
     'Production/Assembly': { color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4', text: '#115e59' },
@@ -824,7 +825,7 @@ export default function SymbOverallPlanView() {
                                                         fontWeight: 700,
                                                         fontSize: '0.88rem'
                                                     }}>
-                                                        {item.stage}
+                                                         {item.stage === 'All Material Available' ? '100% CTB' : item.stage}
                                                     </span>
                                                 </td>
 

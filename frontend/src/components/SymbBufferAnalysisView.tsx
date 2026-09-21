@@ -453,7 +453,8 @@ const SymbBufferAnalysisView: React.FC<SymbBufferAnalysisViewProps> = ({
         switch (stage) {
             case 'EBOM covered': return { color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' };
             case 'PCBA covered': return { color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' };
-            case 'All Material Available': return { color: '#d97706', bg: '#fffbeb', border: '#fde68a' };
+            case 'All Material Available':
+            case '100% CTB': return { color: '#d97706', bg: '#fffbeb', border: '#fde68a' };
             case 'Materials Issued': return { color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' };
             case 'Active alignment': return { color: '#ea580c', bg: '#fff7ed', border: '#fed7aa' };
             case 'Production/Assembly': return { color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' };
@@ -821,7 +822,7 @@ const SymbBufferAnalysisView: React.FC<SymbBufferAnalysisViewProps> = ({
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', gap: '0.5rem' }}>
                                     <span style={{ fontSize: '0.88rem', fontWeight: 800, color: theme.color }}>
-                                        {item.stage}
+                                        {item.stage === 'All Material Available' ? '100% CTB' : item.stage}
                                     </span>
                                     {/* Average Days ONLY (No scary cumulative totals) */}
                                     <span style={{
@@ -1110,7 +1111,7 @@ const SymbBufferAnalysisView: React.FC<SymbBufferAnalysisViewProps> = ({
 
                                                     return (
                                                         <tr key={sb.stage} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                            <td style={{ padding: '0.25rem 0.2rem', fontWeight: 600 }}>{sb.stage}</td>
+                                                            <td style={{ padding: '0.25rem 0.2rem', fontWeight: 600 }}>{sb.stage === 'All Material Available' ? '100% CTB' : sb.stage}</td>
                                                             <td style={{ padding: '0.25rem 0.2rem', color: '#64748b' }}>{tStr}</td>
                                                             <td style={{ padding: '0.25rem 0.2rem', color: '#334155' }}>{aStr}</td>
                                                             <td style={{ padding: '0.25rem 0.2rem', textAlign: 'right', fontWeight: 700, color: sb.slippageDays > 0 ? '#dc2626' : '#16a34a' }}>

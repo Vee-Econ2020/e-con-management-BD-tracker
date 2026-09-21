@@ -1694,6 +1694,107 @@ async def delete_symb_plan_remark(remark_id: str, authorization: Optional[str] =
         print(f"Error deleting symb plan remark: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class SymbStageEtaPayload(BaseModel):
+    event_type: str
+    shipment_week: str
+    variant: str
+    eta_date: str
+    user_name: Optional[str] = None
+
+def _norm_symb_week_key(val):
+    import pandas as pd
+    try:
+        dt = pd.to_datetime(val, errors="coerce")
+        if pd.notna(dt):
+            return dt.strftime("%Y-%m-%d")
+    except Exception:
+        pass
+    return None
+
+@router.get("/symb-stage-eta")
+async def get_symb_stage_eta(event_type: Optional[str] = Query(None)):
+    try:
+        coll = get_collection("symb_stage_eta")
+        query = {}
+        if event_type:
+            query["event_type"] = event_type
+        cursor = coll.find(query)
+        items = []
+        async for doc in cursor:
+            doc["id"] = str(doc["_id"])
+            del doc["_id"]
+            items.append(doc)
+        return clean_json_nan(items)
+    except Exception as e:
+        print(f"Error fetching symb stage eta: {e}")
+        return []
+
+@router.post("/symb-stage-eta")
+async def upsert_symb_stage_eta(payload: SymbStageEtaPayload, authorization: Optional[str] = Header(None)):
+    from routers.auth import get_optional_current_user
+    from SYMB_plan_transformation import run_symb_plan_pipeline
+    user_sess = await get_optional_current_user(authorization)
+    await check_symb_time_lock(user_sess)
+    try:
+        user_email = user_sess.get("email") if user_sess else (payload.user_name or "System")
+        user_role = user_sess.get("role", "User") if user_sess else "Admin"
+        user_perms = user_sess.get("symb_permissions", []) if user_sess else ["ALL"]
+
+        if user_role != "Admin" and "ALL" not in user_perms and payload.event_type not in user_perms:
+            raise HTTPException(status_code=403, detail="you dont have access to it")
+
+        week_key = _norm_symb_week_key(payload.shipment_week)
+        if not week_key:
+            raise HTTPException(status_code=400, detail="Invalid shipment week")
+
+        coll = get_collection("symb_stage_eta")
+        doc = await coll.find_one({
+            "event_type": payload.event_type,
+            "shipment_week": week_key,
+            "variant": payload.variant
+        })
+
+        if doc:
+            hist = doc.get("edit_history", [])
+            hist.append({
+                "old_value": doc.get("eta_date"),
+                "new_value": payload.eta_date,
+                "value": doc.get("eta_date"),
+                "edited_by": user_email,
+                "timestamp": datetime.now().isoformat(),
+                "edit": len(hist) + 1
+            })
+            await coll.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {
+                    "eta_date": payload.eta_date,
+                    "edit_history": hist,
+                    "updated_by": user_email,
+                    "updated_at": datetime.now().isoformat()
+                }}
+            )
+        else:
+            await coll.insert_one({
+                "event_type": payload.event_type,
+                "shipment_week": week_key,
+                "variant": payload.variant,
+                "eta_date": payload.eta_date,
+                "created_by": user_email,
+                "created_at": datetime.now().isoformat(),
+                "edit_history": []
+            })
+
+        try:
+            await run_symb_plan_pipeline(db)
+        except Exception as pe:
+            print(f"Error running SYMB plan pipeline after ETA update: {pe}")
+
+        return {"status": "success"}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/symb-plan/upload")
 async def upload_symb_plan(file: UploadFile = File(...), background_tasks: BackgroundTasks = BackgroundTasks()):
     import io

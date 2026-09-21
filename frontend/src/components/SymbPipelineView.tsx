@@ -76,6 +76,7 @@ const STAGE_COLOR_MAP: Record<string, { color: string; bg: string; border: strin
     'PCBA covered': { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
     'PCBA Ready': { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
     'All Material Available': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
+    '100% CTB': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
     'Materials Issued': { color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe', text: '#5b21b6' },
     'Active alignment': { color: '#d97706', bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
     'Production/Assembly': { color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4', text: '#115e59' },
@@ -84,6 +85,13 @@ const STAGE_COLOR_MAP: Record<string, { color: string; bg: string; border: strin
     'Invoice Date': { color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', text: '#5b21b6' },
     'Shipment Date': { color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8', text: '#9d174d' },
     'customer place': { color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd', text: '#0369a1' }
+};
+
+const getStageDisplayName = (stageName: string) => {
+    if (stageName === 'All Material Available' || stageName === 'All Materials available') {
+        return '100% CTB';
+    }
+    return stageName;
 };
 
 const getStageThemeColor = (stageName: string) => {
@@ -303,7 +311,7 @@ const VariantDetailsModal: React.FC<VariantDetailsModalProps> = ({
                         <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-                                    {stage}
+                                    {getStageDisplayName(stage)}
                                 </h3>
                                 <span style={{
                                     backgroundColor: '#4f46e5',
@@ -861,7 +869,7 @@ const SymbPipelineView: React.FC<SymbPipelineViewProps> = ({ showBufferData = tr
     const MILESTONE_STAGES = useMemo(() => [
         { key: 'EBOM covered', title: 'EBOM covered', eventMatch: ['EBOM covered'], color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe' },
         { key: 'PCBA covered', title: 'PCBA covered', eventMatch: ['PCBA covered', 'PCBA Ready'], color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-        { key: 'All Material Available', title: 'All Material Available', eventMatch: ['All Material Available'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+        { key: 'All Material Available', title: '100% CTB', eventMatch: ['All Material Available'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
         { key: 'Materials Issued', title: 'Materials Issued', eventMatch: ['Materials Issued'], color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' },
         { key: 'Active alignment', title: 'Active alignment', eventMatch: ['Active alignment'], color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
         { key: 'Production/Assembly', title: 'Production/Assembly', eventMatch: ['Production/Assembly'], color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4' },
@@ -1246,9 +1254,9 @@ const SymbPipelineView: React.FC<SymbPipelineViewProps> = ({ showBufferData = tr
                 numColor: '#1d4ed8',
                 subTextColor: '#2563eb'
             },
-            { 
-                key: 'All Material Available', 
-                title: 'All Material Available', 
+            {
+                key: 'All Material Available',
+                title: '100% CTB',
                 eventMatch: ['All Material Available'],
                 bgColor: '#fffbeb',
                 borderColor: '#fde68a',
@@ -1900,7 +1908,7 @@ const SymbPipelineView: React.FC<SymbPipelineViewProps> = ({ showBufferData = tr
                                     overflow: 'hidden'
                                 }}>
                                     <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9', color: '#334155', textAlign: 'center' }}>
-                                        <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>{eventType}</div>
+                                        <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>{getStageDisplayName(eventType)}</div>
                                         {cardBatchDate && (
                                             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginTop: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
                                                 <Clock size={12} style={{ color: '#0284c7' }} />

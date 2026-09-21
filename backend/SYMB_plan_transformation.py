@@ -121,11 +121,35 @@ DEFAULT_STAGE_LEAD_TIMES = [
 ]
 
 
-def process_symb_plan(df_plan, progress_summary_agg, erp_final, df_tracker, stage_lead_times=None):
+# Stages where the team enters a manual ETA (via the Tracker Update "EBOM covered" /
+# "100% CTB" tabs) instead of the date being derived from daily tracker plan_date batches.
+MANUAL_ETA_EVENTS = {"EBOM covered", "All Material Available"}
+
+
+def _norm_week_key(val):
+    try:
+        dt = pd.to_datetime(val, errors="coerce")
+        if pd.notna(dt):
+            return dt.strftime("%Y-%m-%d")
+    except Exception:
+        pass
+    return None
+
+
+def process_symb_plan(df_plan, progress_summary_agg, erp_final, df_tracker, stage_lead_times=None, stage_eta_records=None):
     if df_plan.empty:
         return pd.DataFrame()
-        
+
     SYMB_PLAN = df_plan.copy()
+
+    eta_lookup = {}
+    if stage_eta_records:
+        for rec in stage_eta_records:
+            wk = _norm_week_key(rec.get("shipment_week"))
+            evt = rec.get("event_type")
+            var = rec.get("variant")
+            if wk and evt and var:
+                eta_lookup[(evt, var, wk)] = rec
     
     # Build lead time lookup dictionary from DB config or defaults
     lead_dict = {}
@@ -299,20 +323,45 @@ def process_symb_plan(df_plan, progress_summary_agg, erp_final, df_tracker, stag
         est_given_by = []
         est_created_ats = []
         tracker_mapped_event = EVENT_MAP.get(event_type)
-        
+        is_manual_eta_stage = event_type in MANUAL_ETA_EVENTS
+
         if not df_tracker.empty and tracker_mapped_event:
             tracker_sub = df_tracker[(df_tracker["event_type"] == tracker_mapped_event) & (df_tracker["variant"] == variant)]
         else:
             tracker_sub = pd.DataFrame()
-            
-        for dmd in cum_demand:
+
+        for row_idx, dmd in cum_demand.items():
+            if is_manual_eta_stage:
+                wk_key = _norm_week_key(group.loc[row_idx, "Shipment Week"])
+                eta_rec = eta_lookup.get((event_type, variant, wk_key)) if wk_key else None
+                eta_date_val = eta_rec.get("eta_date") if eta_rec else None
+                if eta_rec and eta_date_val:
+                    formatted_eta = eta_date_val
+                    try:
+                        parsed = pd.to_datetime(eta_date_val, errors="coerce")
+                        if pd.notna(parsed):
+                            formatted_eta = parsed.strftime("%d-%b-%Y").upper()
+                    except Exception:
+                        pass
+                    est_dates.append(formatted_eta)
+                    est_given_by.append(str(eta_rec.get("created_by") or "System Baseline"))
+                    est_created_ats.append(eta_rec.get("created_at"))
+                    hist = eta_rec.get("edit_history")
+                    est_histories.append(hist if isinstance(hist, list) else [])
+                else:
+                    est_dates.append(np.nan)
+                    est_histories.append([])
+                    est_given_by.append(None)
+                    est_created_ats.append(None)
+                continue
+
             if tracker_sub.empty or pd.isna(dmd) or dmd <= 0:
                 est_dates.append(np.nan)
                 est_histories.append([])
                 est_given_by.append(None)
                 est_created_ats.append(None)
                 continue
-                
+
             matching = tracker_sub[tracker_sub["tracker_cum_planned"] >= dmd]
             if not matching.empty:
                 match_row = matching.iloc[0]
@@ -567,18 +616,19 @@ async def run_symb_plan_pipeline(db):
     df_erp = await get_df_async("symb_erp_mech_raw")
     df_tracker = await get_df_async("SYMB_Updated_progress_tracker")
     stage_lead_times = await db["symb_stage_lead_times"].find({}).to_list(length=None)
-    
-    print(f"Raw data lengths: Plan={len(df_plan)}, ERP_MECH={len(df_erp)}, Tracker={len(df_tracker)}, LeadTimes={len(stage_lead_times)}")
-    
+    stage_eta_records = await db["symb_stage_eta"].find({}).to_list(length=None)
+
+    print(f"Raw data lengths: Plan={len(df_plan)}, ERP_MECH={len(df_erp)}, Tracker={len(df_tracker)}, LeadTimes={len(stage_lead_times)}, StageEta={len(stage_eta_records)}")
+
     if df_plan.empty:
         print("SYMB PLAN is empty. Skipping pipeline execution.")
         return False
-        
+
     # Process
     try:
         ERP_final = process_erp_mech(df_erp)
         Progress_summary_agg, tracker_df = process_tracker_progress(df_tracker)
-        SYMB_PLAN = process_symb_plan(df_plan, Progress_summary_agg, ERP_final, tracker_df, stage_lead_times=stage_lead_times)
+        SYMB_PLAN = process_symb_plan(df_plan, Progress_summary_agg, ERP_final, tracker_df, stage_lead_times=stage_lead_times, stage_eta_records=stage_eta_records)
     except Exception as e:
         import traceback
         traceback.print_exc()
