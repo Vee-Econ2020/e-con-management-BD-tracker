@@ -66,7 +66,7 @@ import {
     Slide21_1, Slide21_1_1,
     Slide24_1, Slide24_1_1,
     Slide27_1, Slide27_2, Slide27_1_1, Slide27_2_1,
-    Slide30_1, Slide30_1_1, Slide30_2, Slide30_2_1, Slide30_3, Slide30_3_1
+    Slide30_1, Slide30_1_1, Slide30_2, Slide30_2_1, Slide30_4, Slide30_4_1, Slide30_3, Slide30_3_1
 } from '../components/slides/RegionActivitySlides';
 import {
     Slide9_2_3, Slide12_2_3, Slide15_2_3, Slide18_2_3,
@@ -128,6 +128,7 @@ const SLIDE_REGISTRY: { [key: string]: React.ComponentType<any> } = {
     '27.1': Slide27_1, '27.1.1': Slide27_1_1, '27.2': Slide27_2, '27.2.1': Slide27_2_1,
     '30.1': Slide30_1, '30.1.1': Slide30_1_1,
     '30.2': Slide30_2, '30.2.1': Slide30_2_1,
+    '30.4': Slide30_4, '30.4.1': Slide30_4_1,
     '30.3': Slide30_3, '30.3.1': Slide30_3_1,
     '9.2.2': Slide9_2_2,
     '12.2.2': Slide12_2_2,
@@ -1012,7 +1013,7 @@ export default function WeeklyTracker() {
         12.1, '12.1.1', 12.2, '12.2.1',
         '12.2.2', '12.2.2_services', '10_invoice', '12.2.3', '12.2.3_cy', '12.2.4', '12.2.5',
         28, '28_services', '28_services_q1', 29, '29_services', 30, '30_services',
-        30.1, '30.1.1', 30.2, '30.2.1', 30.3, '30.3.1',
+        30.1, '30.1.1', 30.2, '30.2.1', 30.4, '30.4.1', 30.3, '30.3.1',
         '30.2.2', '30.2.2_services', '28_invoice', '30.2.3', '30.2.3_cy', '30.2.4', '30.2.5',
         16, '16_services', '16_services_q1', 17, '17_services', 18, '18_services',
         18.1, '18.1.1',
@@ -1135,6 +1136,10 @@ export default function WeeklyTracker() {
             '28': 'Cumulative Performance vs Targets',
             '29': '8-Week Historical Trend',
             '30': 'Actual vs Weighted Pipeline',
+            '30.2': 'Asean New Business Summary',
+            '30.2.1': 'Asean New Business - Action Points',
+            '30.4': 'Korea New Business Summary',
+            '30.4.1': 'Korea New Business - Action Points',
             '30.2.2': 'Order Backlog',
             '30.2.3': 'Gross Margin - Manufacturing',
             '30.2.3_cy': 'Gross Margin - Services (Current Year)',
@@ -1276,7 +1281,7 @@ export default function WeeklyTracker() {
                 '21.1', '21.1.1',
                 '24.1', '24.1.1',
                 '27.1', '27.1.1', '27.2', '27.2.1',
-                '30.1', '30.1.1', '30.2', '30.2.1', '30.3', '30.3.1'
+                '30.1', '30.1.1', '30.2', '30.2.1', '30.4', '30.4.1', '30.3', '30.3.1'
             ]
         },
         {
@@ -2625,7 +2630,8 @@ export default function WeeklyTracker() {
         'USA East': ['us_east_acc_mgmt', 'us_east_acc_mgmt_actions', 'us_east_new_biz', 'us_east_new_biz_actions'],
         'ROW': [
             'apac_asean_korea_acc_mgmt', 'apac_asean_korea_acc_mgmt_actions',
-            'apac_asean_korea_new_biz', 'apac_asean_korea_new_biz_actions',
+            'apac_asean_new_biz', 'apac_asean_new_biz_actions',
+            'apac_korea_new_biz', 'apac_korea_new_biz_actions',
             'apac_japan_acc_new_biz', 'apac_japan_acc_new_biz_actions'
         ],
         'Asean': ['asean_acc_new_biz', 'asean_acc_new_biz_actions'],
@@ -2641,7 +2647,7 @@ export default function WeeklyTracker() {
         'USA West': ['9.1', '9.1.1', '9.2', '9.2.1', '9.2.5'],
         'Europe': ['12.1', '12.1.1', '12.2', '12.2.1', '12.2.5'],
         'USA East': ['15.1', '15.1.1', '15.2', '15.2.1', '15.2.5'],
-        'ROW': ['30.1', '30.1.1', '30.2', '30.2.1', '30.3', '30.3.1', '30.2.5'],
+        'ROW': ['30.1', '30.1.1', '30.2', '30.2.1', '30.4', '30.4.1', '30.3', '30.3.1', '30.2.5'],
         'Asean': ['18.1', '18.1.1', '18.2.5'],
         'Japan': ['21.1', '21.1.1', '21.2.5'],
         'Korea': ['24.1', '24.1.1', '24.2.5'],
@@ -2700,8 +2706,10 @@ export default function WeeklyTracker() {
         // Exact slide titles matching slide headers
         if (sid === 'apac_asean_korea_acc_mgmt') return 'ROW — Asean & Korea Account Summary';
         if (sid === 'apac_asean_korea_acc_mgmt_actions') return 'ROW — Asean & Korea Account Action Items';
-        if (sid === 'apac_asean_korea_new_biz') return 'ROW — Asean & Korea New Business Summary';
-        if (sid === 'apac_asean_korea_new_biz_actions') return 'ROW — Asean & Korea New Business Action Items';
+        if (sid === 'apac_asean_new_biz') return 'ROW — Asean New Business Summary';
+        if (sid === 'apac_asean_new_biz_actions') return 'ROW — Asean New Business Action Items';
+        if (sid === 'apac_korea_new_biz') return 'ROW — Korea New Business Summary';
+        if (sid === 'apac_korea_new_biz_actions') return 'ROW — Korea New Business Action Items';
         if (sid === 'apac_japan_acc_new_biz') return 'ROW — Japan Account / New Business Summary';
         if (sid === 'apac_japan_acc_new_biz_actions') return 'ROW — Japan Account / New Business Action Items';
 

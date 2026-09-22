@@ -70,9 +70,14 @@ export const Slide30_1_1 = (props: { isEditing: boolean }) =>
     <ActionItemsSlide title="ROW - Asean & Korea Account Action Items" slideId="apac_asean_korea_acc_mgmt_actions" {...props} />;
 
 export const Slide30_2 = (props: { isEditing: boolean }) =>
-    <RegionInputTableSlide title="ROW - Asean & Korea New business summary" slideId="apac_asean_korea_new_biz" {...props} />;
+    <RegionInputTableSlide title="ROW - Asean New business summary" slideId="apac_asean_new_biz" {...props} />;
 export const Slide30_2_1 = (props: { isEditing: boolean }) =>
-    <ActionItemsSlide title="ROW - Asean & Korea New Business Action Items" slideId="apac_asean_korea_new_biz_actions" {...props} />;
+    <ActionItemsSlide title="ROW - Asean New Business Action Items" slideId="apac_asean_new_biz_actions" {...props} />;
+
+export const Slide30_4 = (props: { isEditing: boolean }) =>
+    <RegionInputTableSlide title="ROW - Korea New business summary" slideId="apac_korea_new_biz" {...props} />;
+export const Slide30_4_1 = (props: { isEditing: boolean }) =>
+    <ActionItemsSlide title="ROW - Korea New Business Action Items" slideId="apac_korea_new_biz_actions" {...props} />;
 
 export const Slide30_3 = (props: { isEditing: boolean }) =>
     <RegionInputTableSlide title="ROW - Japan - Account / New business summary" slideId="apac_japan_acc_new_biz" {...props} />;
