@@ -1470,9 +1470,20 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
     ]
     
     def map_to_region(db_region: str) -> str:
-        if db_region in ["Asean", "ASEAN", "Japan", "KANZ", "ROW", "RoW", "row", "Row"]:
+        if not db_region:
             return "ROW"
-        return db_region
+        r = str(db_region).strip()
+        if r in ["US West", "USA West"]:
+            return "US West"
+        if r in ["US East", "USA East"]:
+            return "US East"
+        if r in ["Europe"]:
+            return "Europe"
+        if r in ["Asean", "ASEAN", "Japan", "KANZ", "ROW", "RoW", "row", "Row"]:
+            return "ROW"
+        if r in ["Legacy"]:
+            return "Legacy"
+        return r
 
     # Initialize with all regions from region_order, but also track ALL regions from DB
     region_week_po = {r: {} for r in region_order}
@@ -1720,7 +1731,7 @@ async def compute_slide7_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> D
         db,
         region_name="US West",
         target_category="US West",
-        filter_query={"mRegion": "US West"},
+        filter_query={"mRegion": {"$in": ["US West", "USA West"]}},
         fy=fy
     )
 
@@ -1734,7 +1745,7 @@ async def compute_slide8_data(db: AsyncIOMotorDatabase, week: int = None, fy: st
         db,
         region_name="US West",
         target_category="US West",
-        filter_query={"mRegion": "US West"},
+        filter_query={"mRegion": {"$in": ["US West", "USA West"]}},
         fy=fy
     )
 
@@ -1748,7 +1759,7 @@ async def compute_slide9_data(db: AsyncIOMotorDatabase, week: int = None, fy: st
         db,
         region_name="US West",
         target_category="US West",
-        filter_query={"mRegion": "US West"},
+        filter_query={"mRegion": {"$in": ["US West", "USA West"]}},
         fy=fy
     )
 
@@ -1799,9 +1810,10 @@ async def compute_slide13_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> 
         db,
         region_name="US East",
         target_category="US East",
-        filter_query={"mRegion": "US East"},
+        filter_query={"mRegion": {"$in": ["US East", "USA East"]}},
         fy=fy
     )
+
 
 
 async def compute_slide14_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
@@ -1812,9 +1824,10 @@ async def compute_slide14_data(db: AsyncIOMotorDatabase, week: int = None, fy: s
         db,
         region_name="US East",
         target_category="US East",
-        filter_query={"mRegion": "US East"},
+        filter_query={"mRegion": {"$in": ["US East", "USA East"]}},
         fy=fy
     )
+
 
 
 async def compute_slide15_data(db: AsyncIOMotorDatabase, week: int = None, fy: str = "FY2027") -> Dict:
@@ -1825,7 +1838,7 @@ async def compute_slide15_data(db: AsyncIOMotorDatabase, week: int = None, fy: s
         db,
         region_name="US East",
         target_category="US East",
-        filter_query={"mRegion": "US East"},
+        filter_query={"mRegion": {"$in": ["US East", "USA East"]}},
         fy=fy
     )
 
@@ -2058,7 +2071,11 @@ async def compute_order_backlog_data(
     
     # 1. Pipeline to get aggregated data
     match_stage = {}
-    if region_name in ["APAC", "ROW", "RoW", "row", "Row"]:
+    if region_name in ["US West", "USA West"]:
+        match_stage["mRegion"] = {"$in": ["US West", "USA West"]}
+    elif region_name in ["US East", "USA East"]:
+        match_stage["mRegion"] = {"$in": ["US East", "USA East"]}
+    elif region_name in ["APAC", "ROW", "RoW", "row", "Row"]:
         match_stage["mRegion"] = {"$in": ["Japan", "KANZ", "Korea", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}
     elif region_name != "Overall":
         match_stage["mRegion"] = region_name
@@ -2135,7 +2152,11 @@ async def compute_order_backlog_data(
     
     for week_num in real_db_weeks:
         fy_match = {"week": week_num}
-        if region_name in ["APAC", "ROW", "RoW", "row", "Row"]:
+        if region_name in ["US West", "USA West"]:
+            fy_match["mRegion"] = {"$in": ["US West", "USA West"]}
+        elif region_name in ["US East", "USA East"]:
+            fy_match["mRegion"] = {"$in": ["US East", "USA East"]}
+        elif region_name in ["APAC", "ROW", "RoW", "row", "Row"]:
             fy_match["mRegion"] = {"$in": ["Japan", "KANZ", "Korea", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}
         elif region_name != "Overall":
             fy_match["mRegion"] = region_name
@@ -2310,17 +2331,17 @@ _SERVICES_SLIDE_CONFIGS: Dict[int, tuple] = {
     4:  ("trend",      "Overall", "Overall - Serivces", None),
     5:  ("pipeline",   "Overall", "Overall - Serivces", None),
     # US West
-    7:  ("cumulative", "US West", "US West -  Services", {"mRegion": "US West"}),
-    8:  ("trend",      "US West", "US West -  Services", {"mRegion": "US West"}),
-    9:  ("pipeline",   "US West", "US West -  Services", {"mRegion": "US West"}),
+    7:  ("cumulative", "US West", "US West -  Services", {"mRegion": {"$in": ["US West", "USA West"]}}),
+    8:  ("trend",      "US West", "US West -  Services", {"mRegion": {"$in": ["US West", "USA West"]}}),
+    9:  ("pipeline",   "US West", "US West -  Services", {"mRegion": {"$in": ["US West", "USA West"]}}),
     # Europe
     10: ("cumulative", "Europe",  "Europe - Services",  {"mRegion": "Europe"}),
     11: ("trend",      "Europe",  "Europe - Services",  {"mRegion": "Europe"}),
     12: ("pipeline",   "Europe",  "Europe - Services",  {"mRegion": "Europe"}),
     # US East
-    13: ("cumulative", "US East", "US East - Services", {"mRegion": "US East"}),
-    14: ("trend",      "US East", "US East - Services", {"mRegion": "US East"}),
-    15: ("pipeline",   "US East", "US East - Services", {"mRegion": "US East"}),
+    13: ("cumulative", "US East", "US East - Services", {"mRegion": {"$in": ["US East", "USA East"]}}),
+    14: ("trend",      "US East", "US East - Services", {"mRegion": {"$in": ["US East", "USA East"]}}),
+    15: ("pipeline",   "US East", "US East - Services", {"mRegion": {"$in": ["US East", "USA East"]}}),
     # Asean
     16: ("cumulative", "Asean",   "Asean",   {"mRegion": "Asean"}),
     17: ("trend",      "Asean",   "Asean",   {"mRegion": "Asean"}),

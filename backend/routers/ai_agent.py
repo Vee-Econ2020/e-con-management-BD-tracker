@@ -271,6 +271,19 @@ def sanitize_mongo_pipeline(raw_pipeline: Any) -> List[Dict[str, Any]]:
     return sanitized
 
 
+def build_region_regex(region: Optional[str]) -> Optional[Dict[str, str]]:
+    if not region or region.lower() in ["all", "overall"]:
+        return None
+    reg = region.strip()
+    if reg.lower() in ["us west", "usa west"]:
+        return {"$regex": r"^(US|USA)\s*West$", "$options": "i"}
+    if reg.lower() in ["us east", "usa east"]:
+        return {"$regex": r"^(US|USA)\s*East$", "$options": "i"}
+    if reg.lower() in ["row", "apac"]:
+        return {"$regex": r"^(ROW|RoW|Asean|ASEAN|Japan|KANZ|Korea|APAC)$", "$options": "i"}
+    return {"$regex": f"^{re.escape(reg)}$", "$options": "i"}
+
+
 async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
     """Execute read-only database query or computation based on the tool name requested by the LLM."""
     try:
@@ -281,7 +294,7 @@ async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
             if not query:
                 return {"error": "query parameter is required"}
 
-            reg_rgx = {"$regex": f"^{re.escape(region)}$", "$options": "i"} if region and region.lower() not in ["all", "overall"] else None
+            reg_rgx = build_region_regex(region)
 
             # 1. Search Slide Tables & Notes (weekly_tracker_user_input)
             user_input_q: Dict[str, Any] = {
@@ -731,9 +744,10 @@ async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
 
             query: Dict[str, Any] = {}
             if region and region.lower() not in ["all", "overall"]:
+                reg_query = build_region_regex(region)
                 query["$or"] = [
-                    {"mRegion": {"$regex": f"^{re.escape(region)}$", "$options": "i"}},
-                    {"region": {"$regex": f"^{re.escape(region)}$", "$options": "i"}}
+                    {"mRegion": reg_query},
+                    {"region": reg_query}
                 ]
             if week is not None:
                 query["week"] = int(week)
@@ -831,9 +845,10 @@ async def execute_tool_call(tool_name: str, args: Dict[str, Any], db) -> Any:
                 if region.lower() in ["apac", "row"]:
                     match_clause["mRegion"] = {"$in": ["Japan", "KANZ", "Korea", "Asean", "ASEAN", "ROW", "RoW", "row", "Row"]}
                 else:
+                    reg_query = build_region_regex(region)
                     match_clause["$or"] = [
-                        {"region": {"$regex": f"^{re.escape(region)}$", "$options": "i"}},
-                        {"mRegion": {"$regex": f"^{re.escape(region)}$", "$options": "i"}}
+                        {"region": reg_query},
+                        {"mRegion": reg_query}
                     ]
 
             # Aggregate by region

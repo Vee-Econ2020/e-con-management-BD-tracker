@@ -448,8 +448,10 @@ def assign_fy_and_qtr_corrected_vectorized(date):
 
 def categorize_region_vectorized(value):
     if isinstance(value, str):
-        if 'USA East-REC' in value or 'USA EAST-NE' in value:
-            return 'USA East'
+        if 'USA East-REC' in value or 'USA EAST-NE' in value or value in ['USA East', 'US East']:
+            return 'US East'
+        elif value in ['USA West', 'US West']:
+            return 'US West'
         elif 'Europe' in value:
             return 'Europe'
         elif 'ROW' in value:
