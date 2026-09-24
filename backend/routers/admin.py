@@ -455,10 +455,20 @@ async def process_upload_background(upload_id: str, contents: bytes, week: int, 
             await asyncio.sleep(0.1)  # Small delay for UI update
         
         dataset_agg, backlog_df = await transform_weekly_data(df, week, file_date, _db)
-        
+
         if dataset_agg is None or len(dataset_agg) == 0:
             progress_update(upload_id, 11, 11, "Error", "Transformation resulted in no data", "error")
             return
+
+        # Seed/refresh zoho_deals_raw from this CSV so the automatic Zoho API
+        # sync (ZCRM-live-PRJ) stays consistent with the manual upload path.
+        # Best-effort: a failure here must not break the existing upload flow.
+        try:
+            import crm_sync
+            csv_seed_result = await crm_sync.upsert_csv_into_zoho_raw(df, _db)
+            print(f"  → zoho_deals_raw seeded from CSV: {csv_seed_result}")
+        except Exception as seed_err:
+            print(f"  ⚠️ Failed to seed zoho_deals_raw from CSV: {seed_err}")
         
         # STEP 11: Save to database
         progress_update(upload_id, 10, 11, "Saving Log", "Saving upload log", "processing")
@@ -1145,6 +1155,107 @@ async def delete_upload_log(log_id: str):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ====================================================================
+# CRM SYNC / TRANSFORM ENDPOINTS (Zoho CRM API sync)
+# ====================================================================
+
+def _serialize_log(doc: dict) -> dict:
+    doc = dict(doc)
+    doc["_id"] = str(doc["_id"])
+    return doc
+
+
+@router.post("/crm-sync/run")
+async def trigger_crm_sync(authorization: Optional[str] = Header(None)):
+    """Manually trigger a Zoho Deals delta sync (same job the scheduler runs),
+    followed automatically by a Transform run."""
+    from routers.auth import get_optional_current_user
+    import crm_sync
+
+    user_sess = await get_optional_current_user(authorization)
+    triggered_by = user_sess.get("email") if user_sess else "unknown"
+
+    try:
+        result = await crm_sync.sync_deals(trigger_type="manual", triggered_by=triggered_by)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"CRM sync failed: {str(e)}")
+
+
+@router.post("/crm-transform/run")
+async def trigger_crm_transform(week: Optional[int] = None, authorization: Optional[str] = Header(None)):
+    """Manually (re-)run just the transform step (zoho_deals_raw -> aggregated
+    weekly_tracker_data/orderbacklogs) for the current (or given) week."""
+    from routers.auth import get_optional_current_user
+    import crm_sync
+
+    user_sess = await get_optional_current_user(authorization)
+    triggered_by = user_sess.get("email") if user_sess else "unknown"
+
+    try:
+        result = await crm_sync.run_crm_transform(week=week, triggered_by=triggered_by)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"CRM transform failed: {str(e)}")
+
+
+@router.get("/crm-sync/logs")
+async def get_crm_sync_logs(limit: int = 20, before: Optional[str] = None):
+    """Paginated Sync History (both delta_sync and deleted_cleanup runs).
+    Excludes the per-record new/updated detail arrays to keep this listing
+    light -- fetch those via GET /crm-sync/logs/{log_id} on demand."""
+    try:
+        coll = get_collection("crm_sync_logs")
+        query = {}
+        if before:
+            from bson import ObjectId
+            query["_id"] = {"$lt": ObjectId(before)}
+        projection = {"new_records_detail": 0, "updated_records_detail": 0}
+        cursor = coll.find(query, projection).sort("_id", -1).limit(limit)
+        logs = [_serialize_log(doc) async for doc in cursor]
+        return {"logs": logs, "has_more": len(logs) == limit}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/crm-sync/logs/{log_id}")
+async def get_crm_sync_log_detail(log_id: str):
+    """Full detail for one sync run -- which records were new vs. updated,
+    and for updated records, exactly which fields changed (for the Sync
+    History "Show detail" view)."""
+    try:
+        from bson import ObjectId
+        coll = get_collection("crm_sync_logs")
+        doc = await coll.find_one({"_id": ObjectId(log_id)})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Sync log not found")
+        return _serialize_log(doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/crm-transform/logs")
+async def get_crm_transform_logs(limit: int = 20, before: Optional[str] = None):
+    """Paginated Transform History."""
+    try:
+        coll = get_collection("crm_transform_logs")
+        query = {}
+        if before:
+            from bson import ObjectId
+            query["_id"] = {"$lt": ObjectId(before)}
+        cursor = coll.find(query).sort("_id", -1).limit(limit)
+        logs = [_serialize_log(doc) async for doc in cursor]
+        return {"logs": logs, "has_more": len(logs) == limit}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ====================================================================

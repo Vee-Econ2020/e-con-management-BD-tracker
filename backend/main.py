@@ -2,8 +2,11 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
 from dotenv import load_dotenv
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # Load environment variables
 load_dotenv()
@@ -53,6 +56,28 @@ DB_NAME = os.getenv("DB_NAME", "econ_tracker")
 client = None
 db = None
 
+# Zoho CRM sync scheduler (ZCRM-live-PRJ)
+IST = ZoneInfo("Asia/Kolkata")
+crm_scheduler = AsyncIOScheduler(timezone=IST)
+
+
+async def _run_scheduled_delta_sync():
+    import crm_sync
+    try:
+        result = await crm_sync.sync_deals(trigger_type="auto", triggered_by=None)
+        print(f"[CRM Sync] Scheduled delta sync completed: {result}")
+    except Exception as e:
+        print(f"[CRM Sync] Scheduled delta sync failed: {e}")
+
+
+async def _run_scheduled_deleted_cleanup():
+    import crm_sync
+    try:
+        result = await crm_sync.run_deleted_cleanup(trigger_type="auto", triggered_by=None)
+        print(f"[CRM Sync] Scheduled deleted-deal cleanup completed: {result}")
+    except Exception as e:
+        print(f"[CRM Sync] Scheduled deleted-deal cleanup failed: {e}")
+
 
 @app.on_event("startup")
 async def startup_db_client():
@@ -72,11 +97,23 @@ async def startup_db_client():
     except Exception as e:
         print(f"Failed to connect to MongoDB: {e}")
 
+    # Register Zoho CRM sync jobs (6AM/12PM/6PM IST delta sync, Saturday 00:00 IST cleanup).
+    # Note: since this runs in-process, a job is skipped if the backend isn't
+    # running at trigger time (no catch-up) -- accepted tradeoff, see plan.
+    crm_scheduler.add_job(_run_scheduled_delta_sync, CronTrigger(hour=6, minute=0, timezone=IST), id="crm_delta_sync_6am", replace_existing=True)
+    crm_scheduler.add_job(_run_scheduled_delta_sync, CronTrigger(hour=12, minute=0, timezone=IST), id="crm_delta_sync_12pm", replace_existing=True)
+    crm_scheduler.add_job(_run_scheduled_delta_sync, CronTrigger(hour=18, minute=0, timezone=IST), id="crm_delta_sync_6pm", replace_existing=True)
+    crm_scheduler.add_job(_run_scheduled_deleted_cleanup, CronTrigger(day_of_week="sat", hour=0, minute=0, timezone=IST), id="crm_deleted_cleanup_sat", replace_existing=True)
+    crm_scheduler.start()
+    print("CRM sync scheduler started (6AM/12PM/6PM IST delta sync, Saturday 00:00 IST cleanup)")
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     """Close MongoDB connection on shutdown"""
     global client
+    if crm_scheduler.running:
+        crm_scheduler.shutdown(wait=False)
     if client:
         client.close()
         print("MongoDB connection closed")
