@@ -35,7 +35,7 @@ interface TrackerRecord {
     edit_history?: EditHistory;
 }
 
-const EVENT_TABS = ['ALL', 'EBOM covered', '100% CTB', 'PCBA Ready', 'Materials Issued', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
+const EVENT_TABS = ['ALL', 'EBOM covered', 'PCBA Ready', '100% CTB', 'Materials Issued', 'Active alignment', 'Production/Assembly', 'FQC', 'Finished goods', 'Invoice Date', 'Shipment Date', 'customer place'];
 
 // The "EBOM covered" and "100% CTB" tabs don't come from daily tracker plan-date batches like
 // the other stages. Their Shipment Week / Variant / Required Qty / Completed Qty are all
@@ -46,6 +46,42 @@ const ETA_STAGE_EVENT_MAP: Record<string, string> = {
     'EBOM covered': 'EBOM covered',
     '100% CTB': 'All Material Available'
 };
+
+// Real stage order, keyed by the pipeline's "Event Type" values, alongside the tab's display label.
+// Used to detect a stage whose planned/estimated completion date falls before the stage that precedes it —
+// which is physically impossible (e.g. Active alignment can't finish before Materials Issued starts it).
+const PIPELINE_STAGE_ORDER: Array<{ key: string; label: string }> = [
+    { key: 'EBOM covered', label: 'EBOM covered' },
+    { key: 'PCBA covered', label: 'PCBA Ready' },
+    { key: 'All Material Available', label: '100% CTB' },
+    { key: 'Materials Issued', label: 'Materials Issued' },
+    { key: 'Active alignment', label: 'Active alignment' },
+    { key: 'Production/Assembly', label: 'Production/Assembly' },
+    { key: 'FQC', label: 'FQC' },
+    { key: 'Finished goods', label: 'Finished goods' },
+    { key: 'Invoice Date', label: 'Invoice Date' },
+    { key: 'Shipment Date', label: 'Shipment Date' },
+    { key: 'customer place', label: 'customer place' }
+];
+
+// A pipeline row's "effective" date: its actual completed date once done, otherwise its estimated/ETA completion date.
+function getEffectivePipelineDateStr(row: any): string | null {
+    if (!row) return null;
+    const plannedVal = Number(row['planned Value']) || 0;
+    const isDone = row['Material Covered'] === 'Yes' || (plannedVal > 0 && Number(row.completed || 0) >= plannedVal);
+    const raw = isDone ? (row['Actual Completed Date'] || row.actual_completed_date) : row['Estimated Completion Date'];
+    const str = raw ? String(raw).trim() : '';
+    return str && str !== 'None' && str !== 'N/A' ? str : null;
+}
+
+interface DateSequenceIssue {
+    week: string;
+    variant: string;
+    currLabel: string;
+    currDate: string;
+    prevLabel: string;
+    prevDate: string;
+}
 
 function parseDayDate(dayStr: any): Date | null {
     if (!dayStr) return null;
@@ -235,9 +271,13 @@ interface MetricCardsStackProps {
     records: TrackerRecord[];
     allVariantRecords?: TrackerRecord[];
     selectedEventTab: string;
+    /** EBOM covered's completed qty (from the plan pipeline) for this variant — seeds PCBA Ready's available inventory, since EBOM covered precedes it in the real stage order. */
+    ebomCompleted: number;
+    /** 100% CTB's completed qty (from the plan pipeline) for this variant — feeds Materials Issued's available inventory, since 100% CTB sits between PCBA Ready and Materials Issued in the real stage order. */
+    ctbCompleted: number;
 }
 
-const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selectedEventTab }: MetricCardsStackProps) => {
+const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selectedEventTab, ebomCompleted, ctbCompleted }: MetricCardsStackProps) => {
     const [showDetail, setShowDetail] = useState(false);
     const [chartMode, setChartMode] = useState<'actuals' | 'cumulative'>('cumulative');
     const [showHistoryLines, setShowHistoryLines] = useState(false);
@@ -257,9 +297,12 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
             { key: 'customer place', label: 'Customer Place', color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' }
         ];
 
-        let prevCompleted: number | null = null;
+        // Real stage order is EBOM covered -> PCBA Ready -> 100% CTB -> Materials Issued -> ...
+        // EBOM covered and 100% CTB are ETA-tracked (plan pipeline), not part of this qty table,
+        // so their completed qty is passed in from the pipeline to seed/bridge the chain below.
+        let prevCompleted: number | null = ebomCompleted;
 
-        return STAGES.map((stg, idx) => {
+        return STAGES.map((stg) => {
             const stgRecords = records.filter(r => r.event_type === stg.key);
             let origPlanned = 0;
             let completed = 0;
@@ -273,24 +316,23 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
             let unplannedQty = 0;
             let warningMsg = '';
 
-            if (idx > 0 && prevCompleted !== null) {
-                // Rule 1: Autofill from previous stage completed if completed > origPlanned
-                if (prevCompleted > origPlanned) {
-                    planned = prevCompleted;
-                    isAutofilled = true;
-                } else {
-                    planned = origPlanned;
-                    isAutofilled = false;
-                }
+            if (prevCompleted !== null) {
+                // Available inventory always equals what the previous stage has completed —
+                // this stage can never mark more as completed than the previous stage handed off.
+                planned = prevCompleted;
+                isAutofilled = prevCompleted !== origPlanned;
 
-                // Rule 2: Warning if previous stage completed units (>0) exceed current stage original planned target
+                // Warning if previous stage completed units (>0) exceed current stage's own planned target
                 if (prevCompleted > 0 && prevCompleted > origPlanned) {
                     unplannedQty = prevCompleted - origPlanned;
                     warningMsg = `There is no plan for remaining qty (${unplannedQty.toLocaleString()} units). Please update!`;
                 }
             }
 
-            prevCompleted = completed;
+            // 100% CTB sits between PCBA Ready and Materials Issued in the real stage order but
+            // isn't part of this qty table, so its pipeline completed qty bridges the two instead
+            // of PCBA Ready's own completed.
+            prevCompleted = stg.key === 'PCBA Ready' ? ctbCompleted : completed;
 
             const remaining = planned > completed ? planned - completed : 0;
             return {
@@ -304,7 +346,7 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
                 warningMsg
             };
         });
-    }, [records, selectedEventTab]);
+    }, [records, selectedEventTab, ebomCompleted, ctbCompleted]);
 
     // Single event tab metrics calculation with Target card & Planned < Target error validation
     const singleTabStageMetric = useMemo(() => {
@@ -323,20 +365,34 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
         ];
 
         const currIdx = STAGES.findIndex(s => s.key === selectedEventTab);
-        if (currIdx <= 0) return null;
+        if (currIdx < 0) return null;
 
-        const prevStage = STAGES[currIdx - 1];
+        // Real stage order is EBOM covered -> PCBA Ready -> 100% CTB -> Materials Issued -> ...
+        // EBOM covered and 100% CTB are ETA-tracked (plan pipeline), not part of this qty table,
+        // so their completed qty (passed in as props) seeds/bridges the chain at those two links.
         let prevCompleted = 0;
-        allVariantRecords.forEach(r => {
-            if (r.event_type === prevStage.key) {
-                prevCompleted += r.completed || 0;
-            }
-        });
+        let prevStageLabel: string;
+        if (currIdx === 0) {
+            prevCompleted = ebomCompleted;
+            prevStageLabel = 'EBOM covered';
+        } else if (STAGES[currIdx].key === 'Materials Issued') {
+            prevCompleted = ctbCompleted;
+            prevStageLabel = '100% CTB';
+        } else {
+            const prevStage = STAGES[currIdx - 1];
+            prevStageLabel = prevStage.label;
+            allVariantRecords.forEach(r => {
+                if (r.event_type === prevStage.key) {
+                    prevCompleted += r.completed || 0;
+                }
+            });
+        }
 
         const plannedQty = metrics.totalPlanned;
         const totalCompleted = metrics.totalCompleted;
-        const targetQty = prevCompleted > 0 ? prevCompleted : plannedQty;
-        const hasTargetFromPrev = prevCompleted > 0;
+        // Available inventory always equals the previous stage's completed qty — never falls back to this stage's own planned qty.
+        const targetQty = prevCompleted;
+        const hasTargetFromPrev = true;
 
         const hasPlanDeficit = plannedQty < targetQty;
         const unplannedQty = hasPlanDeficit ? targetQty - plannedQty : 0;
@@ -356,12 +412,12 @@ const MetricCardsStack = ({ title, metrics, records, allVariantRecords, selected
             hasPlanDeficit,
             unplannedQty,
             errorMsg,
-            prevStageLabel: prevStage.label,
+            prevStageLabel,
             prevCompleted,
             targetRemaining,
             targetExcess
         };
-    }, [records, allVariantRecords, selectedEventTab, metrics]);
+    }, [records, allVariantRecords, selectedEventTab, metrics, ebomCompleted, ctbCompleted]);
 
     // Compute edit statistics for this stack
     const editStats = useMemo(() => {
@@ -1023,9 +1079,10 @@ interface StageEtaPanelProps {
     user: any;
     effectiveIsEditAllowed: boolean;
     hasPermission: (evt: string) => boolean;
+    onSaved?: () => void;
 }
 
-const StageEtaPanel = ({ stageLabel, user, effectiveIsEditAllowed, hasPermission }: StageEtaPanelProps) => {
+const StageEtaPanel = ({ stageLabel, user, effectiveIsEditAllowed, hasPermission, onSaved }: StageEtaPanelProps) => {
     const eventType = ETA_STAGE_EVENT_MAP[stageLabel] || stageLabel;
     const [rows, setRows] = useState<StageEtaRow[]>([]);
     const [loading, setLoading] = useState(false);
@@ -1102,6 +1159,7 @@ const StageEtaPanel = ({ stageLabel, user, effectiveIsEditAllowed, hasPermission
             });
             if (res.ok) {
                 await fetchData();
+                onSaved?.();
                 setEditValues(prev => { const next = { ...prev }; delete next[key]; return next; });
             } else {
                 const err = await res.json();
@@ -1331,6 +1389,106 @@ export default function SymbTrackerUpdate() {
         fetchRecords();
     }, []);
 
+    // EBOM covered and 100% CTB completed qty (from the plan pipeline) — used to seed/bridge
+    // the qty-stage chain's available inventory, since those two stages sit before PCBA Ready
+    // and Materials Issued in the real stage order but track completion via ETA/pipeline data,
+    // not this component's own records.
+    const [pipelinePlanData, setPipelinePlanData] = useState<any[]>([]);
+
+    const fetchPipelinePlanData = async () => {
+        try {
+            const res = await fetch('/api/admin/symb-plan/transformed');
+            if (res.ok) {
+                const data = await res.json();
+                setPipelinePlanData(data);
+            }
+        } catch (err) {
+            console.error('Failed to load plan pipeline data', err);
+        }
+    };
+
+    useEffect(() => {
+        fetchPipelinePlanData();
+    }, []);
+
+    // Detects a stage whose planned/estimated completion date is earlier than the stage right
+    // before it in the real order — e.g. Active alignment scheduled to finish before Materials
+    // Issued, which can't happen in reality and throws off buffer/delay calculations. Keyed by
+    // the stage's display label (matches EVENT_TABS / the Bulk Plan Generator's eventType values).
+    const dateSequenceIssuesByStage = useMemo(() => {
+        const map: Record<string, DateSequenceIssue[]> = {};
+        for (let i = 1; i < PIPELINE_STAGE_ORDER.length; i++) {
+            const stage = PIPELINE_STAGE_ORDER[i];
+            const immediatePrevStage = PIPELINE_STAGE_ORDER[i - 1];
+            const issues: DateSequenceIssue[] = [];
+
+            pipelinePlanData
+                .filter((r: any) => r['Event Type'] === stage.key)
+                .forEach((r: any) => {
+                    const plannedVal = Number(r['planned Value']) || 0;
+                    const isDone = r['Material Covered'] === 'Yes' || (plannedVal > 0 && Number(r.completed || 0) >= plannedVal);
+                    if (isDone) return;
+
+                    const currDateStr = r['Estimated Completion Date'];
+                    const currDate = parseDayDate(currDateStr);
+                    if (!currDate) return;
+
+                    const week = r['Shipment Week'];
+                    const variantKey = String(r['Variant Type'] || '').toLowerCase();
+
+                    const immediatePrevRow = pipelinePlanData.find((p: any) =>
+                        p['Event Type'] === immediatePrevStage.key && p['Shipment Week'] === week &&
+                        String(p['Variant Type'] || '').toLowerCase() === variantKey
+                    );
+                    if (!immediatePrevRow) return;
+                    const immediatePrevDateStr = getEffectivePipelineDateStr(immediatePrevRow);
+                    if (!immediatePrevDateStr) {
+                        issues.push({
+                            week, variant: r['Variant Type'] || '', currLabel: stage.label, currDate: String(currDateStr),
+                            prevLabel: immediatePrevStage.label, prevDate: "doesn't have a completion date yet"
+                        });
+                        return;
+                    }
+
+                    // This stage's date can't fall before ANY earlier stage's date, not just the
+                    // immediately-preceding one — an in-between stage might itself have a wrong
+                    // (too-early) date, so compare against the running max across all priors.
+                    let maxDate: Date | null = null;
+                    let maxDateStr = '';
+                    let maxLabel = '';
+                    for (let j = 0; j < i; j++) {
+                        const earlierStage = PIPELINE_STAGE_ORDER[j];
+                        const earlierRow = pipelinePlanData.find((p: any) =>
+                            p['Event Type'] === earlierStage.key && p['Shipment Week'] === week &&
+                            String(p['Variant Type'] || '').toLowerCase() === variantKey
+                        );
+                        if (!earlierRow) continue;
+                        const earlierDateStr = getEffectivePipelineDateStr(earlierRow);
+                        const earlierDate = earlierDateStr ? parseDayDate(earlierDateStr) : null;
+                        if (earlierDate && (!maxDate || earlierDate.getTime() > maxDate.getTime())) {
+                            maxDate = earlierDate;
+                            maxDateStr = earlierDateStr as string;
+                            maxLabel = earlierStage.label;
+                        }
+                    }
+
+                    if (maxDate && currDate.getTime() < (maxDate as Date).getTime()) {
+                        issues.push({
+                            week, variant: r['Variant Type'] || '', currLabel: stage.label, currDate: String(currDateStr),
+                            prevLabel: maxLabel, prevDate: maxDateStr
+                        });
+                    }
+                });
+
+            if (issues.length > 0) map[stage.label] = issues;
+        }
+        return map;
+    }, [pipelinePlanData]);
+
+    // The Bulk Plan Generator has its own Event Type selector, independent of the viewed tab.
+    const bulkEventDateIssues = dateSequenceIssuesByStage[eventType] || [];
+    const bulkBlockedByDateSequence = bulkEventDateIssues.length > 0;
+
     const filteredRecords = useMemo(() => {
         const res = records.filter(rec => {
             if (selectedEventTab !== 'ALL' && rec.event_type !== selectedEventTab) {
@@ -1418,6 +1576,20 @@ export default function SymbTrackerUpdate() {
     const v1Records = useMemo(() => filteredRecords.filter((r: TrackerRecord) => isVariant1(r.variant)), [filteredRecords]);
     const v2Records = useMemo(() => filteredRecords.filter((r: TrackerRecord) => isVariant2(r.variant)), [filteredRecords]);
 
+    const pipelineChainSeeds = useMemo(() => {
+        const sumCompleted = (pipelineEventType: string, isVariant: (v: any) => boolean) =>
+            pipelinePlanData
+                .filter((r: any) => r['Event Type'] === pipelineEventType && isVariant(r['Variant Type']))
+                .reduce((sum: number, r: any) => sum + (r.completed || 0), 0);
+
+        return {
+            ebomV1: sumCompleted('EBOM covered', isVariant1),
+            ebomV2: sumCompleted('EBOM covered', isVariant2),
+            ctbV1: sumCompleted('All Material Available', isVariant1),
+            ctbV2: sumCompleted('All Material Available', isVariant2)
+        };
+    }, [pipelinePlanData]);
+
     const v1Metrics = useMemo(() => calcMetrics(v1Records), [v1Records]);
     const v2Metrics = useMemo(() => calcMetrics(v2Records), [v2Records]);
 
@@ -1461,6 +1633,7 @@ export default function SymbTrackerUpdate() {
             if (res.ok) {
                 setBulkMsg('Plan generated successfully!');
                 fetchRecords();
+                fetchPipelinePlanData();
             } else {
                 setBulkMsg(`Error: ${data.detail}`);
             }
@@ -1582,6 +1755,7 @@ export default function SymbTrackerUpdate() {
             if (res.ok) {
                 setEditingId(null);
                 fetchRecords();
+                fetchPipelinePlanData();
             } else {
                 alert(`Cannot update: ${data.detail || 'Failed to save update.'}`);
             }
@@ -1902,8 +2076,8 @@ export default function SymbTrackerUpdate() {
                         <input disabled={!effectiveIsEditAllowed} type="number" required min="0" value={upd} onChange={e => setUpd(e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #d1d5db', width: '120px' }} />
                     </div>
 
-                    <button 
-                        type="submit" 
+                    <button
+                        type="submit"
                         disabled={bulkLoading || !effectiveIsEditAllowed}
                         style={{ padding: '0.6rem 1.5rem', backgroundColor: effectiveIsEditAllowed ? '#3b82f6' : '#94a3b8', color: 'white', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: (bulkLoading || !effectiveIsEditAllowed) ? 'not-allowed' : 'pointer' }}
                     >
@@ -1911,6 +2085,23 @@ export default function SymbTrackerUpdate() {
                     </button>
                     {bulkMsg && <span style={{ color: bulkMsg.includes('Error') ? '#ef4444' : '#10b981', fontSize: '0.9rem', fontWeight: '500' }}>{bulkMsg}</span>}
                 </form>
+
+                {bulkBlockedByDateSequence && (
+                    <div style={{ marginTop: '1rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.65rem 0.85rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                        <ShieldAlert size={16} style={{ color: '#dc2626', flexShrink: 0, marginTop: '0.1rem' }} />
+                        <div style={{ fontSize: '0.8rem', color: '#991b1b' }}>
+                            <strong>Planned date needs to be updated.</strong> {eventType} is currently scheduled to complete before {bulkEventDateIssues[0].prevLabel} in {bulkEventDateIssues.length > 1 ? `${bulkEventDateIssues.length} shipment weeks` : 'a shipment week'}:
+                            <ul style={{ margin: '0.3rem 0 0', paddingLeft: '1.1rem' }}>
+                                {bulkEventDateIssues.map((iss, i) => (
+                                    <li key={i}>
+                                        Week {iss.week} ({iss.variant}): <strong>{eventType} = {iss.currDate}</strong>, but <strong>{iss.prevLabel} = {iss.prevDate}</strong>
+                                    </li>
+                                ))}
+                            </ul>
+                            This won't stop plan generation for {eventType} — fix the date(s) above and the warning will clear on its own.
+                        </div>
+                    </div>
+                )}
             </div>
 
 
@@ -1991,18 +2182,39 @@ export default function SymbTrackerUpdate() {
                     ))}
                 </div>
 
+                {/* Date-sequence violation banner: this stage is scheduled to finish before the stage before it */}
+                {selectedEventTab !== 'ALL' && (dateSequenceIssuesByStage[selectedEventTab] || []).length > 0 && (() => {
+                    const issues = dateSequenceIssuesByStage[selectedEventTab];
+                    return (
+                        <div style={{ marginBottom: '1rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.65rem 0.85rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            <ShieldAlert size={16} style={{ color: '#dc2626', flexShrink: 0, marginTop: '0.1rem' }} />
+                            <div style={{ fontSize: '0.8rem', color: '#991b1b' }}>
+                                <strong>Planned date needs to be updated.</strong> {selectedEventTab} is currently scheduled to complete before {issues[0].prevLabel} in {issues.length > 1 ? `${issues.length} shipment weeks` : 'a shipment week'}. Update the date(s) below and this warning will clear automatically:
+                                <ul style={{ margin: '0.3rem 0 0', paddingLeft: '1.1rem' }}>
+                                    {issues.map((iss, i) => (
+                                        <li key={i}>
+                                            Week {iss.week} ({iss.variant}): <strong>{selectedEventTab} = {iss.currDate}</strong>, but <strong>{iss.prevLabel} = {iss.prevDate}</strong>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 {isEtaStage ? (
                     <StageEtaPanel
                         stageLabel={selectedEventTab}
                         user={user}
                         effectiveIsEditAllowed={effectiveIsEditAllowed}
                         hasPermission={hasPermission}
+                        onSaved={fetchPipelinePlanData}
                     />
                 ) : (
                 <>
                 {/* Summary Metric Cards - Stack 1: Variant 1 & Stack 2: Variant 2 */}
-                <MetricCardsStack title="Variant 1 Summary" metrics={v1Metrics} records={v1Records} allVariantRecords={allV1Records} selectedEventTab={selectedEventTab} />
-                <MetricCardsStack title="Variant 2 Summary" metrics={v2Metrics} records={v2Records} allVariantRecords={allV2Records} selectedEventTab={selectedEventTab} />
+                <MetricCardsStack title="Variant 1 Summary" metrics={v1Metrics} records={v1Records} allVariantRecords={allV1Records} selectedEventTab={selectedEventTab} ebomCompleted={pipelineChainSeeds.ebomV1} ctbCompleted={pipelineChainSeeds.ctbV1} />
+                <MetricCardsStack title="Variant 2 Summary" metrics={v2Metrics} records={v2Records} allVariantRecords={allV2Records} selectedEventTab={selectedEventTab} ebomCompleted={pipelineChainSeeds.ebomV2} ctbCompleted={pipelineChainSeeds.ctbV2} />
 
                 {/* Dedicated Scrollable Table Viewport with Frozen (Sticky) Header */}
                 <div style={{
@@ -2205,7 +2417,12 @@ export default function SymbTrackerUpdate() {
                                         
                                         <td style={{ padding: '0.75rem' }}>
                                             {isEditing ? (
-                                                <input type="text" value={editForm.plan_date} onChange={e => setEditForm({...editForm, plan_date: e.target.value})} style={{ width: '100px', padding: '0.3rem' }} />
+                                                <input
+                                                    type="text"
+                                                    value={editForm.plan_date}
+                                                    onChange={e => setEditForm({...editForm, plan_date: e.target.value})}
+                                                    style={{ width: '100px', padding: '0.3rem' }}
+                                                />
                                             ) : (
                                                 <div style={{ display: 'flex', alignItems: 'center' }}>
                                                     {rec.plan_date} 

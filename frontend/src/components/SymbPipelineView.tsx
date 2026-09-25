@@ -1557,11 +1557,14 @@ const SymbPipelineView: React.FC<SymbPipelineViewProps> = ({ showBufferData = tr
     };
 
     const renderVariantSection = (
-        row: SymbPlanRow, 
-        isBackfilled: boolean, 
+        row: SymbPlanRow,
+        isBackfilled: boolean,
         weekStr: string,
-        backfillSourceStage?: string, 
-        backfillActualCompDate?: string
+        backfillSourceStage?: string,
+        backfillActualCompDate?: string,
+        priorStageRows?: Array<SymbPlanRow | null>,
+        maxCompletedIdx?: number,
+        weekBackfillActualDate?: string
     ) => {
         const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
         const isCompleted = isNativeCompleted || isBackfilled;
@@ -1570,7 +1573,65 @@ const SymbPipelineView: React.FC<SymbPipelineViewProps> = ({ showBufferData = tr
         const unplannedQty = Number(row.unplanned_qty || row["unplanned_qty"] || 0);
         const warningMsg = row.warning_msg || row["warning_msg"] || (unplannedQty > 0 ? `There is no plan for remaining qty (${unplannedQty.toLocaleString()} units). Please update!` : '');
         const actualCompDate = row["Actual Completed Date"] || row["actual_completed_date"] || backfillActualCompDate;
-        
+
+        // Date-sequence check: this stage's estimated completion can't fall before ANY stage
+        // earlier than it (e.g. Materials Issued can't finish before PCBA covered does, even if
+        // an in-between stage like 100% CTB currently has an even-earlier — itself wrong — date).
+        // Also flags the case where the immediately-preceding stage has no completion date at
+        // all yet (not completed, no ETA/estimate) — this stage can't reliably have one either.
+        // A prior stage that's only "Auto-Completed" via backfill (no native completion of its
+        // own, e.g. no plan was ever entered for it) uses the same backfill source's actual date
+        // rather than its own — otherwise it would look like it "has no date" and falsely block.
+        const effectiveDateOf = (r: SymbPlanRow, j: number): string | null => {
+            const rIsNativeCompleted = r["Material Covered"] === "Yes" || (r["planned Value"] > 0 && r.completed >= r["planned Value"]);
+            const rIsBackfilled = !rIsNativeCompleted && typeof maxCompletedIdx === 'number' && j < maxCompletedIdx;
+            let raw: any;
+            if (rIsNativeCompleted) {
+                raw = r["Actual Completed Date"] || r["actual_completed_date"];
+            } else if (rIsBackfilled) {
+                raw = weekBackfillActualDate;
+            } else {
+                raw = r["Estimated Completion Date"];
+            }
+            const str = raw ? String(raw).trim() : '';
+            return str && str !== 'None' && str !== 'N/A' ? str : null;
+        };
+
+        let dateSequenceIssue: { prevLabel: string; prevDateStr: string | null; currDateStr: string } | null = null;
+        if (!isCompleted && row["Estimated Completion Date"] && priorStageRows && priorStageRows.length > 0) {
+            const currDate = parseDateSafe(row["Estimated Completion Date"]);
+            const immediatePrevIdx = priorStageRows.length - 1;
+            const immediatePrev = priorStageRows[immediatePrevIdx];
+
+            if (currDate && immediatePrev) {
+                const immediatePrevDateStr = effectiveDateOf(immediatePrev, immediatePrevIdx);
+                if (!immediatePrevDateStr) {
+                    dateSequenceIssue = {
+                        prevLabel: getStageDisplayName(immediatePrev["Event Type"] || ''),
+                        prevDateStr: null,
+                        currDateStr: row["Estimated Completion Date"]
+                    };
+                } else {
+                    let maxDate: Date | null = null;
+                    let maxDateStr = '';
+                    let maxLabel = '';
+                    priorStageRows.forEach((p, j) => {
+                        if (!p) return;
+                        const pDateStr = effectiveDateOf(p, j);
+                        const pDate = pDateStr ? parseDateSafe(pDateStr) : null;
+                        if (pDate && (!maxDate || pDate.getTime() > maxDate.getTime())) {
+                            maxDate = pDate;
+                            maxDateStr = pDateStr!;
+                            maxLabel = getStageDisplayName(p["Event Type"] || '');
+                        }
+                    });
+                    if (maxDate && currDate.getTime() < (maxDate as Date).getTime()) {
+                        dateSequenceIssue = { prevLabel: maxLabel, prevDateStr: maxDateStr, currDateStr: row["Estimated Completion Date"] };
+                    }
+                }
+            }
+        }
+
         const variantType = row["Variant Type"] || "Variant 1";
         const stageName = row["Event Type"] || "";
         const variantRemarksCount = remarks.filter(
@@ -1638,6 +1699,17 @@ const SymbPipelineView: React.FC<SymbPipelineViewProps> = ({ showBufferData = tr
                     <div style={{ color: '#991b1b', fontSize: '0.73rem', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.35rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '0.3rem 0.5rem', borderRadius: '4px', fontWeight: 700 }}>
                         <ShieldAlert size={14} style={{ color: '#dc2626', flexShrink: 0 }} />
                         <span>{warningMsg.replace(/^⚠️\s*/, '')}</span>
+                    </div>
+                )}
+
+                {dateSequenceIssue && (
+                    <div style={{ color: '#991b1b', fontSize: '0.73rem', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.35rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '0.3rem 0.5rem', borderRadius: '4px', fontWeight: 700 }}>
+                        <ShieldAlert size={14} style={{ color: '#dc2626', flexShrink: 0 }} />
+                        {dateSequenceIssue.prevDateStr ? (
+                            <span>Planned date needs to be updated: this stage is set to complete on <strong>{dateSequenceIssue.currDateStr}</strong>, which is before {dateSequenceIssue.prevLabel}'s <strong>{dateSequenceIssue.prevDateStr}</strong>.</span>
+                        ) : (
+                            <span>Planned date needs to be updated: this stage is set to complete on <strong>{dateSequenceIssue.currDateStr}</strong>, but {dateSequenceIssue.prevLabel} doesn't have a completion date yet.</span>
+                        )}
                     </div>
                 )}
 
@@ -1926,14 +1998,29 @@ const SymbPipelineView: React.FC<SymbPipelineViewProps> = ({ showBufferData = tr
                                                 const isNativeCompleted = row["Material Covered"] === "Yes" || (row["planned Value"] > 0 && row.completed >= row["planned Value"]);
                                                 const isBackfilled = !isNativeCompleted && idx < maxCompletedIdx;
                                                 const backfillSourceStage = isBackfilled ? maxNativeCompletedStageNameMap[variantKey] : '';
-                                                const backfillSourceRow = isBackfilled && backfillSourceStage 
-                                                    ? rows.find(r => r["Event Type"] === backfillSourceStage && (r["Variant Type"] || "").toLowerCase() === variantKey) 
+                                                const backfillSourceRow = isBackfilled && backfillSourceStage
+                                                    ? rows.find(r => r["Event Type"] === backfillSourceStage && (r["Variant Type"] || "").toLowerCase() === variantKey)
                                                     : null;
-                                                const backfillActualCompDate = backfillSourceRow 
-                                                    ? (backfillSourceRow["Actual Completed Date"] || backfillSourceRow["actual_completed_date"]) 
+                                                const backfillActualCompDate = backfillSourceRow
+                                                    ? (backfillSourceRow["Actual Completed Date"] || backfillSourceRow["actual_completed_date"])
                                                     : undefined;
 
-                                                return renderVariantSection(row, isBackfilled, weekStr, backfillSourceStage, backfillActualCompDate);
+                                                // Unlike backfillActualCompDate above (only set when THIS row is backfilled), this is
+                                                // always resolved so a backfilled PRIOR stage (used by the date-sequence check) can find
+                                                // its effective date too, even when the current row itself isn't backfilled.
+                                                const weekBackfillSourceStage = maxNativeCompletedStageNameMap[variantKey];
+                                                const weekBackfillSourceRow = weekBackfillSourceStage
+                                                    ? rows.find(r => r["Event Type"] === weekBackfillSourceStage && (r["Variant Type"] || "").toLowerCase() === variantKey)
+                                                    : null;
+                                                const weekBackfillActualDate = weekBackfillSourceRow
+                                                    ? (weekBackfillSourceRow["Actual Completed Date"] || weekBackfillSourceRow["actual_completed_date"])
+                                                    : undefined;
+
+                                                const priorStageRows = EVENT_ORDER.slice(0, idx).map(evt =>
+                                                    rows.find(r => r["Event Type"] === evt && (r["Variant Type"] || "").toLowerCase() === variantKey) || null
+                                                );
+
+                                                return renderVariantSection(row, isBackfilled, weekStr, backfillSourceStage, backfillActualCompDate, priorStageRows, maxCompletedIdx, weekBackfillActualDate);
                                             })
                                         )}
 
