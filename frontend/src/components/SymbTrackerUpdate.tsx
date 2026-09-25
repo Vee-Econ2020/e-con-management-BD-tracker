@@ -1441,8 +1441,15 @@ export default function SymbTrackerUpdate() {
                         String(p['Variant Type'] || '').toLowerCase() === variantKey
                     );
                     if (!immediatePrevRow) return;
+                    const immediatePrevPlannedVal = Number(immediatePrevRow['planned Value']) || 0;
+                    const immediatePrevIsDone = immediatePrevRow['Material Covered'] === 'Yes' || (immediatePrevPlannedVal > 0 && Number(immediatePrevRow.completed || 0) >= immediatePrevPlannedVal);
                     const immediatePrevDateStr = getEffectivePipelineDateStr(immediatePrevRow);
-                    if (!immediatePrevDateStr) {
+
+                    // Only flag "no date" when the previous stage is genuinely still pending with
+                    // no ETA. If it's actually completed but just missing its recorded date (a
+                    // data-entry gap), don't block on that — fall through to the running-max check,
+                    // which simply skips it since it has no date to contribute.
+                    if (!immediatePrevDateStr && !immediatePrevIsDone) {
                         issues.push({
                             week, variant: r['Variant Type'] || '', currLabel: stage.label, currDate: String(currDateStr),
                             prevLabel: immediatePrevStage.label, prevDate: "doesn't have a completion date yet"

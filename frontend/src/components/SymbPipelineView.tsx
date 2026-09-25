@@ -1582,6 +1582,12 @@ const SymbPipelineView: React.FC<SymbPipelineViewProps> = ({ showBufferData = tr
         // A prior stage that's only "Auto-Completed" via backfill (no native completion of its
         // own, e.g. no plan was ever entered for it) uses the same backfill source's actual date
         // rather than its own — otherwise it would look like it "has no date" and falsely block.
+        const isEffectivelyCompleted = (r: SymbPlanRow, j: number): boolean => {
+            const rIsNativeCompleted = r["Material Covered"] === "Yes" || (r["planned Value"] > 0 && r.completed >= r["planned Value"]);
+            const rIsBackfilled = !rIsNativeCompleted && typeof maxCompletedIdx === 'number' && j < maxCompletedIdx;
+            return rIsNativeCompleted || rIsBackfilled;
+        };
+
         const effectiveDateOf = (r: SymbPlanRow, j: number): string | null => {
             const rIsNativeCompleted = r["Material Covered"] === "Yes" || (r["planned Value"] > 0 && r.completed >= r["planned Value"]);
             const rIsBackfilled = !rIsNativeCompleted && typeof maxCompletedIdx === 'number' && j < maxCompletedIdx;
@@ -1605,7 +1611,11 @@ const SymbPipelineView: React.FC<SymbPipelineViewProps> = ({ showBufferData = tr
 
             if (currDate && immediatePrev) {
                 const immediatePrevDateStr = effectiveDateOf(immediatePrev, immediatePrevIdx);
-                if (!immediatePrevDateStr) {
+                // Only flag "no date" when the previous stage is genuinely still pending with no
+                // ETA. If it's actually completed but just missing its recorded date (a data-entry
+                // gap), don't block on that — fall through to the running-max check instead, which
+                // will simply skip it since it has no date to contribute.
+                if (!immediatePrevDateStr && !isEffectivelyCompleted(immediatePrev, immediatePrevIdx)) {
                     dateSequenceIssue = {
                         prevLabel: getStageDisplayName(immediatePrev["Event Type"] || ''),
                         prevDateStr: null,
