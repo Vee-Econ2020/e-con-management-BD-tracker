@@ -380,7 +380,9 @@ async def sync_deals(db=None, trigger_type: str = "auto", triggered_by=None, run
         }
 
         if run_transform:
-            transform_result = await run_crm_transform(db, triggered_by="auto")
+            # Pass the real caller through so the resulting daily snapshot is
+            # correctly labeled "manual" (not mistaken for the 5pm auto run).
+            transform_result = await run_crm_transform(db, triggered_by=triggered_by or "auto")
             result["transform"] = transform_result
 
         return result
@@ -450,7 +452,7 @@ async def run_deleted_cleanup(db=None, trigger_type: str = "auto", triggered_by=
         result = {"status": "completed", "records_scanned": len(deleted_ids), "soft_deleted": soft_deleted_count}
 
         if run_transform:
-            transform_result = await run_crm_transform(db, triggered_by="auto")
+            transform_result = await run_crm_transform(db, triggered_by=triggered_by or "auto")
             result["transform"] = transform_result
 
         return result
@@ -491,9 +493,10 @@ def build_dataframe_from_zoho_raw(raw_docs: list[dict]) -> pd.DataFrame:
 
 async def run_crm_transform(db=None, week: int = None, upload_date: str = None, triggered_by: str = "auto") -> dict:
     """Read active (non-deleted) zoho_deals_raw documents, run them through
-    the existing transform_weekly_data() pipeline, and overwrite the
-    current week's weekly_tracker_data / orderbacklogs, same as a CSV
-    upload would."""
+    the existing transform_weekly_data() pipeline, overwrite the current
+    week's weekly_tracker_data / orderbacklogs (same as a CSV upload would),
+    and record today's numbers into weekly_tracker_daily_snapshots (see
+    snapshots.py) so they survive being overwritten later in the week."""
     own_db = db is None
     if own_db:
         db = _get_db()
@@ -545,6 +548,17 @@ async def run_crm_transform(db=None, week: int = None, upload_date: str = None, 
 
             await coll_backlog.delete_many({"week": week, "type": "weekly"})
             await coll_backlog.insert_many(backlog_records, ordered=False)
+
+        # Preserve today's numbers in the daily-snapshot history (see
+        # snapshots.py) before they can be overwritten by a later transform
+        # this same week. "auto" only ever comes from the 5pm scheduled job;
+        # anything else is a manual run (triggered_by holds the user's email).
+        import snapshots
+        snapshot_trigger = "scheduled_5pm" if triggered_by == "auto" else "manual"
+        await snapshots.save_daily_snapshot(
+            db, dataset_agg, backlog_df, week,
+            triggered_by=snapshot_trigger, source="zoho_sync",
+        )
 
         await db["crm_transform_logs"].update_one(
             {"_id": log_id},

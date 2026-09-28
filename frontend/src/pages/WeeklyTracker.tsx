@@ -950,6 +950,14 @@ export default function WeeklyTracker() {
         return `FY${fyNum}`;
     });
 
+    // Weekly Tracker daily-snapshot comparison ("compare date X to date Y")
+    type SnapshotDateEntry = { snapshot_date: string; snapshot_time: string; week: number; triggered_by: string; record_count: number };
+    const [snapshotDates, setSnapshotDates] = useState<SnapshotDateEntry[]>([]);
+    const [compareFromDate, setCompareFromDate] = useState<string>('');
+    const [compareToDate, setCompareToDate] = useState<string>('');
+    const [compareResult, setCompareResult] = useState<any>(null);
+    const [compareLoading, setCompareLoading] = useState(false);
+
     // Track which slide is being edited
     const [editingSlide, setEditingSlide] = useState<number | string | null>(null);
     const [editedTitle, setEditedTitle] = useState(""); // For custom slide title editing
@@ -2197,6 +2205,58 @@ export default function WeeklyTracker() {
         return () => { isCurrent = false; };
     }, [selectedFY]);
 
+    // Fetch available daily-snapshot dates for the compare pickers whenever FY changes.
+    useEffect(() => {
+        let isCurrent = true;
+        setCompareFromDate('');
+        setCompareToDate('');
+        setCompareResult(null);
+        fetch(`/api/admin/crm-transform/snapshot-dates?fy=${selectedFY}`)
+            .then(res => res.json())
+            .then(data => {
+                if (!isCurrent) return;
+                setSnapshotDates(data.dates || []);
+            })
+            .catch(err => {
+                if (!isCurrent) return;
+                console.error("Failed to fetch snapshot dates", err);
+                setSnapshotDates([]);
+            });
+        return () => { isCurrent = false; };
+    }, [selectedFY]);
+
+    // Default the pickers to "last Wednesday vs latest snapshot" once dates load for this FY.
+    useEffect(() => {
+        if (snapshotDates.length === 0 || compareToDate) return;
+        const fmtDDMMYYYY = (d: Date) => {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            return `${dd}-${mm}-${d.getFullYear()}`;
+        };
+        const today = new Date();
+        const lastWednesday = new Date(today);
+        lastWednesday.setDate(today.getDate() - ((today.getDay() - 3 + 7) % 7)); // Wed = day 3
+        setCompareToDate(snapshotDates[0].snapshot_date); // newest first
+        setCompareFromDate(fmtDDMMYYYY(lastWednesday));
+    }, [snapshotDates, compareToDate]);
+
+    // Recompute the KPI delta whenever the chosen dates (or FY) change.
+    useEffect(() => {
+        if (!compareFromDate || !compareToDate) return;
+        let isCurrent = true;
+        setCompareLoading(true);
+        fetch(`/api/admin/crm-transform/compare?from_date=${compareFromDate}&to_date=${compareToDate}&fy=${selectedFY}`)
+            .then(res => res.json())
+            .then(data => { if (isCurrent) setCompareResult(data); })
+            .catch(err => {
+                if (!isCurrent) return;
+                console.error("Failed to fetch snapshot comparison", err);
+                setCompareResult({ error: 'Failed to load comparison' });
+            })
+            .finally(() => { if (isCurrent) setCompareLoading(false); });
+        return () => { isCurrent = false; };
+    }, [compareFromDate, compareToDate, selectedFY]);
+
     useEffect(() => {
         // Fetch confetti slides
         fetch('/api/admin/confetti-slides')
@@ -3021,6 +3081,65 @@ export default function WeeklyTracker() {
                             </button>
                         ))}
                     </div>
+                </div>
+
+                {/* Snapshot Comparison Picker */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '1.1rem', fontWeight: '700', color: '#4b5563' }}>
+                        Compare:
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', backgroundColor: '#e2e8f0', padding: '0.4rem 0.6rem', borderRadius: '10px', flexWrap: 'wrap' }}>
+                        <select
+                            value={compareFromDate}
+                            onChange={(e) => setCompareFromDate(e.target.value)}
+                            style={{ padding: '0.5rem 0.8rem', borderRadius: '8px', border: 'none', fontWeight: '600', fontSize: '0.95rem', color: '#334155', backgroundColor: 'white', cursor: 'pointer' }}
+                        >
+                            {snapshotDates.length === 0 && <option value="">No snapshots yet</option>}
+                            {snapshotDates.map(d => (
+                                <option key={`from-${d.snapshot_date}-${d.snapshot_time}`} value={d.snapshot_date}>
+                                    {d.snapshot_date}{d.triggered_by !== 'scheduled_5pm' ? ` (${d.triggered_by})` : ''}
+                                </option>
+                            ))}
+                        </select>
+                        <span style={{ color: '#64748b', fontWeight: '700' }}>→</span>
+                        <select
+                            value={compareToDate}
+                            onChange={(e) => setCompareToDate(e.target.value)}
+                            style={{ padding: '0.5rem 0.8rem', borderRadius: '8px', border: 'none', fontWeight: '600', fontSize: '0.95rem', color: '#334155', backgroundColor: 'white', cursor: 'pointer' }}
+                        >
+                            {snapshotDates.length === 0 && <option value="">No snapshots yet</option>}
+                            {snapshotDates.map(d => (
+                                <option key={`to-${d.snapshot_date}-${d.snapshot_time}`} value={d.snapshot_date}>
+                                    {d.snapshot_date}{d.triggered_by !== 'scheduled_5pm' ? ` (${d.triggered_by})` : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {compareLoading && (
+                        <span style={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: '600' }}>Loading…</span>
+                    )}
+
+                    {!compareLoading && compareResult && compareResult.error && (
+                        <span style={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: '600' }}>{compareResult.error}</span>
+                    )}
+
+                    {!compareLoading && compareResult && !compareResult.error && (
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: '0.6rem',
+                            backgroundColor: compareResult.delta.total >= 0 ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                            border: `1px solid ${compareResult.delta.total >= 0 ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
+                            padding: '0.5rem 1rem', borderRadius: '10px',
+                        }}>
+                            <span style={{ fontSize: '0.95rem', fontWeight: '700', color: compareResult.delta.total >= 0 ? '#16a34a' : '#dc2626' }}>
+                                {compareResult.delta.total >= 0 ? '▲' : '▼'} ${Math.abs(compareResult.delta.total / 1_000_000).toFixed(2)}M
+                                {' '}({compareResult.delta.total_pct >= 0 ? '+' : ''}{compareResult.delta.total_pct.toFixed(1)}%)
+                            </span>
+                            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                ${(compareResult.from.total / 1_000_000).toFixed(2)}M ({compareResult.from.snapshot_date}) → ${(compareResult.to.total / 1_000_000).toFixed(2)}M ({compareResult.to.snapshot_date})
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 

@@ -961,7 +961,7 @@ export function CrmDataUpload() {
                     alignItems: 'center',
                     gap: '1rem',
                     marginBottom: '2.5rem',
-                    order: activeTab === 'weekly' ? 2 : 0,
+                    order: 0,
                     boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.06)'
                 }}>
                     <div style={{

@@ -554,6 +554,26 @@ async def process_upload_background(upload_id: str, contents: bytes, week: int, 
         else:
             print("  ⚠️  No backlog records to insert!")
 
+        # Preserve this file's numbers in the daily-snapshot history (see
+        # snapshots.py), dated to the CSV's own file_date (e.g. the
+        # "weekly-tracker_23-09-2026.csv" filename date) -- NOT today's
+        # date -- so a backdated manual upload lands as that day's
+        # snapshot rather than masquerading as today's.
+        if type == "weekly":
+            import snapshots
+            try:
+                from zoneinfo import ZoneInfo
+                snapshot_dt = datetime.strptime(file_date, "%d-%m-%Y").replace(
+                    hour=17, minute=0, tzinfo=ZoneInfo("Asia/Kolkata")
+                )
+                await snapshots.save_daily_snapshot(
+                    _db, dataset_agg, backlog_df, week,
+                    triggered_by="csv_upload", source="csv_upload",
+                    transformed_at=snapshot_dt,
+                )
+            except Exception as snap_err:
+                print(f"  ⚠️ Failed to save daily snapshot: {snap_err}")
+
         # STEP 12: Automated Services Trend Pipeline / SYMB Tracker Pipeline
         if type == "weekly":
             progress_update(upload_id, 12, 13, "Services Trend", "Executing automated Services Trend pipeline (Zoho API & Snapshots)...", "processing")
@@ -1238,6 +1258,35 @@ async def get_crm_sync_log_detail(log_id: str):
         return _serialize_log(doc)
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/crm-transform/snapshot-dates")
+async def get_snapshot_dates(fy: Optional[str] = None):
+    """Available daily-snapshot dates (newest first), one per calendar day,
+    for the Weekly Tracker's 'compare from / to date' pickers."""
+    import snapshots
+    try:
+        coll = get_collection("weekly_tracker_daily_snapshots")
+        db = coll.database
+        results = await snapshots.list_snapshot_dates(db, fy=fy)
+        for r in results:
+            r["_id"] = str(r["_id"])
+        return {"dates": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/crm-transform/compare")
+async def compare_snapshots(from_date: str, to_date: str, fy: str = "FY2027"):
+    """KPI delta (Total PO Won / Pipeline) between the daily snapshots
+    nearest to from_date and to_date (both DD-MM-YYYY)."""
+    import snapshots
+    try:
+        coll = get_collection("weekly_tracker_daily_snapshots")
+        db = coll.database
+        return await snapshots.compute_comparison(db, from_date, to_date, fy)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

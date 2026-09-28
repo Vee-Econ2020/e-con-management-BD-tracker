@@ -62,9 +62,13 @@ crm_scheduler = AsyncIOScheduler(timezone=IST)
 
 
 async def _run_scheduled_delta_sync():
+    """3x/day (6am/12pm/6pm IST): pull changed Deals into zoho_deals_raw
+    only. Does NOT transform -- that now happens once/day, see
+    _run_scheduled_transform, so a mid-week value is never silently
+    overwritten by a later same-week sync."""
     import crm_sync
     try:
-        result = await crm_sync.sync_deals(trigger_type="auto", triggered_by=None)
+        result = await crm_sync.sync_deals(trigger_type="auto", triggered_by=None, run_transform=False)
         print(f"[CRM Sync] Scheduled delta sync completed: {result}")
     except Exception as e:
         print(f"[CRM Sync] Scheduled delta sync failed: {e}")
@@ -73,10 +77,23 @@ async def _run_scheduled_delta_sync():
 async def _run_scheduled_deleted_cleanup():
     import crm_sync
     try:
-        result = await crm_sync.run_deleted_cleanup(trigger_type="auto", triggered_by=None)
+        result = await crm_sync.run_deleted_cleanup(trigger_type="auto", triggered_by=None, run_transform=False)
         print(f"[CRM Sync] Scheduled deleted-deal cleanup completed: {result}")
     except Exception as e:
         print(f"[CRM Sync] Scheduled deleted-deal cleanup failed: {e}")
+
+
+async def _run_scheduled_transform():
+    """Once/day at 5pm IST: transform whatever zoho_deals_raw holds right
+    now into weekly_tracker_data/orderbacklogs, and record today's numbers
+    as a daily snapshot (see snapshots.py) before tomorrow's transform can
+    overwrite them."""
+    import crm_sync
+    try:
+        result = await crm_sync.run_crm_transform(triggered_by="auto")
+        print(f"[CRM Transform] Scheduled 5pm transform completed: {result}")
+    except Exception as e:
+        print(f"[CRM Transform] Scheduled 5pm transform failed: {e}")
 
 
 @app.on_event("startup")
@@ -104,8 +121,9 @@ async def startup_db_client():
     crm_scheduler.add_job(_run_scheduled_delta_sync, CronTrigger(hour=12, minute=0, timezone=IST), id="crm_delta_sync_12pm", replace_existing=True)
     crm_scheduler.add_job(_run_scheduled_delta_sync, CronTrigger(hour=18, minute=0, timezone=IST), id="crm_delta_sync_6pm", replace_existing=True)
     crm_scheduler.add_job(_run_scheduled_deleted_cleanup, CronTrigger(day_of_week="sat", hour=0, minute=0, timezone=IST), id="crm_deleted_cleanup_sat", replace_existing=True)
+    crm_scheduler.add_job(_run_scheduled_transform, CronTrigger(hour=17, minute=0, timezone=IST), id="crm_daily_transform_5pm", replace_existing=True)
     crm_scheduler.start()
-    print("CRM sync scheduler started (6AM/12PM/6PM IST delta sync, Saturday 00:00 IST cleanup)")
+    print("CRM sync scheduler started (6AM/12PM/6PM IST raw sync only, 5PM IST daily transform + snapshot, Saturday 00:00 IST cleanup)")
 
 
 @app.on_event("shutdown")

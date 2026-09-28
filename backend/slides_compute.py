@@ -1152,40 +1152,43 @@ async def compute_slide2_data(db: AsyncIOMotorDatabase, fy: str = "FY2027") -> D
     print("COMPUTING SLIDE 2 DATA")
     print("=" * 70)
     
-    # Step 1: Get current/closest week data
-    print("\n[1/3] Fetching current week data...")
-    current_data = await get_current_or_closest_week_data(db)
-    
-    if current_data is None or current_data.empty:
-        print("✗ No current week data available")
+    # Step 1: Get current (latest daily snapshot) and previous (nearest to
+    # last Wednesday) data -- see snapshots.py / ZCRM-live-PRJ. This matches
+    # the "Compare" picker's default on the Weekly Tracker page so the
+    # presentation KPI tiles agree with it, rather than comparing by raw
+    # week number (which a same-week transform used to silently overwrite).
+    import snapshots as _snapshots
+
+    print("\n[1/3] Fetching latest snapshot (current)...")
+    latest_snap = await _snapshots.get_latest_snapshot(db, fy=fy)
+
+    if latest_snap is None:
+        print("✗ No snapshot data available")
         return {"error": "No data available"}
 
+    current_data = pd.DataFrame(latest_snap.get("data", []))
     if 'closing date Fy' in current_data.columns:
         current_data = current_data[current_data['closing date Fy'] == fy].copy()
-    
-    # Extract current week number
-    current_week = None
-    try:
-        if 'week' in current_data.columns and len(current_data) > 0:
-            current_week = int(current_data['week'].iloc[0])
-            print(f"  → Current week: {current_week}")
-    except Exception as e:
-        print(f"  ✗ Could not extract week number: {e}")
-        return {"error": "Could not determine week number"}
-    
-    # Step 2: Get previous week data
-    print("\n[2/3] Fetching previous week data...")
-    previous_data = await get_previous_week_data(db, current_week)
-    
-    if previous_data is not None and not previous_data.empty and 'closing date Fy' in previous_data.columns:
-        previous_data = previous_data[previous_data['closing date Fy'] == fy].copy()
 
-    if previous_data is None or previous_data.empty:
-        # Fallback: if no previous week data for fy, use current_data as previous_data
+    current_week = latest_snap.get("week")
+    print(f"  → Current snapshot: {latest_snap.get('snapshot_date')} (week {current_week})")
+
+    # Step 2: Get previous (nearest snapshot on/before last Wednesday) data
+    print("\n[2/3] Fetching last-Wednesday snapshot (previous)...")
+    previous_snap = await _snapshots.get_snapshot_on_or_before(db, _snapshots.last_wednesday_date_str())
+
+    if previous_snap is not None and previous_snap.get("snapshot_date") != latest_snap.get("snapshot_date"):
+        previous_data = pd.DataFrame(previous_snap.get("data", []))
+        if 'closing date Fy' in previous_data.columns:
+            previous_data = previous_data[previous_data['closing date Fy'] == fy].copy()
+        previous_week = previous_snap.get("week")
+        print(f"  → Previous snapshot: {previous_snap.get('snapshot_date')} (week {previous_week})")
+    else:
+        # No distinct earlier snapshot yet -- fall back to comparing against itself.
         previous_data = current_data.copy()
-    
-    previous_week = int(previous_data['week'].iloc[0]) if 'week' in previous_data.columns and not previous_data.empty else current_week
-    
+        previous_week = current_week
+        print("  → No distinct earlier snapshot yet; comparing current against itself")
+
     # Step 3: Get target settings
     print("\n[3/3] Fetching target settings and computing metrics...")
     targets = await get_target_settings(db, fy=fy)
