@@ -516,6 +516,34 @@ def compute_granular_QTR(row):
     return row.get('closing date QTR')
 
 
+async def compute_actual_won_qtr_column(dataset, db):
+    """For FY2028 Closed Won deals, replaces the placeholder-Closing-Date-based
+    quarter bucket with the date the deal was ACTUALLY marked 100% won, per
+    Zoho's Stage History (see closed_won_history.py). Every other row keeps
+    its existing granular_QTR value unchanged."""
+    import closed_won_history
+
+    mask = (dataset['closing date Fy'] == 'FY2028') & (dataset['Probability (%)'] == 100)
+    candidates = dataset.loc[mask, ['Record Id', 'Closing Date']].copy()
+    candidates['raw_id'] = candidates['Record Id'].apply(normalize_record_id)
+    candidates = candidates.dropna(subset=['raw_id']).drop_duplicates(subset=['raw_id'])
+
+    record_id_to_fallback_date = dict(zip(candidates['raw_id'], candidates['Closing Date']))
+    win_date_map = await closed_won_history.sync_new_actual_win_dates(
+        db, record_id_to_fallback_date, get_access_token
+    )
+
+    def resolve(row):
+        if mask.get(row.name, False):
+            raw_id = normalize_record_id(row['Record Id'])
+            actual_date = win_date_map.get(raw_id)
+            if actual_date is not None:
+                return closed_won_history.get_quarter_bucket_for_fy2028(actual_date)
+        return row['granular_QTR']
+
+    return dataset.apply(resolve, axis=1)
+
+
 def fill_audited_date(row):
     """
     Fill audited_date based on hierarchical priority.
@@ -634,7 +662,9 @@ async def transform_weekly_data(df, week, upload_date, db):
     dataset['n-Stage'] = dataset.apply(categorize_stage, axis=1)
     print("  → Computing granular quarters...")
     dataset['granular_QTR'] = dataset.apply(compute_granular_QTR, axis=1)
-    
+    print("  → Resolving actual Closed Won dates for FY2028 (Stage History)...")
+    dataset['actual_won_QTR'] = await compute_actual_won_qtr_column(dataset, db)
+
     current_date = datetime.now()
     current_fy, _ = assign_fy_and_qtr_corrected_vectorized(current_date)
     print(f"  ✓ All transformations applied (Current FY: {current_fy})")
@@ -667,7 +697,7 @@ async def transform_weekly_data(df, week, upload_date, db):
            'OPP_Type', 'n-Stage', 'Weighted Amount', 'Amount - unInvoiced',
            'Amount - Invoiced', 'Amount - Negotiation', 'Amount - Quotation',
            'Amount - Others', 'projection', 'projection - category',
-           'granular_QTR']]
+           'granular_QTR', 'actual_won_QTR']]
     print(f"  ✓ Filtered to {len(dataset_filtered.columns)} columns")
     
     # STEP 7.5: Map Region from Region_mapping_table
@@ -716,7 +746,7 @@ async def transform_weekly_data(df, week, upload_date, db):
     dataset_target_fys = dataset_filtered[dataset_filtered['closing date Fy'].isin(['FY2027', 'FY2028'])]
     print(f"  → Target FY records: {len(dataset_target_fys)}")
     print("  → Grouping by: FY, Quarters, Category, mRegion (mapped region), OPP_Type...")
-    dataset_agg = dataset_target_fys.groupby(['closing date Fy', 'granular_QTR', 'closing date QTR', 'projection - category', 'mRegion', 'OPP_Type']).agg({'Weighted Amount': 'sum', 'Amount': 'sum'}).reset_index()
+    dataset_agg = dataset_target_fys.groupby(['closing date Fy', 'granular_QTR', 'closing date QTR', 'actual_won_QTR', 'projection - category', 'mRegion', 'OPP_Type']).agg({'Weighted Amount': 'sum', 'Amount': 'sum'}).reset_index()
     print(f"  ✓ Aggregated to {len(dataset_agg)} distinct groups")
     
     # STEP 9: Add Metadata

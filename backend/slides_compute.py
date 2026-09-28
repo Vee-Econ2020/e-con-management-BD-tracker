@@ -405,8 +405,15 @@ async def _compute_cumulative_generic(
     else:
         week_number = int(dataset_agg['week'].iloc[0])
         print(f"✓ Using data from Week {week_number}")
-        dataset_agg['granular_QTR'] = dataset_agg['granular_QTR'].fillna('Unknown')
-        summary = dataset_agg.groupby(['granular_QTR', 'projection - category'])['Weighted Amount'].sum().unstack(fill_value=0)
+        # FY2028's chart buckets Closed Won deals by the date they were ACTUALLY
+        # marked won (from Zoho Stage History, see closed_won_history.py), not by
+        # the placeholder Closing Date the BD team sets for FY-accounting purposes
+        # (e.g. every FY2028 deal is closing-dated 01-04-2027 regardless of when
+        # it was really won). 'actual_won_QTR' carries that resolved bucket;
+        # everything else still uses the Closing-Date-derived 'granular_QTR'.
+        qtr_group_col = 'actual_won_QTR' if fy == 'FY2028' else 'granular_QTR'
+        dataset_agg[qtr_group_col] = dataset_agg[qtr_group_col].fillna('Unknown')
+        summary = dataset_agg.groupby([qtr_group_col, 'projection - category'])['Weighted Amount'].sum().unstack(fill_value=0)
 
     # 5. Calculate cumulative sums
     print("\\n[4/4] Applying cumulative logic...")
