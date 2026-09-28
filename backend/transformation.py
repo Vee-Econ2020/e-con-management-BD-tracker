@@ -579,6 +579,10 @@ async def transform_weekly_data(df, week, upload_date, db):
     dataset["Order  Date"] = pd.to_datetime(dataset["Order  Date"], errors='coerce', format='%b %d, %Y')
     dataset = dataset[dataset["Closing Date"] >= "2025-04-01"]
     dataset = dataset[dataset["Stage"] != "Closed Lost"]
+    # Exclude dummy/test deals -- matches the "Region (Reports) isn't TEST"
+    # filter used in the CRM's own reporting views.
+    if 'econ-Region' in dataset.columns:
+        dataset = dataset[dataset['econ-Region'] != 'TEST']
     today = pd.to_datetime(datetime.today().strftime('%Y-%m-%d'))
     print(f"  ✓ After filtering: {len(dataset)} records (removed {len(df) - len(dataset)} records)")
     
@@ -619,6 +623,13 @@ async def transform_weekly_data(df, week, upload_date, db):
     dataset['nRegion'] = dataset['econ-Region'].apply(categorize_region_vectorized)
     print("  → Categorizing opportunity types...")
     dataset['OPP_Type'] = dataset['OPP Category'].apply(categorize_opp_category)
+    # Exclude deals with a blank/unrecognized OPP Category -- matches the
+    # CRM's "Reports-OPP-Category is one of [...]" filter, which only
+    # includes the named category groups (Existing/New Business, Service,
+    # Samples, Free Sample), not uncategorized records.
+    before_count = len(dataset)
+    dataset = dataset[dataset['OPP_Type'] != 'Others']
+    print(f"  → Dropped {before_count - len(dataset)} uncategorized (OPP_Type='Others') records")
     print("  → Categorizing stages...")
     dataset['n-Stage'] = dataset.apply(categorize_stage, axis=1)
     print("  → Computing granular quarters...")
