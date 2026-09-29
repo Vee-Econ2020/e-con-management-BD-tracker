@@ -2386,14 +2386,20 @@ export default function SymbTrackerUpdate() {
                                 .filter(r => (r.event_type === normEvt || (normEvt === 'PCBA Ready' && r.event_type === 'PCBA covered')) && isSameV(r.variant, rec.variant))
                                 .reduce((sum, r) => sum + (r.planned_qty || 0), 0);
 
+                            // Available inventory = previous stage's completed qty, matching the summary
+                            // cards: EBOM covered seeds PCBA Ready and 100% CTB bridges into Materials Issued
+                            // (both from the plan pipeline), never this stage's own planned qty.
+                            const rowIsV1 = isVariant1(rec.variant);
+                            const rowIsV2 = isVariant2(rec.variant);
                             if (stageIdx === 0) {
-                                rowStageTarget = currPlannedSum;
+                                rowStageTarget = rowIsV1 ? pipelineChainSeeds.ebomV1 : rowIsV2 ? pipelineChainSeeds.ebomV2 : currPlannedSum;
+                            } else if (normEvt === 'Materials Issued') {
+                                rowStageTarget = rowIsV1 ? pipelineChainSeeds.ctbV1 : rowIsV2 ? pipelineChainSeeds.ctbV2 : currPlannedSum;
                             } else if (stageIdx > 0) {
                                 const prevEvt = seqStages[stageIdx - 1];
-                                const prevCompletedSum = records
+                                rowStageTarget = records
                                     .filter(r => (r.event_type === prevEvt || (prevEvt === 'PCBA Ready' && r.event_type === 'PCBA covered')) && isSameV(r.variant, rec.variant))
                                     .reduce((sum, r) => sum + (r.completed || 0), 0);
-                                rowStageTarget = prevCompletedSum > 0 ? prevCompletedSum : currPlannedSum;
                             }
 
                             const otherCompletedSum = records

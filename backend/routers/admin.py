@@ -3754,8 +3754,33 @@ async def get_stage_target_qty(variant: str, event_type: str) -> int:
             if is_same_v(r.get("variant"), variant) and (r.get("event_type") == norm_evt or (norm_evt == "PCBA Ready" and r.get("event_type") == "PCBA covered"))
         )
 
+        # EBOM covered (before PCBA Ready) and 100% CTB / "All Material Available"
+        # (before Materials Issued) are tracked in the plan pipeline, not in this
+        # collection. Their completed qty is the available inventory for the stage
+        # that follows them, matching the summary cards in the Symb tracker UI.
+        async def pipeline_seed(pipeline_event: str) -> Optional[int]:
+            vs = str(variant or "").strip().lower()
+            if vs in ["1", "1.0", "v1", "variant 1"]:
+                variant_type = "Variant 1"
+            elif vs in ["2", "2.0", "v2", "variant 2"]:
+                variant_type = "Variant 2"
+            else:
+                return None
+            plan_docs = await get_collection("symb_plan_transformed").find(
+                {"Event Type": pipeline_event, "Variant Type": variant_type}
+            ).to_list(100000)
+            return int(sum(d.get("completed") or 0 for d in plan_docs))
+
         if idx == 0:
+            seed = await pipeline_seed("EBOM covered")
+            if seed is not None:
+                return seed
             return curr_planned if curr_planned > 0 else 999999999
+
+        if norm_evt == "Materials Issued":
+            seed = await pipeline_seed("All Material Available")
+            if seed is not None:
+                return seed
 
         prev_evt = seq_stages[idx - 1]
         prev_completed = sum(
@@ -3763,8 +3788,7 @@ async def get_stage_target_qty(variant: str, event_type: str) -> int:
             if is_same_v(r.get("variant"), variant) and (r.get("event_type") == prev_evt or (prev_evt == "PCBA Ready" and r.get("event_type") == "PCBA covered"))
         )
 
-        target = prev_completed if prev_completed > 0 else curr_planned
-        return target if target > 0 else 0
+        return prev_completed
     except Exception as e:
         print(f"Error computing stage target: {e}")
         return 999999999
