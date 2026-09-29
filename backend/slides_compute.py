@@ -1405,13 +1405,16 @@ async def compute_slide6_data(db: AsyncIOMotorDatabase, fy: str = "FY2027"):
     }
 
     # 3. Get current quarter (FY2027 quarters: QP2, QP3, QP4, Q1, Q2, Q3, Q4)
-    # FY2027 starts in April 2026 (approximately)
-    # Week 1-13: QP4, 14-26: Q1, 27-39: Q2, 40-52: Q3 (approximate for FY2027)
-    if target_week <= 13:
+    # Fiscal year runs April-March, so the quarter is derived from the calendar
+    # month (same rule as assign_fy_and_qtr_corrected_vectorized). ISO week
+    # boundaries are NOT used: ISO week 40 starts on 28-Sep, which is still Q2.
+    # Jan-Mar: QP4, Apr-Jun: Q1, Jul-Sep: Q2, Oct-Dec: Q3
+    today_month = datetime.now().month
+    if today_month <= 3:
         current_qtr = "QP4"
-    elif target_week <= 26:
+    elif today_month <= 6:
         current_qtr = "Q1"
-    elif target_week <= 39:
+    elif today_month <= 9:
         current_qtr = "Q2"
     else:
         current_qtr = "Q3"

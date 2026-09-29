@@ -3123,23 +3123,6 @@ export default function WeeklyTracker() {
                     {!compareLoading && compareResult && compareResult.error && (
                         <span style={{ fontSize: '0.9rem', color: '#94a3b8', fontWeight: '600' }}>{compareResult.error}</span>
                     )}
-
-                    {!compareLoading && compareResult && !compareResult.error && (
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: '0.6rem',
-                            backgroundColor: compareResult.delta.total >= 0 ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-                            border: `1px solid ${compareResult.delta.total >= 0 ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`,
-                            padding: '0.5rem 1rem', borderRadius: '10px',
-                        }}>
-                            <span style={{ fontSize: '0.95rem', fontWeight: '700', color: compareResult.delta.total >= 0 ? '#16a34a' : '#dc2626' }}>
-                                {compareResult.delta.total >= 0 ? '▲' : '▼'} ${Math.abs(compareResult.delta.total / 1_000_000).toFixed(2)}M
-                                {' '}({compareResult.delta.total_pct >= 0 ? '+' : ''}{compareResult.delta.total_pct.toFixed(1)}%)
-                            </span>
-                            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                ${(compareResult.from.total / 1_000_000).toFixed(2)}M ({compareResult.from.snapshot_date}) → ${(compareResult.to.total / 1_000_000).toFixed(2)}M ({compareResult.to.snapshot_date})
-                            </span>
-                        </div>
-                    )}
                 </div>
             </div>
 
